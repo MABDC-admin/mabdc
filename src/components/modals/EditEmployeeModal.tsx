@@ -1,0 +1,347 @@
+import { useState, useEffect } from 'react';
+import { useUpdateEmployee } from '@/hooks/useEmployees';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import type { Employee } from '@/types/hr';
+
+interface EditEmployeeModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  employee: Employee;
+}
+
+export function EditEmployeeModal({ isOpen, onClose, employee }: EditEmployeeModalProps) {
+  const updateEmployee = useUpdateEmployee();
+  const [formData, setFormData] = useState({
+    hrms_no: '',
+    full_name: '',
+    job_position: '',
+    department: '',
+    joining_date: '',
+    manager: '',
+    work_email: '',
+    work_phone: '',
+    nationality: '',
+    basic_salary: '',
+    allowance: '',
+    leave_balance: '',
+    status: 'Active' as 'Active' | 'On Leave' | 'Terminated',
+    contract_type: 'Unlimited',
+    visa_no: '',
+    visa_expiration: '',
+    emirates_id: '',
+    emirates_id_expiry: '',
+    passport_no: '',
+    passport_expiry: '',
+  });
+
+  useEffect(() => {
+    if (employee) {
+      setFormData({
+        hrms_no: employee.hrms_no || '',
+        full_name: employee.full_name || '',
+        job_position: employee.job_position || '',
+        department: employee.department || '',
+        joining_date: employee.joining_date || '',
+        manager: employee.manager || '',
+        work_email: employee.work_email || '',
+        work_phone: employee.work_phone || '',
+        nationality: employee.nationality || '',
+        basic_salary: employee.basic_salary?.toString() || '',
+        allowance: employee.allowance?.toString() || '',
+        leave_balance: employee.leave_balance?.toString() || '30',
+        status: (employee.status as 'Active' | 'On Leave' | 'Terminated') || 'Active',
+        contract_type: employee.contract_type || 'Unlimited',
+        visa_no: employee.visa_no || '',
+        visa_expiration: employee.visa_expiration || '',
+        emirates_id: employee.emirates_id || '',
+        emirates_id_expiry: employee.emirates_id_expiry || '',
+        passport_no: employee.passport_no || '',
+        passport_expiry: employee.passport_expiry || '',
+      });
+    }
+  }, [employee]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    updateEmployee.mutate({
+      id: employee.id,
+      hrms_no: formData.hrms_no,
+      full_name: formData.full_name,
+      job_position: formData.job_position,
+      department: formData.department,
+      joining_date: formData.joining_date,
+      manager: formData.manager || undefined,
+      work_email: formData.work_email,
+      work_phone: formData.work_phone,
+      nationality: formData.nationality || undefined,
+      basic_salary: parseFloat(formData.basic_salary) || undefined,
+      allowance: parseFloat(formData.allowance) || undefined,
+      leave_balance: parseInt(formData.leave_balance) || 30,
+      status: formData.status,
+      contract_type: formData.contract_type,
+      visa_no: formData.visa_no || undefined,
+      visa_expiration: formData.visa_expiration || undefined,
+      emirates_id: formData.emirates_id || undefined,
+      emirates_id_expiry: formData.emirates_id_expiry || undefined,
+      passport_no: formData.passport_no || undefined,
+      passport_expiry: formData.passport_expiry || undefined,
+    }, {
+      onSuccess: () => {
+        onClose();
+      }
+    });
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto glass-card border-border soft-scroll">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-semibold text-foreground">Edit Employee</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">HRMS No *</Label>
+              <Input
+                required
+                value={formData.hrms_no}
+                onChange={(e) => setFormData({ ...formData, hrms_no: e.target.value })}
+                className="bg-secondary/50 border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Full Name *</Label>
+              <Input
+                required
+                value={formData.full_name}
+                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                className="bg-secondary/50 border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Job Position *</Label>
+              <Input
+                required
+                value={formData.job_position}
+                onChange={(e) => setFormData({ ...formData, job_position: e.target.value })}
+                className="bg-secondary/50 border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Department *</Label>
+              <Input
+                required
+                value={formData.department}
+                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                className="bg-secondary/50 border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Joining Date *</Label>
+              <Input
+                type="date"
+                required
+                value={formData.joining_date}
+                onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })}
+                className="bg-secondary/50 border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Manager</Label>
+              <Input
+                value={formData.manager}
+                onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
+                className="bg-secondary/50 border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Work Email *</Label>
+              <Input
+                type="email"
+                required
+                value={formData.work_email}
+                onChange={(e) => setFormData({ ...formData, work_email: e.target.value })}
+                className="bg-secondary/50 border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Work Phone *</Label>
+              <Input
+                required
+                value={formData.work_phone}
+                onChange={(e) => setFormData({ ...formData, work_phone: e.target.value })}
+                className="bg-secondary/50 border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Nationality</Label>
+              <Input
+                value={formData.nationality}
+                onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
+                className="bg-secondary/50 border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value: 'Active' | 'On Leave' | 'Terminated') => setFormData({ ...formData, status: value })}
+              >
+                <SelectTrigger className="bg-secondary/50 border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="On Leave">On Leave</SelectItem>
+                  <SelectItem value="Terminated">Terminated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Contract Type</Label>
+              <Select
+                value={formData.contract_type}
+                onValueChange={(value) => setFormData({ ...formData, contract_type: value })}
+              >
+                <SelectTrigger className="bg-secondary/50 border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Unlimited">Unlimited</SelectItem>
+                  <SelectItem value="Limited">Limited</SelectItem>
+                  <SelectItem value="Part-time">Part-time</SelectItem>
+                  <SelectItem value="Temporary">Temporary</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-border">
+            <h3 className="text-sm font-semibold text-foreground mb-3">Salary & Benefits</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Basic Salary (AED)</Label>
+                <Input
+                  type="number"
+                  value={formData.basic_salary}
+                  onChange={(e) => setFormData({ ...formData, basic_salary: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Allowance (AED)</Label>
+                <Input
+                  type="number"
+                  value={formData.allowance}
+                  onChange={(e) => setFormData({ ...formData, allowance: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Leave Balance (Days)</Label>
+                <Input
+                  type="number"
+                  value={formData.leave_balance}
+                  onChange={(e) => setFormData({ ...formData, leave_balance: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-border">
+            <h3 className="text-sm font-semibold text-foreground mb-3">Visa & ID</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Visa No</Label>
+                <Input
+                  value={formData.visa_no}
+                  onChange={(e) => setFormData({ ...formData, visa_no: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Visa Expiration</Label>
+                <Input
+                  type="date"
+                  value={formData.visa_expiration}
+                  onChange={(e) => setFormData({ ...formData, visa_expiration: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Emirates ID</Label>
+                <Input
+                  value={formData.emirates_id}
+                  onChange={(e) => setFormData({ ...formData, emirates_id: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Emirates ID Expiry</Label>
+                <Input
+                  type="date"
+                  value={formData.emirates_id_expiry}
+                  onChange={(e) => setFormData({ ...formData, emirates_id_expiry: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Passport No</Label>
+                <Input
+                  value={formData.passport_no}
+                  onChange={(e) => setFormData({ ...formData, passport_no: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Passport Expiry</Label>
+                <Input
+                  type="date"
+                  value={formData.passport_expiry}
+                  onChange={(e) => setFormData({ ...formData, passport_expiry: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-4 border-t border-border">
+            <Button 
+              type="submit" 
+              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
+              disabled={updateEmployee.isPending}
+            >
+              {updateEmployee.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose}
+              className="bg-secondary hover:bg-secondary/80 text-secondary-foreground border-border"
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
