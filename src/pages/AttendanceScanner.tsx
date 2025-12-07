@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 type ScanMode = 'check-in' | 'check-out';
 type ScannerState = 'standby' | 'scanning' | 'result';
@@ -72,6 +73,41 @@ export default function AttendanceScanner() {
     }, 10000);
   }, []);
 
+  const sendLateNotification = async (employeeData: {
+    employeeName: string;
+    employeeId: string;
+    hrmsNo: string;
+    department: string;
+    jobPosition: string;
+    checkInTime: string;
+    photoUrl?: string | null;
+  }) => {
+    try {
+      // Calculate minutes late (work starts at 8:00 AM)
+      const [hours, minutes] = employeeData.checkInTime.split(':').map(Number);
+      const checkInMinutes = hours * 60 + minutes;
+      const scheduledMinutes = 8 * 60; // 8:00 AM
+      const minutesLate = checkInMinutes - scheduledMinutes;
+
+      await supabase.functions.invoke('send-late-notification', {
+        body: {
+          employeeName: employeeData.employeeName,
+          employeeId: employeeData.employeeId,
+          hrmsNo: employeeData.hrmsNo,
+          department: employeeData.department,
+          jobPosition: employeeData.jobPosition,
+          checkInTime: employeeData.checkInTime,
+          scheduledTime: '08:00 AM',
+          minutesLate: minutesLate,
+          photoUrl: employeeData.photoUrl,
+        },
+      });
+      console.log('Late notification sent successfully');
+    } catch (error) {
+      console.error('Failed to send late notification:', error);
+    }
+  };
+
   const handleScan = async (result: string) => {
     if (!result || scannerState !== 'scanning') return;
     
@@ -95,6 +131,19 @@ export default function AttendanceScanner() {
           checkInTime: data.checkInTime,
           mode: 'check-in',
         });
+
+        // Send late notification if employee is late
+        if (data.status === 'Late') {
+          sendLateNotification({
+            employeeName: data.employeeName,
+            employeeId: data.employeeId,
+            hrmsNo: result,
+            department: data.department || '',
+            jobPosition: data.jobPosition || '',
+            checkInTime: data.checkInTime,
+            photoUrl: data.employeePhoto,
+          });
+        }
       } else {
         const data = await checkOut.mutateAsync(result);
         setScannedEmployee({
