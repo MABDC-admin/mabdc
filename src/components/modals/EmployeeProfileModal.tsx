@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import emiratesIdCard from '@/assets/emirates-id-card.png';
+import uaeVisa from '@/assets/uae-visa.png';
 import { Pencil, Trash2, FileText, Upload, Download, X, Camera, Calendar, Bell, AlertTriangle } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { toast } from 'sonner';
@@ -567,33 +568,122 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
             {activeTab === 'documents' && (
               <div className="space-y-6 animate-fade-in">
                 <div className="glass-card rounded-2xl border border-border p-5">
-                  {/* Animated Emirates ID at top center */}
-                  <div className="flex justify-center mb-6">
-                    <img 
-                      src={emiratesIdCard} 
-                      alt="Emirates ID" 
-                      className="w-32 h-auto animate-float drop-shadow-lg"
-                    />
+                  <h3 className="text-lg font-semibold text-foreground mb-6 text-center">EMPLOYEE DOCUMENTS</h3>
+                  
+                  {/* Animated Visa & Emirates ID Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    {/* Emirates ID Card */}
+                    <div className="relative group">
+                      <input
+                        type="file"
+                        id="eid-upload"
+                        accept="image/*,.pdf"
+                        onChange={(e) => handleFileUpload(e, 'Emirates ID')}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="eid-upload"
+                        className="block cursor-pointer"
+                      >
+                        <div className="relative p-6 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-primary/5 to-accent/5 hover:border-primary/50 transition-all duration-300 hover:shadow-lg">
+                          <div className="flex flex-col items-center">
+                            {documents.find(d => d.category === 'Emirates ID') ? (
+                              <>
+                                <div className="relative mb-3">
+                                  <img 
+                                    src={documents.find(d => d.category === 'Emirates ID')?.file_url || emiratesIdCard} 
+                                    alt="Emirates ID" 
+                                    className="w-36 h-auto rounded-lg shadow-md animate-float"
+                                  />
+                                  <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                                    <Pencil className="w-3 h-3 text-primary-foreground" />
+                                  </div>
+                                </div>
+                                <p className="text-sm font-medium text-foreground">Emirates ID</p>
+                                <p className="text-xs text-primary">Click to change</p>
+                              </>
+                            ) : (
+                              <>
+                                <img 
+                                  src={emiratesIdCard} 
+                                  alt="Emirates ID placeholder" 
+                                  className="w-36 h-auto mb-3 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
+                                />
+                                <p className="text-sm font-medium text-foreground">Emirates ID</p>
+                                <p className="text-xs text-muted-foreground">Click to upload</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Visa Card */}
+                    <div className="relative group">
+                      <input
+                        type="file"
+                        id="visa-upload"
+                        accept="image/*,.pdf"
+                        onChange={(e) => handleFileUpload(e, 'Visa')}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="visa-upload"
+                        className="block cursor-pointer"
+                      >
+                        <div className="relative p-6 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-accent/5 to-primary/5 hover:border-accent/50 transition-all duration-300 hover:shadow-lg">
+                          <div className="flex flex-col items-center">
+                            {documents.find(d => d.category === 'Visa') ? (
+                              <>
+                                <div className="relative mb-3">
+                                  <img 
+                                    src={documents.find(d => d.category === 'Visa')?.file_url || uaeVisa} 
+                                    alt="UAE Visa" 
+                                    className="w-36 h-auto rounded-lg shadow-md animate-float"
+                                    style={{ animationDelay: '0.5s' }}
+                                  />
+                                  <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-accent flex items-center justify-center">
+                                    <Pencil className="w-3 h-3 text-accent-foreground" />
+                                  </div>
+                                </div>
+                                <p className="text-sm font-medium text-foreground">UAE Visa</p>
+                                <p className="text-xs text-accent">Click to change</p>
+                              </>
+                            ) : (
+                              <>
+                                <img 
+                                  src={uaeVisa} 
+                                  alt="UAE Visa placeholder" 
+                                  className="w-36 h-auto mb-3 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
+                                  style={{ animationDelay: '0.5s' }}
+                                />
+                                <p className="text-sm font-medium text-foreground">UAE Visa</p>
+                                <p className="text-xs text-muted-foreground">Click to upload</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                    </div>
                   </div>
                   
-                  <h3 className="text-lg font-semibold text-foreground mb-4 text-center">EMPLOYEE DOCUMENTS</h3>
-                  
+                  {/* Other Documents Upload */}
                   <div 
-                    className="file-drop-area p-8 text-center mb-6 border-2 border-dashed border-border rounded-xl hover:border-primary/50 transition-colors cursor-pointer"
+                    className="file-drop-area p-6 text-center mb-6 border-2 border-dashed border-border rounded-xl hover:border-primary/50 transition-colors cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <div className="mb-4">
-                      <Upload className="w-12 h-12 mx-auto text-muted-foreground" />
+                    <div className="mb-3">
+                      <Upload className="w-10 h-10 mx-auto text-muted-foreground" />
                     </div>
-                    <p className="text-lg font-semibold text-foreground mb-2">Drag & drop files here</p>
-                    <p className="text-sm text-muted-foreground mb-4">or click to browse</p>
+                    <p className="text-base font-semibold text-foreground mb-1">Other Documents</p>
+                    <p className="text-sm text-muted-foreground mb-2">Drag & drop or click to browse</p>
                     <p className="text-xs text-muted-foreground">Supported: JPG, PNG, PDF, XLSX, DOC, DOCX (Max 10MB)</p>
                     <input
                       ref={fileInputRef}
                       type="file"
                       multiple
                       accept=".jpg,.jpeg,.png,.pdf,.xlsx,.xls,.doc,.docx"
-                      onChange={(e) => handleFileUpload(e)}
+                      onChange={(e) => handleFileUpload(e, 'Other')}
                       className="hidden"
                     />
                   </div>
