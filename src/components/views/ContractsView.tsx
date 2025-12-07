@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { useContracts, useUpdateContractStatus, useAddContract, useRenewContract, useCheckContractExpiry } from '@/hooks/useContracts';
+import { useContracts, useUpdateContractStatus, useAddContract, useRenewContract, useCheckContractExpiry, useUpdateContract } from '@/hooks/useContracts';
 import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { FileText, RefreshCw, CheckCircle, Plus, AlertTriangle, Clock, XCircle, RotateCcw, Bell, Zap } from 'lucide-react';
+import { FileText, RefreshCw, CheckCircle, Plus, AlertTriangle, Clock, XCircle, RotateCcw, Bell, Zap, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { differenceInDays, parseISO, format, addYears } from 'date-fns';
 
@@ -16,8 +16,10 @@ export function ContractsView() {
   const addContract = useAddContract();
   const renewContract = useRenewContract();
   const checkExpiry = useCheckContractExpiry();
+  const updateContract = useUpdateContract();
   const [isOpen, setIsOpen] = useState(false);
   const [isRenewOpen, setIsRenewOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<typeof contracts[0] | null>(null);
   const [filter, setFilter] = useState<string>('all');
 
@@ -47,6 +49,23 @@ export function ContractsView() {
     housing_allowance: '',
     transportation_allowance: '',
     total_salary: '',
+  });
+
+  const [editFormData, setEditFormData] = useState({
+    mohre_contract_no: '',
+    contract_type: 'Unlimited' as 'Unlimited' | 'Limited' | 'Part-time' | 'Temporary',
+    start_date: '',
+    end_date: '',
+    basic_salary: '',
+    housing_allowance: '',
+    transportation_allowance: '',
+    total_salary: '',
+    work_location: 'Abu Dhabi',
+    job_title_arabic: '',
+    working_hours: '48',
+    notice_period: '30',
+    annual_leave_days: '30',
+    probation_period: '6',
   });
 
   const getContractExpiryStatus = (contract: typeof contracts[0]) => {
@@ -182,6 +201,55 @@ export function ContractsView() {
     }, {
       onSuccess: () => {
         setIsRenewOpen(false);
+        setSelectedContract(null);
+      }
+    });
+  };
+
+  const handleOpenEdit = (contract: typeof contracts[0]) => {
+    setSelectedContract(contract);
+    setEditFormData({
+      mohre_contract_no: contract.mohre_contract_no || '',
+      contract_type: contract.contract_type,
+      start_date: contract.start_date || '',
+      end_date: contract.end_date || '',
+      basic_salary: contract.basic_salary?.toString() || '',
+      housing_allowance: (contract as any).housing_allowance?.toString() || '',
+      transportation_allowance: (contract as any).transportation_allowance?.toString() || '',
+      total_salary: contract.total_salary?.toString() || '',
+      work_location: contract.work_location || 'Abu Dhabi',
+      job_title_arabic: contract.job_title_arabic || '',
+      working_hours: contract.working_hours?.toString() || '48',
+      notice_period: contract.notice_period?.toString() || '30',
+      annual_leave_days: contract.annual_leave_days?.toString() || '30',
+      probation_period: contract.probation_period?.toString() || '6',
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedContract) return;
+
+    updateContract.mutate({
+      id: selectedContract.id,
+      mohre_contract_no: editFormData.mohre_contract_no,
+      contract_type: editFormData.contract_type,
+      start_date: editFormData.start_date,
+      end_date: editFormData.end_date || undefined,
+      basic_salary: parseFloat(editFormData.basic_salary),
+      housing_allowance: editFormData.housing_allowance ? parseFloat(editFormData.housing_allowance) : 0,
+      transportation_allowance: editFormData.transportation_allowance ? parseFloat(editFormData.transportation_allowance) : 0,
+      total_salary: editFormData.total_salary ? parseFloat(editFormData.total_salary) : undefined,
+      work_location: editFormData.work_location,
+      job_title_arabic: editFormData.job_title_arabic,
+      working_hours: parseInt(editFormData.working_hours),
+      notice_period: parseInt(editFormData.notice_period),
+      annual_leave_days: parseInt(editFormData.annual_leave_days),
+      probation_period: parseInt(editFormData.probation_period),
+    } as any, {
+      onSuccess: () => {
+        setIsEditOpen(false);
         setSelectedContract(null);
       }
     });
@@ -452,6 +520,14 @@ export function ContractsView() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleOpenEdit(contract)} 
+                        className="border-border"
+                      >
+                        <Pencil className="w-4 h-4 mr-1" />Edit
+                      </Button>
                       {canRenew && (
                         <Button 
                           size="sm" 
@@ -480,6 +556,108 @@ export function ContractsView() {
           )}
         </div>
       </section>
+
+      {/* Edit Contract Modal */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Contract</DialogTitle>
+          </DialogHeader>
+          {selectedContract && (
+            <form onSubmit={handleEditSubmit} className="space-y-4 mt-4">
+              <div className="p-3 rounded-lg bg-secondary/50 border border-border">
+                <p className="text-sm font-medium text-foreground">{selectedContract.employees?.full_name}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-muted-foreground">MOHRE Contract No.</label>
+                  <Input value={editFormData.mohre_contract_no} onChange={(e) => setEditFormData({ ...editFormData, mohre_contract_no: e.target.value })} placeholder="MB302614729AE" required />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Contract Type</label>
+                  <Select value={editFormData.contract_type} onValueChange={(v: any) => setEditFormData({ ...editFormData, contract_type: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Unlimited">Unlimited</SelectItem>
+                      <SelectItem value="Limited">Limited (Fixed Term)</SelectItem>
+                      <SelectItem value="Part-time">Part-time</SelectItem>
+                      <SelectItem value="Temporary">Temporary</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Start Date</label>
+                  <Input type="date" value={editFormData.start_date} onChange={(e) => setEditFormData({ ...editFormData, start_date: e.target.value })} required />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">End Date (Limited contracts)</label>
+                  <Input type="date" value={editFormData.end_date} onChange={(e) => setEditFormData({ ...editFormData, end_date: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Basic Salary (AED)</label>
+                  <Input type="number" value={editFormData.basic_salary} onChange={(e) => setEditFormData({ ...editFormData, basic_salary: e.target.value })} placeholder="1800" required />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Housing Allowance (AED)</label>
+                  <Input type="number" value={editFormData.housing_allowance} onChange={(e) => setEditFormData({ ...editFormData, housing_allowance: e.target.value })} placeholder="500" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Transportation Allowance (AED)</label>
+                  <Input type="number" value={editFormData.transportation_allowance} onChange={(e) => setEditFormData({ ...editFormData, transportation_allowance: e.target.value })} placeholder="300" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Total Salary (AED)</label>
+                  <Input type="number" value={editFormData.total_salary} onChange={(e) => setEditFormData({ ...editFormData, total_salary: e.target.value })} placeholder="3500" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Work Location</label>
+                  <Select value={editFormData.work_location} onValueChange={(v) => setEditFormData({ ...editFormData, work_location: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Abu Dhabi">Abu Dhabi</SelectItem>
+                      <SelectItem value="Dubai">Dubai</SelectItem>
+                      <SelectItem value="Sharjah">Sharjah</SelectItem>
+                      <SelectItem value="Ajman">Ajman</SelectItem>
+                      <SelectItem value="Ras Al Khaimah">Ras Al Khaimah</SelectItem>
+                      <SelectItem value="Fujairah">Fujairah</SelectItem>
+                      <SelectItem value="Umm Al Quwain">Umm Al Quwain</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Job Title</label>
+                  <Input value={editFormData.job_title_arabic} onChange={(e) => setEditFormData({ ...editFormData, job_title_arabic: e.target.value })} placeholder="Project Manager" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Working Hours/Week</label>
+                  <Input type="number" value={editFormData.working_hours} onChange={(e) => setEditFormData({ ...editFormData, working_hours: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Notice Period (days)</label>
+                  <Input type="number" value={editFormData.notice_period} onChange={(e) => setEditFormData({ ...editFormData, notice_period: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Annual Leave (days)</label>
+                  <Input type="number" value={editFormData.annual_leave_days} onChange={(e) => setEditFormData({ ...editFormData, annual_leave_days: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Probation (months)</label>
+                  <Input type="number" value={editFormData.probation_period} onChange={(e) => setEditFormData({ ...editFormData, probation_period: e.target.value })} />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground" disabled={updateContract.isPending}>
+                  {updateContract.isPending ? 'Saving...' : 'Save Changes'}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)} className="border-border">
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Renewal Modal */}
       <Dialog open={isRenewOpen} onOpenChange={setIsRenewOpen}>
