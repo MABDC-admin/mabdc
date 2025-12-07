@@ -334,47 +334,25 @@ export function EmployeesView() {
                 <div 
                   key={emp.id} 
                   className={cn(
-                    "glass-card rounded-2xl border border-border p-4 hover:border-muted-foreground/30 transition-colors relative",
+                    "glass-card rounded-2xl border border-border p-4 hover:border-muted-foreground/30 transition-colors",
                     hasPendingLeave && !isContractExpired && "animate-pulse border-amber-500/50 bg-amber-500/5",
                     isContractExpired && "bg-muted/50 border-muted grayscale-[50%] opacity-80"
                   )}
                 >
-                  {/* Contract Expired Badge */}
-                  {isContractExpired && (
-                    <div className="absolute top-2 right-16 flex items-center gap-1 px-2 py-1 rounded-full bg-destructive/20 text-destructive text-[10px] font-medium animate-pulse">
-                      <FileWarning className="w-3 h-3" />
-                      {contractStatus.hasContract ? 'Contract Expired' : 'No Contract'}
-                    </div>
-                  )}
-                  
-                  {/* Contract Expiring Soon Badge */}
-                  {contractStatus.status === 'expiring-soon' && (
-                    <div className="absolute top-2 right-16 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-medium">
-                      <Clock className="w-3 h-3" />
-                      Contract: {(contractStatus as any).daysLeft}d left
-                    </div>
-                  )}
-                  
-                  {hasPendingLeave && !isContractExpired && contractStatus.status !== 'expiring-soon' && (
-                    <div className="absolute top-2 right-16 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-medium">
-                      <Clock className="w-3 h-3" />
-                      Pending Leave
-                    </div>
-                  )}
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-4 flex-1 min-w-0">
                       {emp.photo_url ? (
                         <img 
                           src={emp.photo_url} 
                           alt={emp.full_name}
-                          className="w-14 h-14 rounded-xl object-cover"
+                          className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
                         />
                       ) : (
-                        <span className="w-14 h-14 rounded-xl avatar-gradient flex items-center justify-center text-lg font-bold text-primary-foreground">
+                        <span className="w-14 h-14 rounded-xl avatar-gradient flex items-center justify-center text-lg font-bold text-primary-foreground flex-shrink-0">
                           {getInitials(emp.full_name)}
                         </span>
                       )}
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <h3 className="text-base font-semibold text-foreground">{emp.full_name}</h3>
                         <p className="text-xs text-muted-foreground">{emp.hrms_no} • {emp.department}</p>
                         <div className="flex flex-wrap gap-2 mt-2">
@@ -384,27 +362,41 @@ export function EmployeesView() {
                           <span className={cn(
                             "text-xs px-2 py-1 rounded-full",
                             emp.status === 'Active' 
-                              ? "bg-primary/10 text-primary border border-primary/30"
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
                               : emp.status === 'On Leave'
                               ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
                               : "bg-destructive/10 text-destructive border border-destructive/30"
                           )}>
                             {emp.status || 'Active'}
                           </span>
+                          {/* Contract Status Badges - inline with other badges */}
+                          {isContractExpired && (
+                            <span className="text-xs px-2 py-1 rounded-full bg-destructive/10 text-destructive border border-destructive/30 animate-pulse flex items-center gap-1">
+                              <FileWarning className="w-3 h-3" />
+                              {contractStatus.hasContract ? 'Contract Expired' : 'No Contract'}
+                            </span>
+                          )}
+                          {contractStatus.status === 'expiring-soon' && (
+                            <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              Contract: {(contractStatus as any).daysLeft}d left
+                            </span>
+                          )}
+                          {hasPendingLeave && !isContractExpired && contractStatus.status !== 'expiring-soon' && (
+                            <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              Pending Leave
+                            </span>
+                          )}
                           {visaDays && (
                             <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
                               Visa: {visaDays}d
                             </span>
                           )}
-                          {isContractExpired && (
-                            <span className="text-xs px-2 py-1 rounded-full bg-destructive/10 text-destructive border border-destructive/30 animate-pulse">
-                              Needs Contract Renewal
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-shrink-0">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button 
