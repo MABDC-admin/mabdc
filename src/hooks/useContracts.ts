@@ -90,3 +90,66 @@ export function useUpdateContractStatus() {
     },
   });
 }
+
+export function useRenewContract() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      oldContractId, 
+      newContract 
+    }: { 
+      oldContractId: string; 
+      newContract: Omit<Contract, 'id' | 'created_at' | 'employees'> 
+    }) => {
+      // Mark old contract as terminated
+      const { error: terminateError } = await supabase
+        .from('contracts')
+        .update({ status: 'Terminated' })
+        .eq('id', oldContractId);
+      
+      if (terminateError) throw terminateError;
+
+      // Create new contract
+      const { data, error } = await supabase
+        .from('contracts')
+        .insert([{ ...newContract, status: 'Draft' }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      toast.success('Contract renewed successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to renew contract: ${error.message}`);
+    },
+  });
+}
+
+export function useCheckContractExpiry() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('check-contract-expiry');
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      if (data?.expiring_contracts > 0 || data?.auto_expired > 0) {
+        toast.info(`Found ${data.expiring_contracts} expiring and ${data.auto_expired} expired contracts`);
+      } else {
+        toast.success('All contracts are up to date');
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to check contracts: ${error.message}`);
+    },
+  });
+}

@@ -1,20 +1,24 @@
 import { useState } from 'react';
-import { useContracts, useUpdateContractStatus, useAddContract } from '@/hooks/useContracts';
+import { useContracts, useUpdateContractStatus, useAddContract, useRenewContract, useCheckContractExpiry } from '@/hooks/useContracts';
 import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { FileText, RefreshCw, CheckCircle, Plus, AlertTriangle, Clock, XCircle, RotateCcw } from 'lucide-react';
+import { FileText, RefreshCw, CheckCircle, Plus, AlertTriangle, Clock, XCircle, RotateCcw, Bell, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { differenceInDays, parseISO, format } from 'date-fns';
+import { differenceInDays, parseISO, format, addYears } from 'date-fns';
 
 export function ContractsView() {
   const { data: contracts = [], isLoading, refetch } = useContracts();
   const { data: employees = [] } = useEmployees();
   const updateStatus = useUpdateContractStatus();
   const addContract = useAddContract();
+  const renewContract = useRenewContract();
+  const checkExpiry = useCheckContractExpiry();
   const [isOpen, setIsOpen] = useState(false);
+  const [isRenewOpen, setIsRenewOpen] = useState(false);
+  const [selectedContract, setSelectedContract] = useState<typeof contracts[0] | null>(null);
   const [filter, setFilter] = useState<string>('all');
 
   const [formData, setFormData] = useState({
@@ -33,7 +37,23 @@ export function ContractsView() {
     probation_period: '6',
   });
 
+  const [renewFormData, setRenewFormData] = useState({
+    mohre_contract_no: '',
+    start_date: '',
+    end_date: '',
+    basic_salary: '',
+    total_salary: '',
+  });
+
   const getContractExpiryStatus = (contract: typeof contracts[0]) => {
+    if (contract.status === 'Expired') {
+      return { status: 'expired', label: 'Expired', icon: XCircle, color: 'bg-destructive/10 text-destructive border-destructive/30' };
+    }
+    
+    if (contract.status === 'Terminated') {
+      return { status: 'terminated', label: 'Terminated', icon: XCircle, color: 'bg-muted/50 text-muted-foreground border-border' };
+    }
+
     if (contract.contract_type === 'Unlimited') {
       return { status: 'active', label: 'Active', icon: CheckCircle, color: 'bg-primary/10 text-primary border-primary/30' };
     }
@@ -89,6 +109,10 @@ export function ContractsView() {
       status: 'Draft',
     });
     setIsOpen(false);
+    resetFormData();
+  };
+
+  const resetFormData = () => {
     setFormData({
       employee_id: '',
       mohre_contract_no: '',
@@ -106,8 +130,84 @@ export function ContractsView() {
     });
   };
 
+  const handleOpenRenewal = (contract: typeof contracts[0]) => {
+    setSelectedContract(contract);
+    const newStartDate = contract.end_date ? format(parseISO(contract.end_date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+    const newEndDate = contract.end_date ? format(addYears(parseISO(contract.end_date), 2), 'yyyy-MM-dd') : format(addYears(new Date(), 2), 'yyyy-MM-dd');
+    
+    setRenewFormData({
+      mohre_contract_no: '',
+      start_date: newStartDate,
+      end_date: newEndDate,
+      basic_salary: contract.basic_salary?.toString() || '',
+      total_salary: contract.total_salary?.toString() || '',
+    });
+    setIsRenewOpen(true);
+  };
+
+  const handleRenewSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedContract) return;
+
+    renewContract.mutate({
+      oldContractId: selectedContract.id,
+      newContract: {
+        employee_id: selectedContract.employee_id,
+        mohre_contract_no: renewFormData.mohre_contract_no,
+        contract_type: selectedContract.contract_type,
+        start_date: renewFormData.start_date,
+        end_date: renewFormData.end_date || undefined,
+        basic_salary: parseFloat(renewFormData.basic_salary),
+        total_salary: renewFormData.total_salary ? parseFloat(renewFormData.total_salary) : undefined,
+        work_location: selectedContract.work_location,
+        job_title_arabic: selectedContract.job_title_arabic,
+        working_hours: selectedContract.working_hours,
+        notice_period: selectedContract.notice_period,
+        annual_leave_days: selectedContract.annual_leave_days,
+        probation_period: selectedContract.probation_period,
+        status: 'Draft',
+      },
+    }, {
+      onSuccess: () => {
+        setIsRenewOpen(false);
+        setSelectedContract(null);
+      }
+    });
+  };
+
+  const alertsCount = statusCounts.expiring + statusCounts.nearing;
+
   return (
     <div className="space-y-6 animate-slide-up">
+      {/* Alerts Banner */}
+      {alertsCount > 0 && (
+        <div className="glass-card rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                <Bell className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Contract Expiry Alerts</h3>
+                <p className="text-xs text-muted-foreground">
+                  {statusCounts.expiring} contracts expiring soon, {statusCounts.nearing} nearing expiry
+                </p>
+              </div>
+            </div>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => checkExpiry.mutate()}
+              disabled={checkExpiry.isPending}
+              className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+            >
+              <Zap className={cn("w-4 h-4 mr-1", checkExpiry.isPending && "animate-spin")} />
+              {checkExpiry.isPending ? 'Checking...' : 'Run Check'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <section className="glass-card rounded-3xl border border-border p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
@@ -115,6 +215,16 @@ export function ContractsView() {
             <p className="text-xs text-muted-foreground mt-1">MOHRE registered employment contracts</p>
           </div>
           <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => checkExpiry.mutate()} 
+              disabled={checkExpiry.isPending}
+              className="border-border"
+              title="Check for expiring contracts"
+            >
+              <Zap className={cn("w-4 h-4", checkExpiry.isPending && "animate-spin")} />
+            </Button>
             <Button variant="outline" size="sm" onClick={() => refetch()} className="border-border">
               <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
             </Button>
@@ -258,6 +368,7 @@ export function ContractsView() {
             filteredContracts.map((contract) => {
               const expiryStatus = getContractExpiryStatus(contract);
               const StatusIcon = expiryStatus.icon;
+              const canRenew = expiryStatus.status === 'expired' || expiryStatus.status === 'expiring' || expiryStatus.status === 'nearing';
               
               return (
                 <div key={contract.id} className="glass-card rounded-2xl border border-border p-4 hover:border-primary/30 transition-colors">
@@ -269,7 +380,7 @@ export function ContractsView() {
                           <StatusIcon className="w-3 h-3" />
                           {expiryStatus.label}
                         </span>
-                        {contract.status !== 'Active' && (
+                        {contract.status !== 'Active' && contract.status !== 'Expired' && (
                           <span className="text-xs px-2 py-1 rounded-full border bg-muted/50 text-muted-foreground border-border">
                             {contract.status}
                           </span>
@@ -321,12 +432,11 @@ export function ContractsView() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      {expiryStatus.status === 'expired' && (
+                      {canRenew && (
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => updateStatus.mutate({ id: contract.id, status: 'Expired' })} 
-                          disabled={updateStatus.isPending}
+                          onClick={() => handleOpenRenewal(contract)} 
                           className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
                         >
                           <RotateCcw className="w-4 h-4 mr-1" />Renew
@@ -350,6 +460,95 @@ export function ContractsView() {
           )}
         </div>
       </section>
+
+      {/* Renewal Modal */}
+      <Dialog open={isRenewOpen} onOpenChange={setIsRenewOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Renew Contract</DialogTitle>
+          </DialogHeader>
+          {selectedContract && (
+            <form onSubmit={handleRenewSubmit} className="space-y-4 mt-4">
+              <div className="p-3 rounded-lg bg-secondary/50 border border-border">
+                <p className="text-sm font-medium text-foreground">{selectedContract.employees?.full_name}</p>
+                <p className="text-xs text-muted-foreground">Previous: {selectedContract.mohre_contract_no}</p>
+              </div>
+
+              <div>
+                <label className="text-xs text-muted-foreground">New MOHRE Contract No. *</label>
+                <Input 
+                  value={renewFormData.mohre_contract_no} 
+                  onChange={(e) => setRenewFormData({ ...renewFormData, mohre_contract_no: e.target.value })} 
+                  placeholder="Enter new contract number" 
+                  required 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-muted-foreground">New Start Date</label>
+                  <Input 
+                    type="date" 
+                    value={renewFormData.start_date} 
+                    onChange={(e) => setRenewFormData({ ...renewFormData, start_date: e.target.value })} 
+                    required 
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">New End Date</label>
+                  <Input 
+                    type="date" 
+                    value={renewFormData.end_date} 
+                    onChange={(e) => setRenewFormData({ ...renewFormData, end_date: e.target.value })} 
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-muted-foreground">Basic Salary (AED)</label>
+                  <Input 
+                    type="number" 
+                    value={renewFormData.basic_salary} 
+                    onChange={(e) => setRenewFormData({ ...renewFormData, basic_salary: e.target.value })} 
+                    required 
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Total Salary (AED)</label>
+                  <Input 
+                    type="number" 
+                    value={renewFormData.total_salary} 
+                    onChange={(e) => setRenewFormData({ ...renewFormData, total_salary: e.target.value })} 
+                  />
+                </div>
+              </div>
+
+              <div className="text-xs text-muted-foreground p-2 rounded bg-muted/30">
+                The old contract will be marked as "Terminated" and a new draft contract will be created.
+              </div>
+
+              <div className="flex gap-2">
+                <Button 
+                  type="submit" 
+                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground" 
+                  disabled={renewContract.isPending}
+                >
+                  {renewContract.isPending ? 'Renewing...' : 'Create Renewal'}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsRenewOpen(false)}
+                  className="border-border"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
