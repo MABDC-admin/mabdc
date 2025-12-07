@@ -4,65 +4,74 @@
 
 @layer base {
   :root {
-    --background: 222 47% 3%;
-    --foreground: 210 40% 98%;
+    --background: 210 20% 98%;
+    --foreground: 222 47% 11%;
 
-    --card: 222 47% 6%;
-    --card-foreground: 210 40% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
 
-    --popover: 222 47% 6%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 152 100% 30%;
+    --primary: 262 83% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 215 28% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 210 100% 35%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 339 90% 51%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 355 78% 44%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 152 100% 30%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 262 83% 58%;
 
     --radius: 0.75rem;
 
-    /* UAE Colors */
-    --uae-green: 152 100% 30%;
-    --uae-red: 355 88% 44%;
-    --uae-blue: 210 100% 33%;
-    --uae-black: 0 0% 0%;
+    /* Brand Colors */
+    --uae-green: 158 64% 52%;
+    --uae-red: 0 84% 60%;
+    --uae-blue: 217 91% 60%;
+    --uae-black: 222 47% 11%;
 
     /* Custom gradients and effects */
-    --glass-bg: 222 47% 6% / 0.9;
-    --glass-border: 217 33% 17% / 0.8;
-    --stat-gradient: radial-gradient(circle at top left, hsl(152 76% 40% / 0.2), hsl(222 47% 6% / 0.96));
-    --body-gradient: radial-gradient(circle at top left, hsl(222 47% 4%), hsl(222 47% 4%) 40%, hsl(0 0% 0%) 100%);
+    --glass-bg: 0 0% 100%;
+    --glass-border: 214 32% 91%;
+    --stat-gradient: linear-gradient(135deg, hsl(262 83% 58% / 0.08), hsl(339 90% 51% / 0.05));
+    --body-gradient: linear-gradient(135deg, hsl(210 20% 98%), hsl(262 83% 58% / 0.03) 50%, hsl(339 90% 51% / 0.02));
 
     /* Shadows */
-    --shadow-glow: 0 0 40px hsl(152 100% 30% / 0.15);
-    --shadow-card: 0 4px 30px hsl(0 0% 0% / 0.3);
+    --shadow-glow: 0 0 40px hsl(262 83% 58% / 0.1);
+    --shadow-card: 0 4px 24px hsl(222 47% 11% / 0.06);
+    --shadow-hover: 0 8px 32px hsl(222 47% 11% / 0.1);
 
-    --sidebar-background: 222 47% 5%;
-    --sidebar-foreground: 215 20% 65%;
-    --sidebar-primary: 152 100% 30%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 215 16% 47%;
+    --sidebar-primary: 262 83% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 33% 12%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 152 100% 30%;
+    --sidebar-accent: 262 83% 58% / 0.1;
+    --sidebar-accent-foreground: 262 83% 58%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 262 83% 58%;
   }
 
   .dark {
-    --background: 222 47% 3%;
+    --background: 222 47% 11%;
     --foreground: 210 40% 98%;
+    --card: 222 47% 14%;
+    --card-foreground: 210 40% 98%;
+    --primary: 262 83% 65%;
+    --secondary: 217 33% 17%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --border: 217 33% 22%;
+    --sidebar-background: 222 47% 8%;
   }
 }
 
@@ -81,21 +90,26 @@
 @layer components {
   .glass-card {
     background: hsl(var(--glass-bg));
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
     box-shadow: var(--shadow-card);
+    border: 1px solid hsl(var(--border));
+    transition: box-shadow 0.2s ease;
+  }
+
+  .glass-card:hover {
+    box-shadow: var(--shadow-hover);
   }
 
   .stat-card {
     background: var(--stat-gradient);
+    border: 1px solid hsl(var(--border));
   }
 
   .uae-gradient {
-    background: linear-gradient(135deg, hsl(var(--uae-green)), hsl(var(--uae-blue)));
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
   }
 
   .avatar-gradient {
-    background: linear-gradient(135deg, hsl(152 76% 40%), hsl(var(--uae-green)));
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
   }
 
   .soft-scroll::-webkit-scrollbar {
@@ -104,7 +118,7 @@
   }
 
   .soft-scroll::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.5);
+    background: hsl(var(--muted-foreground) / 0.3);
     border-radius: 999px;
   }
 
@@ -120,7 +134,7 @@
 
   .file-drop-area.dragover {
     border-color: hsl(var(--primary));
-    background: hsl(var(--primary) / 0.1);
+    background: hsl(var(--primary) / 0.05);
   }
 
   .profile-tab {
@@ -128,7 +142,7 @@
   }
 
   .profile-tab.active {
-    background: hsl(var(--secondary) / 0.8);
+    background: hsl(var(--secondary));
     border-bottom: 2px solid hsl(var(--primary));
   }
 
@@ -141,22 +155,26 @@
     border-radius: 8px;
   }
 
-  .file-icon.pdf { background: hsl(0 70% 45% / 0.2); color: hsl(0 70% 65%); }
-  .file-icon.image { background: hsl(210 90% 55% / 0.2); color: hsl(210 90% 70%); }
-  .file-icon.excel { background: hsl(142 76% 40% / 0.2); color: hsl(142 76% 60%); }
-  .file-icon.word { background: hsl(217 90% 55% / 0.2); color: hsl(217 90% 65%); }
-  .file-icon.generic { background: hsl(var(--muted-foreground) / 0.2); color: hsl(var(--muted-foreground)); }
+  .file-icon.pdf { background: hsl(0 84% 60% / 0.1); color: hsl(0 84% 50%); }
+  .file-icon.image { background: hsl(217 91% 60% / 0.1); color: hsl(217 91% 50%); }
+  .file-icon.excel { background: hsl(158 64% 52% / 0.1); color: hsl(158 64% 42%); }
+  .file-icon.word { background: hsl(217 91% 60% / 0.1); color: hsl(217 91% 50%); }
+  .file-icon.generic { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
 
   .nav-item {
     @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200;
+    color: hsl(var(--muted-foreground));
   }
 
   .nav-item:hover {
-    @apply bg-secondary/50;
+    background: hsl(var(--secondary));
+    color: hsl(var(--foreground));
   }
 
   .nav-item.active {
-    @apply bg-primary/20 text-primary border-l-2 border-primary;
+    background: hsl(var(--primary) / 0.1);
+    color: hsl(var(--primary));
+    border-left: 3px solid hsl(var(--primary));
   }
 }
 
