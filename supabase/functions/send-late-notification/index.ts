@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,16 +27,13 @@ const handler = async (req: Request): Promise<Response> => {
     const data: LateNotificationRequest = await req.json();
     console.log("Sending late notification for:", data.employeeName);
 
-    const client = new SMTPClient({
-      connection: {
-        hostname: Deno.env.get("SMTP_HOST") || "",
-        port: parseInt(Deno.env.get("SMTP_PORT") || "587"),
-        tls: true,
-        auth: {
-          username: Deno.env.get("SMTP_USER") || "",
-          password: Deno.env.get("SMTP_PASS") || "",
-        },
-      },
+    const client = new SmtpClient();
+
+    await client.connectTLS({
+      hostname: Deno.env.get("SMTP_HOST") || "",
+      port: parseInt(Deno.env.get("SMTP_PORT") || "587"),
+      username: Deno.env.get("SMTP_USER") || "",
+      password: Deno.env.get("SMTP_PASS") || "",
     });
 
     const emailHtml = `
@@ -49,8 +46,8 @@ const handler = async (req: Request): Promise<Response> => {
           .header { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 20px; border-radius: 8px 8px 0 0; }
           .content { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
           .footer { background: #374151; color: white; padding: 15px; border-radius: 0 0 8px 8px; font-size: 12px; }
-          .info-row { display: flex; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
-          .label { font-weight: bold; width: 150px; color: #6b7280; }
+          .info-row { padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
+          .label { font-weight: bold; color: #6b7280; display: inline-block; width: 140px; }
           .value { color: #111827; }
           .late-badge { background: #fef2f2; color: #dc2626; padding: 4px 12px; border-radius: 20px; font-weight: bold; display: inline-block; }
         </style>
@@ -58,7 +55,7 @@ const handler = async (req: Request): Promise<Response> => {
       <body>
         <div class="container">
           <div class="header">
-            <h2 style="margin: 0;">⚠️ Late Check-In Alert</h2>
+            <h2 style="margin: 0;">Late Check-In Alert</h2>
             <p style="margin: 5px 0 0 0; opacity: 0.9;">Employee arrived late to work</p>
           </div>
           <div class="content">
@@ -103,12 +100,13 @@ const handler = async (req: Request): Promise<Response> => {
     await client.send({
       from: Deno.env.get("SMTP_FROM_EMAIL") || "",
       to: Deno.env.get("HR_NOTIFICATION_EMAIL") || "",
-      subject: `⚠️ Late Check-In: ${data.employeeName} - ${data.minutesLate} mins late`,
-      content: "Late check-in notification",
+      subject: `Late Check-In: ${data.employeeName} - ${data.minutesLate} mins late`,
+      content: `Late Check-In Alert\n\nEmployee: ${data.employeeName}\nHRMS No: ${data.hrmsNo}\nDepartment: ${data.department}\nPosition: ${data.jobPosition}\nScheduled: ${data.scheduledTime}\nActual: ${data.checkInTime}\nMinutes Late: ${data.minutesLate}`,
       html: emailHtml,
     });
 
     await client.close();
+
     console.log("Late notification email sent successfully");
 
     return new Response(JSON.stringify({ success: true }), {
