@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
 import { AddEmployeeModal } from '@/components/modals/AddEmployeeModal';
-import { Search, Plus, Trash2, RefreshCw, Link2, Clock } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/hr';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -35,6 +36,7 @@ export function EmployeesView() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // Get employees with pending leave requests
   const employeesWithPendingLeave = new Set(
@@ -87,6 +89,24 @@ export function EmployeesView() {
             <p className="text-xs text-muted-foreground mt-1">{employees.length} employees in system</p>
           </div>
           <div className="flex gap-2">
+            <div className="flex border border-border rounded-lg overflow-hidden">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="rounded-none"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="rounded-none"
+              >
+                <List className="w-4 h-4" />
+              </Button>
+            </div>
             <Button 
               variant="outline"
               size="sm"
@@ -115,14 +135,19 @@ export function EmployeesView() {
           />
         </div>
 
-        <div className="space-y-3">
+        <ScrollArea className="h-[calc(100vh-280px)]">
+          <div className={cn(
+            viewMode === 'grid' 
+              ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+              : "space-y-3"
+          )}>
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-muted-foreground col-span-full">
               <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
               <p className="text-sm">Loading employees...</p>
             </div>
           ) : filteredEmployees.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-muted-foreground col-span-full">
               <p className="text-sm">No employees found.</p>
               <Button 
                 variant="outline" 
@@ -133,7 +158,117 @@ export function EmployeesView() {
                 Add your first employee
               </Button>
             </div>
+          ) : viewMode === 'grid' ? (
+            filteredEmployees.map((emp) => {
+              const visaDays = getVisaDaysRemaining(emp);
+              const hasPendingLeave = employeesWithPendingLeave.has(emp.id);
+              return (
+                <div 
+                  key={emp.id} 
+                  className={cn(
+                    "glass-card rounded-2xl border border-border p-4 hover:border-muted-foreground/30 transition-all hover:shadow-lg relative group cursor-pointer",
+                    hasPendingLeave && "animate-pulse border-amber-500/50 bg-amber-500/5"
+                  )}
+                  onClick={() => openProfile(emp)}
+                >
+                  {hasPendingLeave && (
+                    <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-medium z-10">
+                      <Clock className="w-3 h-3" />
+                      Pending
+                    </div>
+                  )}
+                  
+                  {/* Quick Actions - show on hover */}
+                  <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="secondary"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => { e.stopPropagation(); copyPortalLink(emp.id); }}
+                        >
+                          <Link2 className="w-3 h-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Copy portal link</TooltipContent>
+                    </Tooltip>
+                    <Button 
+                      variant="secondary"
+                      size="icon"
+                      className="h-7 w-7 hover:bg-destructive/20 hover:text-destructive"
+                      onClick={(e) => { e.stopPropagation(); setDeleteId(emp.id); }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+
+                  {/* Avatar */}
+                  <div className="flex flex-col items-center text-center mb-4">
+                    {emp.photo_url ? (
+                      <img 
+                        src={emp.photo_url} 
+                        alt={emp.full_name}
+                        className="w-20 h-20 rounded-2xl object-cover mb-3 ring-2 ring-border"
+                      />
+                    ) : (
+                      <span className="w-20 h-20 rounded-2xl avatar-gradient flex items-center justify-center text-2xl font-bold text-primary-foreground mb-3 ring-2 ring-primary/20">
+                        {getInitials(emp.full_name)}
+                      </span>
+                    )}
+                    <h3 className="text-sm font-semibold text-foreground line-clamp-1">{emp.full_name}</h3>
+                    <p className="text-xs text-muted-foreground">{emp.hrms_no}</p>
+                  </div>
+
+                  {/* Info */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/30">
+                        {emp.job_position}
+                      </span>
+                      <span className={cn(
+                        "text-[10px] px-2 py-0.5 rounded-full",
+                        emp.status === 'Active' 
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                          : emp.status === 'On Leave'
+                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                          : "bg-destructive/10 text-destructive border border-destructive/30"
+                      )}>
+                        {emp.status || 'Active'}
+                      </span>
+                    </div>
+                    
+                    <div className="text-center">
+                      <p className="text-[10px] text-muted-foreground">{emp.department}</p>
+                    </div>
+
+                    {visaDays && (
+                      <div className="text-center">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                          Visa: {visaDays}d remaining
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer Stats */}
+                  <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-border">
+                    <div className="text-center">
+                      <p className="text-[10px] uppercase text-muted-foreground">Joined</p>
+                      <p className="text-xs text-foreground font-medium">
+                        {new Date(emp.joining_date).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] uppercase text-muted-foreground">Leave</p>
+                      <p className="text-xs text-foreground font-medium">{emp.leave_balance || 0}d</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
           ) : (
+            // List View
             filteredEmployees.map((emp) => {
               const visaDays = getVisaDaysRemaining(emp);
               const hasPendingLeave = employeesWithPendingLeave.has(emp.id);
@@ -146,7 +281,7 @@ export function EmployeesView() {
                   )}
                 >
                   {hasPendingLeave && (
-                    <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-medium">
+                    <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-medium">
                       <Clock className="w-3 h-3" />
                       Pending Leave
                     </div>
@@ -176,13 +311,13 @@ export function EmployeesView() {
                             emp.status === 'Active' 
                               ? "bg-primary/10 text-primary border border-primary/30"
                               : emp.status === 'On Leave'
-                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
                               : "bg-destructive/10 text-destructive border border-destructive/30"
                           )}>
                             {emp.status || 'Active'}
                           </span>
                           {visaDays && (
-                            <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-200 border border-amber-500/30">
+                            <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
                               Visa: {visaDays}d
                             </span>
                           )}
@@ -245,7 +380,8 @@ export function EmployeesView() {
               );
             })
           )}
-        </div>
+          </div>
+        </ScrollArea>
       </section>
 
       <EmployeeProfileModal 
