@@ -16,6 +16,9 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import emiratesIdCard from '@/assets/emirates-id-card.png';
 import uaeVisa from '@/assets/uae-visa.png';
+import passportIcon from '@/assets/passport-icon.png';
+import contractIcon from '@/assets/contract-icon.png';
+import photoPlaceholder from '@/assets/photo-placeholder.png';
 import { Pencil, Trash2, FileText, Upload, Download, X, Camera, Calendar, Bell, AlertTriangle } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { toast } from 'sonner';
@@ -570,8 +573,57 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                 <div className="glass-card rounded-2xl border border-border p-5">
                   <h3 className="text-lg font-semibold text-foreground mb-6 text-center">EMPLOYEE DOCUMENTS</h3>
                   
-                  {/* Animated Visa & Emirates ID Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  {/* Document Cards Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+                    {/* Photo Card - Auto updates avatar */}
+                    <div className="relative group">
+                      <input
+                        type="file"
+                        id="photo-upload-doc"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            await uploadPhoto.mutateAsync({ file, employeeId: currentEmployee.id });
+                            refetchEmployees();
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <label htmlFor="photo-upload-doc" className="block cursor-pointer">
+                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-pink-500/5 to-purple-500/5 hover:border-pink-500/50 transition-all duration-300 hover:shadow-lg">
+                          <div className="flex flex-col items-center">
+                            {currentEmployee.photo_url ? (
+                              <>
+                                <div className="relative mb-2">
+                                  <img 
+                                    src={currentEmployee.photo_url} 
+                                    alt="Employee Photo" 
+                                    className="w-20 h-20 rounded-full object-cover shadow-md animate-float"
+                                  />
+                                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-pink-500 flex items-center justify-center">
+                                    <Camera className="w-2.5 h-2.5 text-white" />
+                                  </div>
+                                </div>
+                                <p className="text-xs font-medium text-foreground">Photo</p>
+                                <p className="text-[10px] text-pink-500">Click to change</p>
+                              </>
+                            ) : (
+                              <>
+                                <img 
+                                  src={photoPlaceholder} 
+                                  alt="Photo placeholder" 
+                                  className="w-20 h-auto mb-2 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
+                                />
+                                <p className="text-xs font-medium text-foreground">Photo</p>
+                                <p className="text-[10px] text-muted-foreground">Click to upload</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
                     {/* Emirates ID Card */}
                     <div className="relative group">
                       <input
@@ -581,36 +633,35 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                         onChange={(e) => handleFileUpload(e, 'Emirates ID')}
                         className="hidden"
                       />
-                      <label
-                        htmlFor="eid-upload"
-                        className="block cursor-pointer"
-                      >
-                        <div className="relative p-6 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-primary/5 to-accent/5 hover:border-primary/50 transition-all duration-300 hover:shadow-lg">
+                      <label htmlFor="eid-upload" className="block cursor-pointer">
+                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-primary/5 to-accent/5 hover:border-primary/50 transition-all duration-300 hover:shadow-lg">
                           <div className="flex flex-col items-center">
                             {documents.find(d => d.category === 'Emirates ID') ? (
                               <>
-                                <div className="relative mb-3">
+                                <div className="relative mb-2">
                                   <img 
                                     src={documents.find(d => d.category === 'Emirates ID')?.file_url || emiratesIdCard} 
                                     alt="Emirates ID" 
-                                    className="w-36 h-auto rounded-lg shadow-md animate-float"
+                                    className="w-20 h-auto rounded-lg shadow-md animate-float"
+                                    style={{ animationDelay: '0.2s' }}
                                   />
-                                  <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                                    <Pencil className="w-3 h-3 text-primary-foreground" />
+                                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                                    <Pencil className="w-2.5 h-2.5 text-primary-foreground" />
                                   </div>
                                 </div>
-                                <p className="text-sm font-medium text-foreground">Emirates ID</p>
-                                <p className="text-xs text-primary">Click to change</p>
+                                <p className="text-xs font-medium text-foreground">Emirates ID</p>
+                                <p className="text-[10px] text-primary">Click to change</p>
                               </>
                             ) : (
                               <>
                                 <img 
                                   src={emiratesIdCard} 
                                   alt="Emirates ID placeholder" 
-                                  className="w-36 h-auto mb-3 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
+                                  className="w-20 h-auto mb-2 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
+                                  style={{ animationDelay: '0.2s' }}
                                 />
-                                <p className="text-sm font-medium text-foreground">Emirates ID</p>
-                                <p className="text-xs text-muted-foreground">Click to upload</p>
+                                <p className="text-xs font-medium text-foreground">Emirates ID</p>
+                                <p className="text-[10px] text-muted-foreground">Click to upload</p>
                               </>
                             )}
                           </div>
@@ -627,38 +678,125 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                         onChange={(e) => handleFileUpload(e, 'Visa')}
                         className="hidden"
                       />
-                      <label
-                        htmlFor="visa-upload"
-                        className="block cursor-pointer"
-                      >
-                        <div className="relative p-6 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-accent/5 to-primary/5 hover:border-accent/50 transition-all duration-300 hover:shadow-lg">
+                      <label htmlFor="visa-upload" className="block cursor-pointer">
+                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-accent/5 to-primary/5 hover:border-accent/50 transition-all duration-300 hover:shadow-lg">
                           <div className="flex flex-col items-center">
                             {documents.find(d => d.category === 'Visa') ? (
                               <>
-                                <div className="relative mb-3">
+                                <div className="relative mb-2">
                                   <img 
                                     src={documents.find(d => d.category === 'Visa')?.file_url || uaeVisa} 
                                     alt="UAE Visa" 
-                                    className="w-36 h-auto rounded-lg shadow-md animate-float"
-                                    style={{ animationDelay: '0.5s' }}
+                                    className="w-20 h-auto rounded-lg shadow-md animate-float"
+                                    style={{ animationDelay: '0.4s' }}
                                   />
-                                  <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-accent flex items-center justify-center">
-                                    <Pencil className="w-3 h-3 text-accent-foreground" />
+                                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent flex items-center justify-center">
+                                    <Pencil className="w-2.5 h-2.5 text-accent-foreground" />
                                   </div>
                                 </div>
-                                <p className="text-sm font-medium text-foreground">UAE Visa</p>
-                                <p className="text-xs text-accent">Click to change</p>
+                                <p className="text-xs font-medium text-foreground">Visa</p>
+                                <p className="text-[10px] text-accent">Click to change</p>
                               </>
                             ) : (
                               <>
                                 <img 
                                   src={uaeVisa} 
                                   alt="UAE Visa placeholder" 
-                                  className="w-36 h-auto mb-3 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
-                                  style={{ animationDelay: '0.5s' }}
+                                  className="w-20 h-auto mb-2 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
+                                  style={{ animationDelay: '0.4s' }}
                                 />
-                                <p className="text-sm font-medium text-foreground">UAE Visa</p>
-                                <p className="text-xs text-muted-foreground">Click to upload</p>
+                                <p className="text-xs font-medium text-foreground">Visa</p>
+                                <p className="text-[10px] text-muted-foreground">Click to upload</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Passport Card */}
+                    <div className="relative group">
+                      <input
+                        type="file"
+                        id="passport-upload"
+                        accept="image/*,.pdf"
+                        onChange={(e) => handleFileUpload(e, 'Passport')}
+                        className="hidden"
+                      />
+                      <label htmlFor="passport-upload" className="block cursor-pointer">
+                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-blue-500/5 to-indigo-500/5 hover:border-blue-500/50 transition-all duration-300 hover:shadow-lg">
+                          <div className="flex flex-col items-center">
+                            {documents.find(d => d.category === 'Passport') ? (
+                              <>
+                                <div className="relative mb-2">
+                                  <img 
+                                    src={documents.find(d => d.category === 'Passport')?.file_url || passportIcon} 
+                                    alt="Passport" 
+                                    className="w-20 h-auto rounded-lg shadow-md animate-float"
+                                    style={{ animationDelay: '0.6s' }}
+                                  />
+                                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                                    <Pencil className="w-2.5 h-2.5 text-white" />
+                                  </div>
+                                </div>
+                                <p className="text-xs font-medium text-foreground">Passport</p>
+                                <p className="text-[10px] text-blue-500">Click to change</p>
+                              </>
+                            ) : (
+                              <>
+                                <img 
+                                  src={passportIcon} 
+                                  alt="Passport placeholder" 
+                                  className="w-20 h-auto mb-2 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
+                                  style={{ animationDelay: '0.6s' }}
+                                />
+                                <p className="text-xs font-medium text-foreground">Passport</p>
+                                <p className="text-[10px] text-muted-foreground">Click to upload</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Contract Card */}
+                    <div className="relative group">
+                      <input
+                        type="file"
+                        id="contract-upload"
+                        accept="image/*,.pdf"
+                        onChange={(e) => handleFileUpload(e, 'Contract')}
+                        className="hidden"
+                      />
+                      <label htmlFor="contract-upload" className="block cursor-pointer">
+                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-green-500/5 to-emerald-500/5 hover:border-green-500/50 transition-all duration-300 hover:shadow-lg">
+                          <div className="flex flex-col items-center">
+                            {documents.find(d => d.category === 'Contract') ? (
+                              <>
+                                <div className="relative mb-2">
+                                  <img 
+                                    src={documents.find(d => d.category === 'Contract')?.file_url || contractIcon} 
+                                    alt="Contract" 
+                                    className="w-20 h-auto rounded-lg shadow-md animate-float"
+                                    style={{ animationDelay: '0.8s' }}
+                                  />
+                                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                                    <Pencil className="w-2.5 h-2.5 text-white" />
+                                  </div>
+                                </div>
+                                <p className="text-xs font-medium text-foreground">Contract</p>
+                                <p className="text-[10px] text-green-500">Click to change</p>
+                              </>
+                            ) : (
+                              <>
+                                <img 
+                                  src={contractIcon} 
+                                  alt="Contract placeholder" 
+                                  className="w-20 h-auto mb-2 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
+                                  style={{ animationDelay: '0.8s' }}
+                                />
+                                <p className="text-xs font-medium text-foreground">Contract</p>
+                                <p className="text-[10px] text-muted-foreground">Click to upload</p>
                               </>
                             )}
                           </div>
