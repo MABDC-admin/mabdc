@@ -90,7 +90,7 @@ export function useCheckInByHRMS() {
       // First find the employee by HRMS number
       const { data: employee, error: empError } = await supabase
         .from('employees')
-        .select('id, full_name')
+        .select('id, full_name, photo_url, department, job_position')
         .eq('hrms_no', hrmsNo)
         .maybeSingle();
       
@@ -117,9 +117,12 @@ export function useCheckInByHRMS() {
         }
       }
       
-      // Determine status based on check-in time (9:00 AM as cutoff)
+      // Work hours: 8:00 AM to 5:00 PM, Monday to Friday
+      // Late if check-in after 8:00 AM
       const hour = now.getHours();
-      const status = hour >= 9 ? 'Late' : 'Present';
+      const minutes = now.getMinutes();
+      const isLate = hour > 8 || (hour === 8 && minutes > 0);
+      const status = isLate ? 'Late' : 'Present';
       
       const { data, error } = await supabase
         .from('attendance')
@@ -129,11 +132,19 @@ export function useCheckInByHRMS() {
           check_in: checkInTime,
           status
         }])
-        .select(`*, employees (full_name, hrms_no)`)
+        .select(`*, employees (full_name, hrms_no, photo_url)`)
         .single();
       
       if (error) throw error;
-      return { ...data, employeeName: employee.full_name, status };
+      return { 
+        ...data, 
+        employeeName: employee.full_name, 
+        employeePhoto: employee.photo_url,
+        department: employee.department,
+        jobPosition: employee.job_position,
+        status,
+        checkInTime
+      };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
@@ -154,7 +165,7 @@ export function useCheckOutByHRMS() {
       // First find the employee by HRMS number
       const { data: employee, error: empError } = await supabase
         .from('employees')
-        .select('id, full_name')
+        .select('id, full_name, photo_url, department, job_position')
         .eq('hrms_no', hrmsNo)
         .maybeSingle();
       
@@ -167,7 +178,7 @@ export function useCheckOutByHRMS() {
       // Find today's attendance record
       const { data: attendance, error: attError } = await supabase
         .from('attendance')
-        .select('id, check_out')
+        .select('id, check_out, check_in, status')
         .eq('employee_id', employee.id)
         .eq('date', today)
         .maybeSingle();
@@ -184,7 +195,16 @@ export function useCheckOutByHRMS() {
         .single();
       
       if (error) throw error;
-      return { ...data, employeeName: employee.full_name };
+      return { 
+        ...data, 
+        employeeName: employee.full_name,
+        employeePhoto: employee.photo_url,
+        department: employee.department,
+        jobPosition: employee.job_position,
+        checkInTime: attendance.check_in,
+        checkOutTime,
+        status: attendance.status
+      };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
