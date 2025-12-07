@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useContracts, useUpdateContractStatus, useAddContract, useRenewContract, useCheckContractExpiry, useUpdateContract } from '@/hooks/useContracts';
 import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { FileText, RefreshCw, CheckCircle, Plus, AlertTriangle, Clock, XCircle, RotateCcw, Bell, Zap, Pencil } from 'lucide-react';
+import { FileText, RefreshCw, CheckCircle, Plus, AlertTriangle, Clock, XCircle, RotateCcw, Bell, Zap, Pencil, Upload, Image, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { differenceInDays, parseISO, format, addYears } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export function ContractsView() {
   const { data: contracts = [], isLoading, refetch } = useContracts();
@@ -22,6 +24,13 @@ export function ContractsView() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<typeof contracts[0] | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const [page1Preview, setPage1Preview] = useState<string | null>(null);
+  const [page2Preview, setPage2Preview] = useState<string | null>(null);
+  const [page1File, setPage1File] = useState<File | null>(null);
+  const [page2File, setPage2File] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const page1InputRef = useRef<HTMLInputElement>(null);
+  const page2InputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     employee_id: '',
@@ -113,28 +122,107 @@ export function ContractsView() {
     expired: contracts.filter(c => getContractExpiryStatus(c).status === 'expired').length,
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFileChange = (file: File | null, pageNum: 1 | 2) => {
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      if (pageNum === 1) {
+        setPage1Preview(result);
+        setPage1File(file);
+      } else {
+        setPage2Preview(result);
+        setPage2File(file);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const uploadContractImage = async (file: File, contractId: string, pageNum: 1 | 2): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${contractId}/page${pageNum}-${Date.now()}.${fileExt}`;
+    
+    const { error } = await supabase.storage
+      .from('contract-documents')
+      .upload(fileName, file);
+    
+    if (error) {
+      console.error('Upload error:', error);
+      return null;
+    }
+    
+    const { data: urlData } = supabase.storage
+      .from('contract-documents')
+      .getPublicUrl(fileName);
+    
+    return urlData.publicUrl;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addContract.mutate({
-      employee_id: formData.employee_id,
-      mohre_contract_no: formData.mohre_contract_no,
-      contract_type: formData.contract_type,
-      start_date: formData.start_date,
-      end_date: formData.end_date || undefined,
-      basic_salary: parseFloat(formData.basic_salary),
-      housing_allowance: formData.housing_allowance ? parseFloat(formData.housing_allowance) : 0,
-      transportation_allowance: formData.transportation_allowance ? parseFloat(formData.transportation_allowance) : 0,
-      total_salary: formData.total_salary ? parseFloat(formData.total_salary) : undefined,
-      work_location: formData.work_location,
-      job_title_arabic: formData.job_title_arabic,
-      working_hours: parseInt(formData.working_hours),
-      notice_period: parseInt(formData.notice_period),
-      annual_leave_days: parseInt(formData.annual_leave_days),
-      probation_period: parseInt(formData.probation_period),
-      status: 'Draft',
-    } as any);
-    setIsOpen(false);
-    resetFormData();
+    setIsUploading(true);
+    
+    try {
+      // First create the contract
+      const contractData = {
+        employee_id: formData.employee_id,
+        mohre_contract_no: formData.mohre_contract_no,
+        contract_type: formData.contract_type,
+        start_date: formData.start_date,
+        end_date: formData.end_date || undefined,
+        basic_salary: parseFloat(formData.basic_salary),
+        housing_allowance: formData.housing_allowance ? parseFloat(formData.housing_allowance) : 0,
+        transportation_allowance: formData.transportation_allowance ? parseFloat(formData.transportation_allowance) : 0,
+        total_salary: formData.total_salary ? parseFloat(formData.total_salary) : undefined,
+        work_location: formData.work_location,
+        job_title_arabic: formData.job_title_arabic,
+        working_hours: parseInt(formData.working_hours),
+        notice_period: parseInt(formData.notice_period),
+        annual_leave_days: parseInt(formData.annual_leave_days),
+        probation_period: parseInt(formData.probation_period),
+        status: 'Draft' as const,
+      };
+
+      const { data: newContract, error: contractError } = await supabase
+        .from('contracts')
+        .insert([contractData])
+        .select()
+        .single();
+
+      if (contractError) throw contractError;
+
+      // Upload images if provided
+      let page1Url = null;
+      let page2Url = null;
+
+      if (page1File) {
+        page1Url = await uploadContractImage(page1File, newContract.id, 1);
+      }
+      if (page2File) {
+        page2Url = await uploadContractImage(page2File, newContract.id, 2);
+      }
+
+      // Update contract with image URLs if any were uploaded
+      if (page1Url || page2Url) {
+        await supabase
+          .from('contracts')
+          .update({ 
+            page1_url: page1Url,
+            page2_url: page2Url 
+          })
+          .eq('id', newContract.id);
+      }
+
+      toast.success('Contract added successfully');
+      refetch();
+      setIsOpen(false);
+      resetFormData();
+    } catch (error: any) {
+      toast.error(`Failed to add contract: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const resetFormData = () => {
@@ -155,6 +243,10 @@ export function ContractsView() {
       annual_leave_days: '30',
       probation_period: '6',
     });
+    setPage1Preview(null);
+    setPage2Preview(null);
+    setPage1File(null);
+    setPage2File(null);
   };
 
   const handleOpenRenewal = (contract: typeof contracts[0]) => {
@@ -407,8 +499,122 @@ export function ContractsView() {
                       <Input type="number" value={formData.probation_period} onChange={(e) => setFormData({ ...formData, probation_period: e.target.value })} />
                     </div>
                   </div>
-                  <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={addContract.isPending}>
-                    {addContract.isPending ? 'Adding...' : 'Add Contract'}
+
+                  {/* Contract Page Images Upload */}
+                  <div className="pt-4 border-t border-border">
+                    <label className="text-xs text-muted-foreground font-medium mb-3 block">Contract Document Images (Optional)</label>
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Page 1 Upload */}
+                      <div 
+                        className={cn(
+                          "relative group cursor-pointer rounded-xl border-2 border-dashed transition-all duration-300 overflow-hidden",
+                          page1Preview 
+                            ? "border-primary/50 bg-primary/5" 
+                            : "border-border hover:border-primary/30 hover:bg-secondary/50"
+                        )}
+                        onClick={() => page1InputRef.current?.click()}
+                      >
+                        <input
+                          ref={page1InputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleFileChange(e.target.files?.[0] || null, 1)}
+                        />
+                        {page1Preview ? (
+                          <div className="relative animate-scale-in">
+                            <img 
+                              src={page1Preview} 
+                              alt="Contract Page 1" 
+                              className="w-full h-32 object-cover"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                              <span className="text-xs text-white font-medium bg-primary/80 px-2 py-1 rounded">1st Page</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPage1Preview(null);
+                                  setPage1File(null);
+                                }}
+                                className="w-6 h-6 rounded-full bg-destructive/80 text-white flex items-center justify-center hover:bg-destructive transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-6 flex flex-col items-center justify-center text-center animate-fade-in">
+                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                              <Image className="w-5 h-5 text-primary" />
+                            </div>
+                            <p className="text-xs font-medium text-foreground">1st Page</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">Click to upload</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Page 2 Upload */}
+                      <div 
+                        className={cn(
+                          "relative group cursor-pointer rounded-xl border-2 border-dashed transition-all duration-300 overflow-hidden",
+                          page2Preview 
+                            ? "border-primary/50 bg-primary/5" 
+                            : "border-border hover:border-primary/30 hover:bg-secondary/50"
+                        )}
+                        onClick={() => page2InputRef.current?.click()}
+                      >
+                        <input
+                          ref={page2InputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleFileChange(e.target.files?.[0] || null, 2)}
+                        />
+                        {page2Preview ? (
+                          <div className="relative animate-scale-in">
+                            <img 
+                              src={page2Preview} 
+                              alt="Contract Page 2" 
+                              className="w-full h-32 object-cover"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                              <span className="text-xs text-white font-medium bg-primary/80 px-2 py-1 rounded">2nd Page</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPage2Preview(null);
+                                  setPage2File(null);
+                                }}
+                                className="w-6 h-6 rounded-full bg-destructive/80 text-white flex items-center justify-center hover:bg-destructive transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-6 flex flex-col items-center justify-center text-center animate-fade-in">
+                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                              <Image className="w-5 h-5 text-primary" />
+                            </div>
+                            <p className="text-xs font-medium text-foreground">2nd Page</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">Click to upload</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isUploading}>
+                    {isUploading ? (
+                      <span className="flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Uploading...
+                      </span>
+                    ) : 'Add Contract'}
                   </Button>
                 </form>
               </DialogContent>
@@ -517,6 +723,44 @@ export function ContractsView() {
                           <p className="text-xs text-foreground">{contract.annual_leave_days} days</p>
                         </div>
                       </div>
+
+                      {/* Contract Page Images */}
+                      {((contract as any).page1_url || (contract as any).page2_url) && (
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+                          {(contract as any).page1_url && (
+                            <a 
+                              href={(contract as any).page1_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="group relative w-16 h-16 rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-all hover:scale-105"
+                            >
+                              <img 
+                                src={(contract as any).page1_url} 
+                                alt="Contract Page 1" 
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <span className="absolute bottom-1 left-1 text-[8px] text-white font-medium bg-primary/80 px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">1st</span>
+                            </a>
+                          )}
+                          {(contract as any).page2_url && (
+                            <a 
+                              href={(contract as any).page2_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="group relative w-16 h-16 rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-all hover:scale-105"
+                            >
+                              <img 
+                                src={(contract as any).page2_url} 
+                                alt="Contract Page 2" 
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <span className="absolute bottom-1 left-1 text-[8px] text-white font-medium bg-primary/80 px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">2nd</span>
+                            </a>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap gap-2">

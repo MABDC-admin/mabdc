@@ -146,6 +146,8 @@ export type Database = {
           job_title_arabic: string | null
           mohre_contract_no: string
           notice_period: number | null
+          page1_url: string | null
+          page2_url: string | null
           probation_period: number | null
           start_date: string
           status: string | null
@@ -167,6 +169,8 @@ export type Database = {
           job_title_arabic?: string | null
           mohre_contract_no: string
           notice_period?: number | null
+          page1_url?: string | null
+          page2_url?: string | null
           probation_period?: number | null
           start_date: string
           status?: string | null
@@ -188,6 +192,8 @@ export type Database = {
           job_title_arabic?: string | null
           mohre_contract_no?: string
           notice_period?: number | null
+          page1_url?: string | null
+          page2_url?: string | null
           probation_period?: number | null
           start_date?: string
           status?: string | null
