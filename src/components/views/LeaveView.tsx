@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLeave, useLeaveTypes, usePublicHolidays, useUpdateLeaveStatus, useAddLeave, useAddPublicHoliday } from '@/hooks/useLeave';
+import { useLeave, useLeaveTypes, usePublicHolidays, useUpdateLeaveStatus, useAddLeave, useAddPublicHoliday, useAllocateLeave, useBulkAllocateLeave, useAllLeaveBalances } from '@/hooks/useLeave';
 import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,21 +8,27 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Check, X, Clock, RefreshCw, Plus, Calendar, FileText, AlertCircle, CalendarDays, Users } from 'lucide-react';
+import { Check, X, Clock, RefreshCw, Plus, Calendar, FileText, AlertCircle, CalendarDays, Users, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, differenceInDays } from 'date-fns';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export function LeaveView() {
   const { data: leave = [], isLoading, refetch } = useLeave();
   const { data: leaveTypes = [] } = useLeaveTypes();
   const { data: holidays = [] } = usePublicHolidays();
   const { data: employees = [] } = useEmployees();
+  const { data: allBalances = [], refetch: refetchBalances } = useAllLeaveBalances();
   const updateStatus = useUpdateLeaveStatus();
   const addLeave = useAddLeave();
   const addHoliday = useAddPublicHoliday();
+  const allocateLeave = useAllocateLeave();
+  const bulkAllocate = useBulkAllocateLeave();
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
+  const [isAllocateModalOpen, setIsAllocateModalOpen] = useState(false);
+  const [isBulkAllocateModalOpen, setIsBulkAllocateModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('requests');
 
   const [leaveForm, setLeaveForm] = useState({
@@ -40,6 +46,21 @@ export function LeaveView() {
     name_arabic: '',
     is_half_day: false,
   });
+
+  const [allocateForm, setAllocateForm] = useState({
+    employee_id: '',
+    leave_type_id: '',
+    entitled_days: '',
+    carried_forward_days: '',
+  });
+
+  const [bulkForm, setBulkForm] = useState({
+    leave_type_id: '',
+    entitled_days: '',
+    selected_employees: [] as string[],
+  });
+
+  const currentYear = new Date().getFullYear();
 
   const handleApprove = (id: string) => {
     updateStatus.mutate({ id, status: 'Approved' });
@@ -85,6 +106,57 @@ export function LeaveView() {
     });
   };
 
+  const handleSubmitAllocate = (e: React.FormEvent) => {
+    e.preventDefault();
+    allocateLeave.mutate({
+      employee_id: allocateForm.employee_id,
+      leave_type_id: allocateForm.leave_type_id,
+      year: currentYear,
+      entitled_days: parseFloat(allocateForm.entitled_days),
+      carried_forward_days: parseFloat(allocateForm.carried_forward_days) || 0,
+    }, {
+      onSuccess: () => {
+        setIsAllocateModalOpen(false);
+        setAllocateForm({ employee_id: '', leave_type_id: '', entitled_days: '', carried_forward_days: '' });
+        refetchBalances();
+      }
+    });
+  };
+
+  const handleBulkAllocate = (e: React.FormEvent) => {
+    e.preventDefault();
+    bulkAllocate.mutate({
+      employee_ids: bulkForm.selected_employees,
+      leave_type_id: bulkForm.leave_type_id,
+      year: currentYear,
+      entitled_days: parseFloat(bulkForm.entitled_days),
+    }, {
+      onSuccess: () => {
+        setIsBulkAllocateModalOpen(false);
+        setBulkForm({ leave_type_id: '', entitled_days: '', selected_employees: [] });
+        refetchBalances();
+      }
+    });
+  };
+
+  const toggleEmployeeSelection = (empId: string) => {
+    setBulkForm(prev => ({
+      ...prev,
+      selected_employees: prev.selected_employees.includes(empId)
+        ? prev.selected_employees.filter(id => id !== empId)
+        : [...prev.selected_employees, empId]
+    }));
+  };
+
+  const selectAllEmployees = () => {
+    setBulkForm(prev => ({
+      ...prev,
+      selected_employees: prev.selected_employees.length === employees.length 
+        ? [] 
+        : employees.map(e => e.id)
+    }));
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Approved': return 'bg-primary/10 text-primary border-primary/30';
@@ -105,6 +177,19 @@ export function LeaveView() {
   const pendingCount = leave.filter(l => l.status === 'Pending').length;
   const approvedCount = leave.filter(l => l.status === 'Approved').length;
 
+  // Group balances by employee
+  const balancesByEmployee = allBalances.reduce((acc, balance) => {
+    const empId = balance.employee_id;
+    if (!acc[empId]) {
+      acc[empId] = {
+        employee: balance.employees,
+        balances: []
+      };
+    }
+    acc[empId].balances.push(balance);
+    return acc;
+  }, {} as Record<string, { employee: { id: string; full_name: string; hrms_no: string; department: string }; balances: typeof allBalances }>);
+
   return (
     <div className="space-y-6 animate-slide-up">
       {/* Header */}
@@ -114,7 +199,7 @@ export function LeaveView() {
           <p className="text-sm text-muted-foreground mt-1">UAE Labour Law Compliant Leave System</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="border-border">
+          <Button variant="outline" size="sm" onClick={() => { refetch(); refetchBalances(); }} className="border-border">
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
           </Button>
           <Button size="sm" onClick={() => setIsRequestModalOpen(true)} className="bg-primary hover:bg-primary/90">
@@ -124,7 +209,7 @@ export function LeaveView() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="stat-card rounded-2xl border border-border p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
@@ -169,6 +254,17 @@ export function LeaveView() {
             </div>
           </div>
         </div>
+        <div className="stat-card rounded-2xl border border-border p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-uae-green/10 flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-uae-green" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">{Object.keys(balancesByEmployee).length}</p>
+              <p className="text-xs text-muted-foreground">Allocated</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -176,6 +272,9 @@ export function LeaveView() {
         <TabsList className="bg-secondary/50 border border-border">
           <TabsTrigger value="requests" className="data-[state=active]:bg-card">
             <Clock className="w-4 h-4 mr-2" /> Requests
+          </TabsTrigger>
+          <TabsTrigger value="allocation" className="data-[state=active]:bg-card">
+            <Wallet className="w-4 h-4 mr-2" /> Allocation
           </TabsTrigger>
           <TabsTrigger value="types" className="data-[state=active]:bg-card">
             <FileText className="w-4 h-4 mr-2" /> Leave Types
@@ -274,6 +373,80 @@ export function LeaveView() {
           </div>
         </TabsContent>
 
+        {/* Leave Allocation Tab */}
+        <TabsContent value="allocation" className="mt-4">
+          <div className="glass-card rounded-2xl border border-border p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Leave Allocation - {currentYear}</h2>
+                <p className="text-xs text-muted-foreground">Assign leave entitlements to employees</p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setIsAllocateModalOpen(true)} className="border-border">
+                  <Plus className="w-4 h-4 mr-1" /> Individual
+                </Button>
+                <Button size="sm" onClick={() => setIsBulkAllocateModalOpen(true)} className="bg-primary hover:bg-primary/90">
+                  <Users className="w-4 h-4 mr-1" /> Bulk Allocate
+                </Button>
+              </div>
+            </div>
+
+            {Object.keys(balancesByEmployee).length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Wallet className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                <p className="text-sm font-medium">No leave allocated yet</p>
+                <p className="text-xs mt-1">Allocate leave entitlements to employees for {currentYear}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {Object.values(balancesByEmployee).map(({ employee, balances }) => (
+                  <div key={employee.id} className="glass-card rounded-xl border border-border p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-lg avatar-gradient flex items-center justify-center text-sm font-bold text-primary-foreground">
+                        {employee.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">{employee.full_name}</h3>
+                        <p className="text-[10px] text-muted-foreground">{employee.hrms_no} • {employee.department}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                      {balances.map((balance) => {
+                        const remaining = Number(balance.entitled_days) + Number(balance.carried_forward_days) - Number(balance.used_days) - Number(balance.pending_days);
+                        const percentUsed = ((Number(balance.used_days) + Number(balance.pending_days)) / (Number(balance.entitled_days) + Number(balance.carried_forward_days))) * 100;
+                        return (
+                          <div key={balance.id} className="p-3 rounded-lg bg-secondary/30 border border-border">
+                            <p className="text-[10px] font-medium text-muted-foreground mb-1 truncate">
+                              {balance.leave_types?.name || 'Unknown'}
+                            </p>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-lg font-bold text-foreground">{remaining.toFixed(0)}</span>
+                              <span className="text-[10px] text-muted-foreground">/ {(Number(balance.entitled_days) + Number(balance.carried_forward_days)).toFixed(0)}</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-muted rounded-full mt-2 overflow-hidden">
+                              <div 
+                                className={cn(
+                                  "h-full rounded-full transition-all",
+                                  percentUsed > 80 ? "bg-destructive" : percentUsed > 50 ? "bg-amber-500" : "bg-primary"
+                                )}
+                                style={{ width: `${Math.min(percentUsed, 100)}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between mt-1 text-[9px] text-muted-foreground">
+                              <span>Used: {Number(balance.used_days).toFixed(0)}</span>
+                              <span>Pending: {Number(balance.pending_days).toFixed(0)}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
         {/* Leave Types Tab */}
         <TabsContent value="types" className="mt-4">
           <div className="glass-card rounded-2xl border border-border p-4">
@@ -334,10 +507,6 @@ export function LeaveView() {
         </TabsContent>
 
         {/* Public Holidays Tab */}
-        <TabsContent value="types" className="mt-4">
-          {/* Leave Types content from above */}
-        </TabsContent>
-
         <TabsContent value="holidays" className="mt-4">
           <div className="glass-card rounded-2xl border border-border p-4">
             <div className="flex items-center justify-between mb-4">
@@ -456,12 +625,10 @@ export function LeaveView() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 id="emergency"
                 checked={leaveForm.is_emergency}
-                onChange={(e) => setLeaveForm({ ...leaveForm, is_emergency: e.target.checked })}
-                className="rounded border-border"
+                onCheckedChange={(checked) => setLeaveForm({ ...leaveForm, is_emergency: checked as boolean })}
               />
               <Label htmlFor="emergency" className="text-xs text-muted-foreground cursor-pointer">
                 This is an emergency leave request
@@ -472,6 +639,165 @@ export function LeaveView() {
                 {addLeave.isPending ? 'Submitting...' : 'Submit Request'}
               </Button>
               <Button type="button" variant="outline" onClick={() => setIsRequestModalOpen(false)} className="border-border">
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Individual Allocate Modal */}
+      <Dialog open={isAllocateModalOpen} onOpenChange={setIsAllocateModalOpen}>
+        <DialogContent className="max-w-md glass-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-foreground">Allocate Leave - {currentYear}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmitAllocate} className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Employee *</Label>
+              <Select value={allocateForm.employee_id} onValueChange={(v) => setAllocateForm({ ...allocateForm, employee_id: v })}>
+                <SelectTrigger className="bg-secondary/50 border-border">
+                  <SelectValue placeholder="Select employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>{emp.hrms_no} - {emp.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Leave Type *</Label>
+              <Select value={allocateForm.leave_type_id} onValueChange={(v) => setAllocateForm({ ...allocateForm, leave_type_id: v })}>
+                <SelectTrigger className="bg-secondary/50 border-border">
+                  <SelectValue placeholder="Select leave type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {leaveTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>{type.name} ({type.max_days_per_year} days)</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Entitled Days *</Label>
+                <Input
+                  type="number"
+                  required
+                  min="0"
+                  step="0.5"
+                  value={allocateForm.entitled_days}
+                  onChange={(e) => setAllocateForm({ ...allocateForm, entitled_days: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                  placeholder="30"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Carry Forward</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={allocateForm.carried_forward_days}
+                  onChange={(e) => setAllocateForm({ ...allocateForm, carried_forward_days: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-4 border-t border-border">
+              <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90" disabled={allocateLeave.isPending}>
+                {allocateLeave.isPending ? 'Allocating...' : 'Allocate'}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setIsAllocateModalOpen(false)} className="border-border">
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Allocate Modal */}
+      <Dialog open={isBulkAllocateModalOpen} onOpenChange={setIsBulkAllocateModalOpen}>
+        <DialogContent className="max-w-lg glass-card border-border max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-foreground">Bulk Allocate Leave - {currentYear}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleBulkAllocate} className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Leave Type *</Label>
+              <Select value={bulkForm.leave_type_id} onValueChange={(v) => setBulkForm({ ...bulkForm, leave_type_id: v })}>
+                <SelectTrigger className="bg-secondary/50 border-border">
+                  <SelectValue placeholder="Select leave type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {leaveTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>{type.name} ({type.max_days_per_year} days)</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Entitled Days *</Label>
+              <Input
+                type="number"
+                required
+                min="0"
+                step="0.5"
+                value={bulkForm.entitled_days}
+                onChange={(e) => setBulkForm({ ...bulkForm, entitled_days: e.target.value })}
+                className="bg-secondary/50 border-border"
+                placeholder="30"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">Select Employees *</Label>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={selectAllEmployees}
+                  className="text-xs h-auto py-1"
+                >
+                  {bulkForm.selected_employees.length === employees.length ? 'Deselect All' : 'Select All'}
+                </Button>
+              </div>
+              <div className="max-h-48 overflow-y-auto rounded-lg border border-border p-2 space-y-1 bg-secondary/20">
+                {employees.map((emp) => (
+                  <div 
+                    key={emp.id} 
+                    className={cn(
+                      "flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors",
+                      bulkForm.selected_employees.includes(emp.id) ? "bg-primary/10" : "hover:bg-secondary/50"
+                    )}
+                    onClick={() => toggleEmployeeSelection(emp.id)}
+                  >
+                    <Checkbox 
+                      checked={bulkForm.selected_employees.includes(emp.id)}
+                      onCheckedChange={() => toggleEmployeeSelection(emp.id)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">{emp.full_name}</p>
+                      <p className="text-[10px] text-muted-foreground">{emp.hrms_no} • {emp.department}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {bulkForm.selected_employees.length} of {employees.length} employees selected
+              </p>
+            </div>
+            <div className="flex gap-2 pt-4 border-t border-border">
+              <Button 
+                type="submit" 
+                className="flex-1 bg-primary hover:bg-primary/90" 
+                disabled={bulkAllocate.isPending || bulkForm.selected_employees.length === 0}
+              >
+                {bulkAllocate.isPending ? 'Allocating...' : `Allocate to ${bulkForm.selected_employees.length} Employees`}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setIsBulkAllocateModalOpen(false)} className="border-border">
                 Cancel
               </Button>
             </div>
@@ -517,12 +843,10 @@ export function LeaveView() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 id="halfday"
                 checked={holidayForm.is_half_day}
-                onChange={(e) => setHolidayForm({ ...holidayForm, is_half_day: e.target.checked })}
-                className="rounded border-border"
+                onCheckedChange={(checked) => setHolidayForm({ ...holidayForm, is_half_day: checked as boolean })}
               />
               <Label htmlFor="halfday" className="text-xs text-muted-foreground cursor-pointer">
                 This is a half-day holiday
