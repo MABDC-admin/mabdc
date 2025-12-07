@@ -134,9 +134,17 @@ export function EmployeesView() {
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-4">
-                      <span className="w-14 h-14 rounded-xl avatar-gradient flex items-center justify-center text-lg font-bold text-primary-foreground">
-                        {getInitials(emp.full_name)}
-                      </span>
+                      {emp.photo_url ? (
+                        <img 
+                          src={emp.photo_url} 
+                          alt={emp.full_name}
+                          className="w-14 h-14 rounded-xl object-cover"
+                        />
+                      ) : (
+                        <span className="w-14 h-14 rounded-xl avatar-gradient flex items-center justify-center text-lg font-bold text-primary-foreground">
+                          {getInitials(emp.full_name)}
+                        </span>
+                      )}
                       <div>
                         <h3 className="text-base font-semibold text-foreground">{emp.full_name}</h3>
                         <p className="text-xs text-muted-foreground">{emp.hrms_no} • {emp.department}</p>

@@ -141,6 +141,7 @@ export type Database = {
           created_at: string
           employee_id: string
           end_date: string | null
+          housing_allowance: number | null
           id: string
           job_title_arabic: string | null
           mohre_contract_no: string
@@ -149,6 +150,7 @@ export type Database = {
           start_date: string
           status: string | null
           total_salary: number | null
+          transportation_allowance: number | null
           updated_at: string
           work_location: string | null
           working_hours: number | null
@@ -160,6 +162,7 @@ export type Database = {
           created_at?: string
           employee_id: string
           end_date?: string | null
+          housing_allowance?: number | null
           id?: string
           job_title_arabic?: string | null
           mohre_contract_no: string
@@ -168,6 +171,7 @@ export type Database = {
           start_date: string
           status?: string | null
           total_salary?: number | null
+          transportation_allowance?: number | null
           updated_at?: string
           work_location?: string | null
           working_hours?: number | null
@@ -179,6 +183,7 @@ export type Database = {
           created_at?: string
           employee_id?: string
           end_date?: string | null
+          housing_allowance?: number | null
           id?: string
           job_title_arabic?: string | null
           mohre_contract_no?: string
@@ -187,6 +192,7 @@ export type Database = {
           start_date?: string
           status?: string | null
           total_salary?: number | null
+          transportation_allowance?: number | null
           updated_at?: string
           work_location?: string | null
           working_hours?: number | null
