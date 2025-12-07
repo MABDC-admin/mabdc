@@ -222,3 +222,104 @@ export function useAddPublicHoliday() {
     },
   });
 }
+
+export function useAllocateLeave() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (allocation: {
+      employee_id: string;
+      leave_type_id: string;
+      year: number;
+      entitled_days: number;
+      carried_forward_days?: number;
+    }) => {
+      // Upsert - update if exists, insert if not
+      const { data, error } = await supabase
+        .from('leave_balances')
+        .upsert([{
+          employee_id: allocation.employee_id,
+          leave_type_id: allocation.leave_type_id,
+          year: allocation.year,
+          entitled_days: allocation.entitled_days,
+          carried_forward_days: allocation.carried_forward_days || 0,
+          used_days: 0,
+          pending_days: 0,
+        }], {
+          onConflict: 'employee_id,leave_type_id,year',
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
+      toast.success('Leave allocated successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to allocate leave: ${error.message}`);
+    },
+  });
+}
+
+export function useBulkAllocateLeave() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (allocations: {
+      employee_ids: string[];
+      leave_type_id: string;
+      year: number;
+      entitled_days: number;
+    }) => {
+      const records = allocations.employee_ids.map(employee_id => ({
+        employee_id,
+        leave_type_id: allocations.leave_type_id,
+        year: allocations.year,
+        entitled_days: allocations.entitled_days,
+        carried_forward_days: 0,
+        used_days: 0,
+        pending_days: 0,
+      }));
+
+      const { data, error } = await supabase
+        .from('leave_balances')
+        .upsert(records, {
+          onConflict: 'employee_id,leave_type_id,year',
+        })
+        .select();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
+      toast.success(`Leave allocated to ${data?.length || 0} employees`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to allocate leave: ${error.message}`);
+    },
+  });
+}
+
+export function useAllLeaveBalances() {
+  return useQuery({
+    queryKey: ['all_leave_balances'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('leave_balances')
+        .select(`
+          *,
+          leave_types (*),
+          employees (id, full_name, hrms_no, department)
+        `)
+        .eq('year', new Date().getFullYear())
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as (LeaveBalance & { employees: { id: string; full_name: string; hrms_no: string; department: string } })[];
+    },
+  });
+}
