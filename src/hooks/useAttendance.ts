@@ -138,6 +138,7 @@ export function useCheckInByHRMS() {
       if (error) throw error;
       return { 
         ...data, 
+        employeeId: employee.id,
         employeeName: employee.full_name, 
         employeePhoto: employee.photo_url,
         department: employee.department,

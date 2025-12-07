@@ -2,3 +2,9 @@ project_id = "fwdtjszxnnfqxjevlasm"
 
 [functions.check-contract-expiry]
 verify_jwt = false
+
+[functions.send-late-notification]
+verify_jwt = false
+
+[functions.send-daily-summary]
+verify_jwt = false
