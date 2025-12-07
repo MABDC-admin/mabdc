@@ -8,10 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Check, X, Clock, RefreshCw, Plus, Calendar, FileText, AlertCircle, CalendarDays, Users, Wallet } from 'lucide-react';
+import { Check, X, Clock, RefreshCw, Plus, Calendar, FileText, AlertCircle, CalendarDays, Users, Wallet, LayoutGrid } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, differenceInDays } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
+import { CalendarView } from '@/components/calendar/CalendarView';
 
 export function LeaveView() {
   const { data: leave = [], isLoading, refetch } = useLeave();
@@ -269,9 +270,12 @@ export function LeaveView() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-secondary/50 border border-border">
+        <TabsList className="bg-secondary/50 border border-border flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="requests" className="data-[state=active]:bg-card">
             <Clock className="w-4 h-4 mr-2" /> Requests
+          </TabsTrigger>
+          <TabsTrigger value="calendar" className="data-[state=active]:bg-card">
+            <LayoutGrid className="w-4 h-4 mr-2" /> Calendar
           </TabsTrigger>
           <TabsTrigger value="allocation" className="data-[state=active]:bg-card">
             <Wallet className="w-4 h-4 mr-2" /> Allocation
@@ -283,6 +287,11 @@ export function LeaveView() {
             <Calendar className="w-4 h-4 mr-2" /> Holidays
           </TabsTrigger>
         </TabsList>
+
+        {/* Calendar Tab */}
+        <TabsContent value="calendar" className="mt-4">
+          <CalendarView />
+        </TabsContent>
 
         {/* Leave Requests Tab */}
         <TabsContent value="requests" className="mt-4">

@@ -6,6 +6,7 @@ import { AttendanceView } from '@/components/views/AttendanceView';
 import { LeaveView } from '@/components/views/LeaveView';
 import { PayrollView } from '@/components/views/PayrollView';
 import { EOSView } from '@/components/views/EOSView';
+import { SettingsView } from '@/components/views/SettingsView';
 import { useHRStore } from '@/store/hrStore';
 
 const Index = () => {
@@ -27,6 +28,8 @@ const Index = () => {
         return <PayrollView />;
       case 'eos':
         return <EOSView />;
+      case 'settings':
+        return <SettingsView />;
       default:
         return <DashboardView />;
     }
