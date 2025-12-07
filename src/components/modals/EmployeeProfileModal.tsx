@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import emiratesIdCard from '@/assets/emirates-id-card.png';
 import { Pencil, Trash2, FileText, Upload, Download, X, Camera, Calendar, Bell, AlertTriangle } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { toast } from 'sonner';
@@ -566,7 +567,16 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
             {activeTab === 'documents' && (
               <div className="space-y-6 animate-fade-in">
                 <div className="glass-card rounded-2xl border border-border p-5">
-                  <h3 className="text-lg font-semibold text-foreground mb-4">EMPLOYEE DOCUMENTS</h3>
+                  {/* Animated Emirates ID at top center */}
+                  <div className="flex justify-center mb-6">
+                    <img 
+                      src={emiratesIdCard} 
+                      alt="Emirates ID" 
+                      className="w-32 h-auto animate-float drop-shadow-lg"
+                    />
+                  </div>
+                  
+                  <h3 className="text-lg font-semibold text-foreground mb-4 text-center">EMPLOYEE DOCUMENTS</h3>
                   
                   <div 
                     className="file-drop-area p-8 text-center mb-6 border-2 border-dashed border-border rounded-xl hover:border-primary/50 transition-colors cursor-pointer"
