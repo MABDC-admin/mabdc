@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useEmployees, useDeleteEmployee } from '@/hooks/useEmployees';
+import { useLeave } from '@/hooks/useLeave';
 import { useHRStore } from '@/store/hrStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
 import { AddEmployeeModal } from '@/components/modals/AddEmployeeModal';
-import { Search, Plus, Trash2, RefreshCw, Link2, Copy } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Link2, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/hr';
 import { toast } from 'sonner';
@@ -27,12 +28,20 @@ import {
 
 export function EmployeesView() {
   const { data: employees = [], isLoading, refetch } = useEmployees();
+  const { data: leaveRecords = [] } = useLeave();
   const deleteEmployee = useDeleteEmployee();
   const { setCurrentEmployee } = useHRStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Get employees with pending leave requests
+  const employeesWithPendingLeave = new Set(
+    leaveRecords
+      .filter(l => l.status === 'Pending')
+      .map(l => l.employee_id)
+  );
 
   const filteredEmployees = employees.filter(emp =>
     emp.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -127,11 +136,21 @@ export function EmployeesView() {
           ) : (
             filteredEmployees.map((emp) => {
               const visaDays = getVisaDaysRemaining(emp);
+              const hasPendingLeave = employeesWithPendingLeave.has(emp.id);
               return (
                 <div 
                   key={emp.id} 
-                  className="glass-card rounded-2xl border border-border p-4 hover:border-muted-foreground/30 transition-colors"
+                  className={cn(
+                    "glass-card rounded-2xl border border-border p-4 hover:border-muted-foreground/30 transition-colors relative",
+                    hasPendingLeave && "animate-pulse border-amber-500/50 bg-amber-500/5"
+                  )}
                 >
+                  {hasPendingLeave && (
+                    <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-medium">
+                      <Clock className="w-3 h-3" />
+                      Pending Leave
+                    </div>
+                  )}
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-4">
                       {emp.photo_url ? (
