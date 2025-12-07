@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.2";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -82,13 +82,6 @@ const handler = async (req: Request): Promise<Response> => {
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
           .container { max-width: 700px; margin: 0 auto; }
           .header { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 30px; text-align: center; }
-          .stats { display: flex; justify-content: space-around; padding: 20px; background: #f9fafb; }
-          .stat-box { text-align: center; padding: 15px 25px; }
-          .stat-number { font-size: 32px; font-weight: bold; }
-          .stat-label { font-size: 14px; color: #6b7280; margin-top: 5px; }
-          .present { color: #10b981; }
-          .late { color: #f59e0b; }
-          .absent { color: #ef4444; }
           .section { padding: 20px; }
           .section-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #374151; }
           table { width: 100%; border-collapse: collapse; }
@@ -100,31 +93,33 @@ const handler = async (req: Request): Promise<Response> => {
       <body>
         <div class="container">
           <div class="header">
-            <h1 style="margin: 0;">📊 Daily Attendance Summary</h1>
+            <h1 style="margin: 0;">Daily Attendance Summary</h1>
             <p style="margin: 10px 0 0 0; opacity: 0.9;">${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Dubai' })}</p>
           </div>
           
-          <div class="stats">
-            <div class="stat-box">
-              <div class="stat-number">${totalEmployees}</div>
-              <div class="stat-label">Total Employees</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-number present">${presentCount}</div>
-              <div class="stat-label">On Time</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-number late">${lateCount}</div>
-              <div class="stat-label">Late</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-number absent">${absentCount}</div>
-              <div class="stat-label">Absent</div>
-            </div>
-          </div>
+          <table style="width: 100%;">
+            <tr>
+              <td style="text-align: center; padding: 20px; background: #f9fafb;">
+                <div style="font-size: 32px; font-weight: bold;">${totalEmployees}</div>
+                <div style="font-size: 14px; color: #6b7280;">Total Employees</div>
+              </td>
+              <td style="text-align: center; padding: 20px; background: #f9fafb;">
+                <div style="font-size: 32px; font-weight: bold; color: #10b981;">${presentCount}</div>
+                <div style="font-size: 14px; color: #6b7280;">On Time</div>
+              </td>
+              <td style="text-align: center; padding: 20px; background: #f9fafb;">
+                <div style="font-size: 32px; font-weight: bold; color: #f59e0b;">${lateCount}</div>
+                <div style="font-size: 14px; color: #6b7280;">Late</div>
+              </td>
+              <td style="text-align: center; padding: 20px; background: #f9fafb;">
+                <div style="font-size: 32px; font-weight: bold; color: #ef4444;">${absentCount}</div>
+                <div style="font-size: 14px; color: #6b7280;">Absent</div>
+              </td>
+            </tr>
+          </table>
 
           <div class="section">
-            <div class="section-title">⚠️ Late Arrivals Today</div>
+            <div class="section-title">Late Arrivals Today</div>
             ${lateEmployees.length > 0 ? `
               <table>
                 <thead>
@@ -140,7 +135,7 @@ const handler = async (req: Request): Promise<Response> => {
                 </tbody>
               </table>
             ` : `
-              <div class="no-late">✅ No late arrivals today! All employees arrived on time.</div>
+              <div class="no-late">No late arrivals today! All employees arrived on time.</div>
             `}
           </div>
 
@@ -153,28 +148,26 @@ const handler = async (req: Request): Promise<Response> => {
       </html>
     `;
 
-    // Send email
-    const client = new SMTPClient({
-      connection: {
-        hostname: Deno.env.get("SMTP_HOST") || "",
-        port: parseInt(Deno.env.get("SMTP_PORT") || "587"),
-        tls: true,
-        auth: {
-          username: Deno.env.get("SMTP_USER") || "",
-          password: Deno.env.get("SMTP_PASS") || "",
-        },
-      },
+    // Send email using SmtpClient
+    const client = new SmtpClient();
+
+    await client.connectTLS({
+      hostname: Deno.env.get("SMTP_HOST") || "",
+      port: parseInt(Deno.env.get("SMTP_PORT") || "587"),
+      username: Deno.env.get("SMTP_USER") || "",
+      password: Deno.env.get("SMTP_PASS") || "",
     });
 
     await client.send({
       from: Deno.env.get("SMTP_FROM_EMAIL") || "",
       to: Deno.env.get("HR_NOTIFICATION_EMAIL") || "",
-      subject: `📊 Daily Attendance Summary - ${today} | ${presentCount} Present, ${lateCount} Late, ${absentCount} Absent`,
-      content: "Daily attendance summary",
+      subject: `Daily Attendance Summary - ${today} | ${presentCount} Present, ${lateCount} Late, ${absentCount} Absent`,
+      content: `Daily Attendance Summary - ${today}\n\nTotal: ${totalEmployees}\nOn Time: ${presentCount}\nLate: ${lateCount}\nAbsent: ${absentCount}`,
       html: emailHtml,
     });
 
     await client.close();
+
     console.log("Daily summary email sent successfully");
 
     return new Response(JSON.stringify({ 
