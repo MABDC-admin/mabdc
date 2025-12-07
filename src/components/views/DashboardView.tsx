@@ -202,34 +202,42 @@ export function DashboardView() {
           </div>
         </div>
 
-        {/* Status Overview */}
+        {/* Today's Late Employees */}
         <div className="glass-card rounded-2xl border border-border p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground">Status Overview</h2>
-            <Calendar className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              Today's Late Employees
+            </h2>
+            <span className="text-xs text-amber-500 font-medium">{lateToday} late</span>
           </div>
-          <div className="h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={statusData} layout="vertical">
-                <XAxis type="number" hide />
-                <YAxis 
-                  type="category" 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false}
-                  tick={{ fill: 'hsl(215, 20%, 65%)', fontSize: 11 }}
-                  width={80}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(222, 47%, 6%)', 
-                    border: '1px solid hsl(217, 33%, 17%)',
-                    borderRadius: '8px'
-                  }}
-                />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-[200px] overflow-y-auto soft-scroll">
+            {todayAttendance.filter(a => a.status === 'Late').length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                <CheckCircle className="w-10 h-10 mb-2 text-primary opacity-50" />
+                <p className="text-sm font-medium">All on time!</p>
+                <p className="text-xs opacity-70">No late arrivals today</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {todayAttendance.filter(a => a.status === 'Late').map((record) => (
+                  <div key={record.id} className="flex items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-xs font-bold text-amber-500">
+                        {record.employees?.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '??'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{record.employees?.full_name}</p>
+                        <p className="text-[10px] text-muted-foreground">Check-in: {record.check_in || '--:--'}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] px-2 py-1 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                      Late
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
