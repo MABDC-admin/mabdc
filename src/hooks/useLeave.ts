@@ -174,6 +174,55 @@ export function useUpdateLeaveStatus() {
   });
 }
 
+export function useUpdateLeave() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string } & Partial<Omit<LeaveRecord, 'id' | 'created_at' | 'employees'>>) => {
+      const { data, error } = await supabase
+        .from('leave_records')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leave'] });
+      queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
+      toast.success('Leave request updated');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update leave: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteLeave() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('leave_records')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leave'] });
+      queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
+      toast.success('Leave request deleted');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete leave: ${error.message}`);
+    },
+  });
+}
+
 export function useAddLeave() {
   const queryClient = useQueryClient();
   
