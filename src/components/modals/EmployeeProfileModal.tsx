@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useHRStore } from '@/store/hrStore';
 import { useDeleteEmployee, useEmployees } from '@/hooks/useEmployees';
 import { useEmployeeDocuments, useUploadDocument, useDeleteDocument, useUploadEmployeePhoto } from '@/hooks/useDocuments';
-import { useLeave } from '@/hooks/useLeave';
+import { useLeave, useDeleteLeave, useUpdateLeave } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { EditEmployeeModal } from './EditEmployeeModal';
 import { LeaveRequestModal } from './LeaveRequestModal';
@@ -47,7 +47,9 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
   const uploadPhoto = useUploadEmployeePhoto();
 
   // Hooks for leave records
-  const { data: leaveRecords = [] } = useLeave();
+  const { data: leaveRecords = [], refetch: refetchLeave } = useLeave();
+  const deleteLeave = useDeleteLeave();
+  const [editingLeave, setEditingLeave] = useState<string | null>(null);
   const employeeLeaveRecords = leaveRecords.filter(r => r.employee_id === currentEmployee?.id);
 
   // Hooks for contracts
@@ -582,21 +584,50 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                     ) : (
                       <div className="space-y-2">
                         {employeeLeaveRecords.slice(0, 5).map((record) => (
-                          <div key={record.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
+                          <div key={record.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 group">
                             <span className="text-sm text-foreground">
                               {record.leave_type} – {record.days_count} day(s)
                               <span className="text-xs text-muted-foreground ml-2">
                                 ({format(parseISO(record.start_date), 'dd MMM')} - {format(parseISO(record.end_date), 'dd MMM yyyy')})
                               </span>
                             </span>
-                            <span className={cn(
-                              "px-2 py-1 rounded-full text-xs font-medium",
-                              record.status === 'Approved' && "bg-primary/20 text-primary",
-                              record.status === 'Pending' && "bg-amber-500/20 text-amber-400",
-                              record.status === 'Rejected' && "bg-destructive/20 text-destructive"
-                            )}>
-                              {record.status}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={cn(
+                                "px-2 py-1 rounded-full text-xs font-medium",
+                                record.status === 'Approved' && "bg-primary/20 text-primary",
+                                record.status === 'Pending' && "bg-amber-500/20 text-amber-400",
+                                record.status === 'Rejected' && "bg-destructive/20 text-destructive"
+                              )}>
+                                {record.status}
+                              </span>
+                              {record.status === 'Pending' && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => {
+                                      setEditingLeave(record.id);
+                                      setIsLeaveOpen(true);
+                                    }}
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => {
+                                      if (confirm('Are you sure you want to delete this leave request?')) {
+                                        deleteLeave.mutate(record.id);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
