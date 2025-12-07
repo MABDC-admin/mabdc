@@ -91,6 +91,31 @@ export function useUpdateContractStatus() {
   });
 }
 
+export function useUpdateContract() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string } & Partial<Omit<Contract, 'id' | 'created_at' | 'employees'>>) => {
+      const { data, error } = await supabase
+        .from('contracts')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      toast.success('Contract updated successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update contract: ${error.message}`);
+    },
+  });
+}
+
 export function useRenewContract() {
   const queryClient = useQueryClient();
   
