@@ -371,6 +371,24 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                 </div>
 
                 <div className="glass-card rounded-2xl border border-border p-5">
+                  <h3 className="text-lg font-semibold text-foreground mb-4">BANK DETAILS (WPS)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Bank Name</p>
+                      <p className="text-lg font-semibold text-foreground">{(currentEmployee as any).bank_name || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">IBAN</p>
+                      <p className="text-lg font-semibold text-foreground font-mono">{(currentEmployee as any).iban || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Account Number</p>
+                      <p className="text-lg font-semibold text-foreground font-mono">{(currentEmployee as any).bank_account_no || 'Not set'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-card rounded-2xl border border-border p-5">
                   <h3 className="text-lg font-semibold text-foreground mb-4">CURRENT LEAVE</h3>
                   <div className="flex items-center justify-between">
                     <div>

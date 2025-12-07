@@ -22,6 +22,9 @@ export interface Employee {
   contract_type?: string;
   documents?: EmployeeDocument[];
   photo_url?: string;
+  bank_name?: string;
+  iban?: string;
+  bank_account_no?: string;
   created_at?: string;
 }
 

@@ -251,6 +251,8 @@ export type Database = {
       employees: {
         Row: {
           allowance: number | null
+          bank_account_no: string | null
+          bank_name: string | null
           basic_salary: number | null
           contract_type: string | null
           created_at: string
@@ -259,6 +261,7 @@ export type Database = {
           emirates_id_expiry: string | null
           full_name: string
           hrms_no: string
+          iban: string | null
           id: string
           job_position: string
           joining_date: string
@@ -277,6 +280,8 @@ export type Database = {
         }
         Insert: {
           allowance?: number | null
+          bank_account_no?: string | null
+          bank_name?: string | null
           basic_salary?: number | null
           contract_type?: string | null
           created_at?: string
@@ -285,6 +290,7 @@ export type Database = {
           emirates_id_expiry?: string | null
           full_name: string
           hrms_no: string
+          iban?: string | null
           id?: string
           job_position: string
           joining_date: string
@@ -303,6 +309,8 @@ export type Database = {
         }
         Update: {
           allowance?: number | null
+          bank_account_no?: string | null
+          bank_name?: string | null
           basic_salary?: number | null
           contract_type?: string | null
           created_at?: string
@@ -311,6 +319,7 @@ export type Database = {
           emirates_id_expiry?: string | null
           full_name?: string
           hrms_no?: string
+          iban?: string | null
           id?: string
           job_position?: string
           joining_date?: string

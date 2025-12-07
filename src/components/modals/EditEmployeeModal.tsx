@@ -47,6 +47,9 @@ export function EditEmployeeModal({ isOpen, onClose, employee }: EditEmployeeMod
     emirates_id_expiry: '',
     passport_no: '',
     passport_expiry: '',
+    bank_name: '',
+    iban: '',
+    bank_account_no: '',
   });
 
   useEffect(() => {
@@ -72,6 +75,9 @@ export function EditEmployeeModal({ isOpen, onClose, employee }: EditEmployeeMod
         emirates_id_expiry: employee.emirates_id_expiry || '',
         passport_no: employee.passport_no || '',
         passport_expiry: employee.passport_expiry || '',
+        bank_name: (employee as any).bank_name || '',
+        iban: (employee as any).iban || '',
+        bank_account_no: (employee as any).bank_account_no || '',
       });
     }
   }, [employee]);
@@ -101,7 +107,10 @@ export function EditEmployeeModal({ isOpen, onClose, employee }: EditEmployeeMod
       emirates_id_expiry: formData.emirates_id_expiry || undefined,
       passport_no: formData.passport_no || undefined,
       passport_expiry: formData.passport_expiry || undefined,
-    }, {
+      bank_name: formData.bank_name || undefined,
+      iban: formData.iban || undefined,
+      bank_account_no: formData.bank_account_no || undefined,
+    } as any, {
       onSuccess: () => {
         onClose();
       }
@@ -317,6 +326,39 @@ export function EditEmployeeModal({ isOpen, onClose, employee }: EditEmployeeMod
                   type="date"
                   value={formData.passport_expiry}
                   onChange={(e) => setFormData({ ...formData, passport_expiry: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-border">
+            <h3 className="text-sm font-semibold text-foreground mb-3">Bank Details (WPS)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Bank Name</Label>
+                <Input
+                  value={formData.bank_name}
+                  onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
+                  placeholder="Emirates NBD"
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">IBAN</Label>
+                <Input
+                  value={formData.iban}
+                  onChange={(e) => setFormData({ ...formData, iban: e.target.value })}
+                  placeholder="AE070331234567890123456"
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Account Number</Label>
+                <Input
+                  value={formData.bank_account_no}
+                  onChange={(e) => setFormData({ ...formData, bank_account_no: e.target.value })}
+                  placeholder="1234567890123"
                   className="bg-secondary/50 border-border"
                 />
               </div>

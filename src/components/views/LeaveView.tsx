@@ -310,7 +310,10 @@ export function LeaveView() {
                 </div>
               ) : (
                 leave.map((record) => (
-                  <div key={record.id} className="glass-card rounded-xl border border-border p-4 hover:border-primary/30 transition-colors">
+                  <div key={record.id} className={cn(
+                    "glass-card rounded-xl border border-border p-4 hover:border-primary/30 transition-colors",
+                    record.status === 'Pending' && "animate-pulse border-amber-500/50 bg-amber-500/5"
+                  )}>
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex flex-wrap items-center gap-2 mb-2">
