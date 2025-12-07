@@ -9,12 +9,14 @@ import {
   Menu,
   X,
   Settings,
-  Calendar
+  Calendar,
+  QrCode
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHRStore } from '@/store/hrStore';
 import type { ViewType } from '@/types/hr';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const navItems: { id: ViewType; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -82,6 +84,15 @@ export function Sidebar() {
               <span>{item.label}</span>
             </button>
           ))}
+          
+          {/* Attendance Scanner Link */}
+          <Link
+            to="/attendance-scanner"
+            className="nav-item w-full text-left text-muted-foreground flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-secondary transition-colors"
+          >
+            <QrCode className="w-5 h-5" />
+            <span>QR Scanner</span>
+          </Link>
         </nav>
 
         <div className="absolute bottom-4 left-4 right-4">

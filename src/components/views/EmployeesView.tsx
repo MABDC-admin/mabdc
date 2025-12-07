@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
 import { AddEmployeeModal } from '@/components/modals/AddEmployeeModal';
-import { Search, Plus, Trash2, RefreshCw } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Link2, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/hr';
+import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +19,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export function EmployeesView() {
   const { data: employees = [], isLoading, refetch } = useEmployees();
@@ -55,6 +61,12 @@ export function EmployeesView() {
     if (!employee.visa_expiration) return null;
     const days = Math.ceil((new Date(employee.visa_expiration).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
     return days > 0 && days <= 60 ? days : null;
+  };
+
+  const copyPortalLink = (employeeId: string) => {
+    const link = `${window.location.origin}/employee/${employeeId}`;
+    navigator.clipboard.writeText(link);
+    toast.success('Portal link copied to clipboard!');
   };
 
   return (
@@ -151,6 +163,19 @@ export function EmployeesView() {
                       </div>
                     </div>
                     <div className="flex gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyPortalLink(emp.id)}
+                            className="text-muted-foreground hover:text-primary"
+                          >
+                            <Link2 className="w-4 h-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Copy employee portal link</TooltipContent>
+                      </Tooltip>
                       <Button 
                         onClick={() => openProfile(emp)}
                         className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-full text-xs"

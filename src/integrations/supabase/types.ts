@@ -406,6 +406,50 @@ export type Database = {
         }
         Relationships: []
       }
+      hr_letters: {
+        Row: {
+          content: string | null
+          created_at: string
+          employee_id: string
+          file_url: string | null
+          id: string
+          issued_date: string
+          letter_type: string
+          status: string | null
+          title: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          employee_id: string
+          file_url?: string | null
+          id?: string
+          issued_date?: string
+          letter_type?: string
+          status?: string | null
+          title: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          employee_id?: string
+          file_url?: string | null
+          id?: string
+          issued_date?: string
+          letter_type?: string
+          status?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_letters_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_balances: {
         Row: {
           carried_forward_days: number
