@@ -310,7 +310,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
 
                 <div className="glass-card rounded-2xl border border-border p-5">
                   <h3 className="text-lg font-semibold text-foreground mb-4">SUMMARY</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-4">
                       <div>
                         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Joined</p>
@@ -321,22 +321,50 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                         </p>
                       </div>
                       <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Service Length</p>
+                        <p className="text-lg font-semibold text-primary">{calculateServiceLength()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Nationality</p>
+                        <p className="text-lg font-semibold text-foreground">{currentEmployee.nationality || 'N/A'}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
                         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Basic Salary</p>
                         <p className="text-xl font-bold text-primary">
                           AED {(currentEmployee.basic_salary || 0).toLocaleString()}
                         </p>
                       </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Housing Allowance</p>
+                        <p className="text-xl font-bold text-primary">
+                          AED {((employeeContract as any)?.housing_allowance || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Transportation Allowance</p>
+                        <p className="text-xl font-bold text-primary">
+                          AED {((employeeContract as any)?.transportation_allowance || 0).toLocaleString()}
+                        </p>
+                      </div>
                     </div>
                     <div className="space-y-4">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Service Length</p>
-                        <p className="text-lg font-semibold text-primary">{calculateServiceLength()}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Allowance</p>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">General Allowance</p>
                         <p className="text-xl font-bold text-primary">
                           AED {(currentEmployee.allowance || 0).toLocaleString()}
                         </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Total Salary</p>
+                        <p className="text-xl font-bold text-accent">
+                          AED {(employeeContract?.total_salary || (currentEmployee.basic_salary || 0) + (currentEmployee.allowance || 0)).toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Contract Type</p>
+                        <p className="text-lg font-semibold text-foreground">{employeeContract?.contract_type || currentEmployee.contract_type || 'Unlimited'}</p>
                       </div>
                     </div>
                   </div>

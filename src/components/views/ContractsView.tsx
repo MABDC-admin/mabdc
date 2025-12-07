@@ -28,6 +28,8 @@ export function ContractsView() {
     start_date: '',
     end_date: '',
     basic_salary: '',
+    housing_allowance: '',
+    transportation_allowance: '',
     total_salary: '',
     work_location: 'Abu Dhabi',
     job_title_arabic: '',
@@ -42,6 +44,8 @@ export function ContractsView() {
     start_date: '',
     end_date: '',
     basic_salary: '',
+    housing_allowance: '',
+    transportation_allowance: '',
     total_salary: '',
   });
 
@@ -99,6 +103,8 @@ export function ContractsView() {
       start_date: formData.start_date,
       end_date: formData.end_date || undefined,
       basic_salary: parseFloat(formData.basic_salary),
+      housing_allowance: formData.housing_allowance ? parseFloat(formData.housing_allowance) : 0,
+      transportation_allowance: formData.transportation_allowance ? parseFloat(formData.transportation_allowance) : 0,
       total_salary: formData.total_salary ? parseFloat(formData.total_salary) : undefined,
       work_location: formData.work_location,
       job_title_arabic: formData.job_title_arabic,
@@ -107,7 +113,7 @@ export function ContractsView() {
       annual_leave_days: parseInt(formData.annual_leave_days),
       probation_period: parseInt(formData.probation_period),
       status: 'Draft',
-    });
+    } as any);
     setIsOpen(false);
     resetFormData();
   };
@@ -120,6 +126,8 @@ export function ContractsView() {
       start_date: '',
       end_date: '',
       basic_salary: '',
+      housing_allowance: '',
+      transportation_allowance: '',
       total_salary: '',
       work_location: 'Abu Dhabi',
       job_title_arabic: '',
@@ -140,6 +148,8 @@ export function ContractsView() {
       start_date: newStartDate,
       end_date: newEndDate,
       basic_salary: contract.basic_salary?.toString() || '',
+      housing_allowance: (contract as any).housing_allowance?.toString() || '',
+      transportation_allowance: (contract as any).transportation_allowance?.toString() || '',
       total_salary: contract.total_salary?.toString() || '',
     });
     setIsRenewOpen(true);
@@ -158,6 +168,8 @@ export function ContractsView() {
         start_date: renewFormData.start_date,
         end_date: renewFormData.end_date || undefined,
         basic_salary: parseFloat(renewFormData.basic_salary),
+        housing_allowance: renewFormData.housing_allowance ? parseFloat(renewFormData.housing_allowance) : 0,
+        transportation_allowance: renewFormData.transportation_allowance ? parseFloat(renewFormData.transportation_allowance) : 0,
         total_salary: renewFormData.total_salary ? parseFloat(renewFormData.total_salary) : undefined,
         work_location: selectedContract.work_location,
         job_title_arabic: selectedContract.job_title_arabic,
@@ -166,7 +178,7 @@ export function ContractsView() {
         annual_leave_days: selectedContract.annual_leave_days,
         probation_period: selectedContract.probation_period,
         status: 'Draft',
-      },
+      } as any,
     }, {
       onSuccess: () => {
         setIsRenewOpen(false);
@@ -278,6 +290,14 @@ export function ContractsView() {
                     <div>
                       <label className="text-xs text-muted-foreground">Basic Salary (AED)</label>
                       <Input type="number" value={formData.basic_salary} onChange={(e) => setFormData({ ...formData, basic_salary: e.target.value })} placeholder="1800" required />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Housing Allowance (AED)</label>
+                      <Input type="number" value={formData.housing_allowance} onChange={(e) => setFormData({ ...formData, housing_allowance: e.target.value })} placeholder="500" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Transportation Allowance (AED)</label>
+                      <Input type="number" value={formData.transportation_allowance} onChange={(e) => setFormData({ ...formData, transportation_allowance: e.target.value })} placeholder="300" />
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Total Salary (AED)</label>
