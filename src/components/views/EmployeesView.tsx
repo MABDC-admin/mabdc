@@ -1,18 +1,32 @@
 import { useState } from 'react';
+import { useEmployees, useDeleteEmployee } from '@/hooks/useEmployees';
 import { useHRStore } from '@/store/hrStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
 import { AddEmployeeModal } from '@/components/modals/AddEmployeeModal';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/hr';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export function EmployeesView() {
-  const { employees, setCurrentEmployee } = useHRStore();
+  const { data: employees = [], isLoading, refetch } = useEmployees();
+  const deleteEmployee = useDeleteEmployee();
+  const { setCurrentEmployee } = useHRStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const filteredEmployees = employees.filter(emp =>
     emp.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -24,6 +38,13 @@ export function EmployeesView() {
   const openProfile = (employee: Employee) => {
     setCurrentEmployee(employee);
     setIsProfileOpen(true);
+  };
+
+  const handleDelete = () => {
+    if (deleteId) {
+      deleteEmployee.mutate(deleteId);
+      setDeleteId(null);
+    }
   };
 
   const getInitials = (name: string) => {
@@ -42,15 +63,25 @@ export function EmployeesView() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
             <h1 className="text-xl font-semibold text-foreground">Employee Management</h1>
-            <p className="text-xs text-muted-foreground mt-1">Manage your workforce</p>
+            <p className="text-xs text-muted-foreground mt-1">{employees.length} employees in system</p>
           </div>
-          <Button 
-            onClick={() => setIsAddOpen(true)}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Employee
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              className="border-border"
+            >
+              <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
+            </Button>
+            <Button 
+              onClick={() => setIsAddOpen(true)}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Employee
+            </Button>
+          </div>
         </div>
 
         <div className="mb-4 relative">
@@ -64,8 +95,23 @@ export function EmployeesView() {
         </div>
 
         <div className="space-y-3">
-          {filteredEmployees.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No employees found.</p>
+          {isLoading ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+              <p className="text-sm">Loading employees...</p>
+            </div>
+          ) : filteredEmployees.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p className="text-sm">No employees found.</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="mt-3"
+                onClick={() => setIsAddOpen(true)}
+              >
+                Add your first employee
+              </Button>
+            </div>
           ) : (
             filteredEmployees.map((emp) => {
               const visaDays = getVisaDaysRemaining(emp);
@@ -104,13 +150,23 @@ export function EmployeesView() {
                         </div>
                       </div>
                     </div>
-                    <Button 
-                      onClick={() => openProfile(emp)}
-                      className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-full text-xs"
-                      size="sm"
-                    >
-                      View Profile
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={() => openProfile(emp)}
+                        className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-full text-xs"
+                        size="sm"
+                      >
+                        View Profile
+                      </Button>
+                      <Button 
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeleteId(emp.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-border">
@@ -148,6 +204,26 @@ export function EmployeesView() {
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
       />
+
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent className="glass-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this employee? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
