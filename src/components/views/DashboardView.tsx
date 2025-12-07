@@ -4,7 +4,8 @@ import { useContracts } from '@/hooks/useContracts';
 import { useTodayAttendance, useRealtimeAttendance } from '@/hooks/useAttendance';
 import { useHRStore } from '@/store/hrStore';
 import { cn } from '@/lib/utils';
-import { Users, FileText, Clock, AlertTriangle, TrendingUp, Calendar, ArrowRight, RefreshCw, LogIn, LogOut, CheckCircle, QrCode } from 'lucide-react';
+import { Users, FileText, Clock, AlertTriangle, TrendingUp, Calendar, ArrowRight, RefreshCw, LogIn, LogOut, CheckCircle, QrCode, Bell, Zap } from 'lucide-react';
+import { differenceInDays, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
@@ -81,6 +82,21 @@ export function DashboardView() {
     return days > 0 && days <= 60;
   });
 
+  // Contract expiry calculations
+  const getContractExpiryStatus = (contract: typeof contracts[0]) => {
+    if (contract.status === 'Expired' || contract.status === 'Terminated') return 'expired';
+    if (!contract.end_date) return 'active';
+    const daysUntilExpiry = differenceInDays(parseISO(contract.end_date), new Date());
+    if (daysUntilExpiry < 0) return 'expired';
+    if (daysUntilExpiry <= 30) return 'expiring';
+    if (daysUntilExpiry <= 90) return 'nearing';
+    return 'active';
+  };
+
+  const expiringContracts = contracts.filter(c => getContractExpiryStatus(c) === 'expiring').length;
+  const nearingExpiryContracts = contracts.filter(c => getContractExpiryStatus(c) === 'nearing').length;
+  const contractAlertsCount = expiringContracts + nearingExpiryContracts;
+
   const recentEmployees = employees.slice(0, 5);
 
   // Department distribution data
@@ -108,7 +124,38 @@ export function DashboardView() {
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Dashboard Overview</h1>
           <p className="text-sm text-muted-foreground mt-1">Welcome to MABDC HR Management System</p>
+      </div>
+
+      {/* Contract Expiry Alerts Banner */}
+      {contractAlertsCount > 0 && (
+        <div 
+          className="glass-card rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 cursor-pointer hover:bg-amber-500/10 transition-colors"
+          onClick={() => setCurrentView('contracts')}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                <Bell className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Contract Expiry Alerts</h3>
+                <p className="text-xs text-muted-foreground">
+                  {expiringContracts} contracts expiring soon, {nearingExpiryContracts} nearing expiry
+                </p>
+              </div>
+            </div>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={(e) => { e.stopPropagation(); setCurrentView('contracts'); }}
+              className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+            >
+              <Zap className="w-4 h-4 mr-1" />
+              View
+            </Button>
+          </div>
         </div>
+      )}
         <Button 
           variant="outline" 
           size="sm" 
