@@ -33,6 +33,12 @@ export function useTheme() {
     return saved ? parseInt(saved, 10) : 0;
   });
 
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('hr-dark-mode');
+    if (saved !== null) return saved === 'true';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
   useEffect(() => {
     const theme = themes[themeIndex];
     const root = document.documentElement;
@@ -48,6 +54,16 @@ export function useTheme() {
     localStorage.setItem('hr-theme-index', themeIndex.toString());
   }, [themeIndex]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDark) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('hr-dark-mode', isDark.toString());
+  }, [isDark]);
+
   const randomizeTheme = () => {
     const newIndex = Math.floor(Math.random() * themes.length);
     setThemeIndex(newIndex);
@@ -57,5 +73,9 @@ export function useTheme() {
     setThemeIndex(index);
   };
 
-  return { themeIndex, themes, randomizeTheme, setTheme, currentTheme: themes[themeIndex] };
+  const toggleDarkMode = () => {
+    setIsDark(prev => !prev);
+  };
+
+  return { themeIndex, themes, randomizeTheme, setTheme, currentTheme: themes[themeIndex], isDark, toggleDarkMode };
 }
