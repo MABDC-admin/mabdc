@@ -42,6 +42,9 @@ export function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
     visa_no: '',
     visa_expiration: '',
     emirates_id: '',
+    bank_name: '',
+    iban: '',
+    bank_account_no: '',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -65,6 +68,9 @@ export function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
       visa_no: formData.visa_no || undefined,
       visa_expiration: formData.visa_expiration || undefined,
       emirates_id: formData.emirates_id || undefined,
+      bank_name: formData.bank_name || undefined,
+      iban: formData.iban || undefined,
+      bank_account_no: formData.bank_account_no || undefined,
     }, {
       onSuccess: () => {
         onClose();
@@ -86,6 +92,9 @@ export function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
           visa_no: '',
           visa_expiration: '',
           emirates_id: '',
+          bank_name: '',
+          iban: '',
+          bank_account_no: '',
         });
       }
     });
@@ -261,6 +270,39 @@ export function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
                   value={formData.emirates_id}
                   onChange={(e) => setFormData({ ...formData, emirates_id: e.target.value })}
                   placeholder="784-xxxx-xxxxxxx-x"
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-border">
+            <h3 className="text-sm font-semibold text-foreground mb-3">Bank Details (WPS)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Bank Name</Label>
+                <Input
+                  value={formData.bank_name}
+                  onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
+                  placeholder="Emirates NBD"
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">IBAN</Label>
+                <Input
+                  value={formData.iban}
+                  onChange={(e) => setFormData({ ...formData, iban: e.target.value })}
+                  placeholder="AE070331234567890123456"
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Account Number</Label>
+                <Input
+                  value={formData.bank_account_no}
+                  onChange={(e) => setFormData({ ...formData, bank_account_no: e.target.value })}
+                  placeholder="1234567890123"
                   className="bg-secondary/50 border-border"
                 />
               </div>
