@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { useEmployees, useDeleteEmployee } from '@/hooks/useEmployees';
 import { useLeave } from '@/hooks/useLeave';
+import { useContracts } from '@/hooks/useContracts';
 import { useHRStore } from '@/store/hrStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
 import { AddEmployeeModal } from '@/components/modals/AddEmployeeModal';
-import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/hr';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
+import { differenceInDays, parseISO } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +32,7 @@ import {
 export function EmployeesView() {
   const { data: employees = [], isLoading, refetch } = useEmployees();
   const { data: leaveRecords = [] } = useLeave();
+  const { data: contracts = [] } = useContracts();
   const deleteEmployee = useDeleteEmployee();
   const { setCurrentEmployee } = useHRStore();
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,6 +75,38 @@ export function EmployeesView() {
     if (!employee.visa_expiration) return null;
     const days = Math.ceil((new Date(employee.visa_expiration).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
     return days > 0 && days <= 60 ? days : null;
+  };
+
+  // Check if employee has an expired or no active contract
+  const getContractStatus = (employeeId: string) => {
+    const employeeContracts = contracts.filter(c => c.employee_id === employeeId);
+    
+    if (employeeContracts.length === 0) {
+      return { hasContract: false, isExpired: false, status: 'no-contract' as const };
+    }
+    
+    // Find active or most recent contract
+    const activeContract = employeeContracts.find(c => 
+      c.status === 'Active' || c.status === 'Approved' || c.status === 'Draft'
+    );
+    
+    if (!activeContract) {
+      return { hasContract: true, isExpired: true, status: 'expired' as const };
+    }
+    
+    // Check if contract is expired based on end_date
+    if (activeContract.end_date) {
+      const endDate = parseISO(activeContract.end_date);
+      const daysUntilExpiry = differenceInDays(endDate, new Date());
+      
+      if (daysUntilExpiry < 0) {
+        return { hasContract: true, isExpired: true, status: 'expired' as const };
+      } else if (daysUntilExpiry <= 30) {
+        return { hasContract: true, isExpired: false, status: 'expiring-soon' as const, daysLeft: daysUntilExpiry };
+      }
+    }
+    
+    return { hasContract: true, isExpired: false, status: 'active' as const };
   };
 
   const copyPortalLink = (employeeId: string) => {
@@ -162,16 +197,36 @@ export function EmployeesView() {
             filteredEmployees.map((emp) => {
               const visaDays = getVisaDaysRemaining(emp);
               const hasPendingLeave = employeesWithPendingLeave.has(emp.id);
+              const contractStatus = getContractStatus(emp.id);
+              const isContractExpired = contractStatus.isExpired || !contractStatus.hasContract;
+              
               return (
                 <div 
                   key={emp.id} 
                   className={cn(
                     "glass-card rounded-2xl border border-border p-4 hover:border-muted-foreground/30 transition-all hover:shadow-lg relative group cursor-pointer",
-                    hasPendingLeave && "animate-pulse border-amber-500/50 bg-amber-500/5"
+                    hasPendingLeave && !isContractExpired && "animate-pulse border-amber-500/50 bg-amber-500/5",
+                    isContractExpired && "bg-muted/50 border-muted grayscale-[50%] opacity-80"
                   )}
                   onClick={() => openProfile(emp)}
                 >
-                  {hasPendingLeave && (
+                  {/* Contract Expired Badge */}
+                  {isContractExpired && (
+                    <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-destructive/20 text-destructive text-[10px] font-medium z-10 animate-pulse">
+                      <FileWarning className="w-3 h-3" />
+                      {contractStatus.hasContract ? 'Contract Expired' : 'No Contract'}
+                    </div>
+                  )}
+                  
+                  {/* Contract Expiring Soon Badge */}
+                  {contractStatus.status === 'expiring-soon' && (
+                    <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-medium z-10">
+                      <Clock className="w-3 h-3" />
+                      Contract: {(contractStatus as any).daysLeft}d
+                    </div>
+                  )}
+                  
+                  {hasPendingLeave && !isContractExpired && contractStatus.status !== 'expiring-soon' && (
                     <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-medium z-10">
                       <Clock className="w-3 h-3" />
                       Pending
@@ -272,16 +327,36 @@ export function EmployeesView() {
             filteredEmployees.map((emp) => {
               const visaDays = getVisaDaysRemaining(emp);
               const hasPendingLeave = employeesWithPendingLeave.has(emp.id);
+              const contractStatus = getContractStatus(emp.id);
+              const isContractExpired = contractStatus.isExpired || !contractStatus.hasContract;
+              
               return (
                 <div 
                   key={emp.id} 
                   className={cn(
                     "glass-card rounded-2xl border border-border p-4 hover:border-muted-foreground/30 transition-colors relative",
-                    hasPendingLeave && "animate-pulse border-amber-500/50 bg-amber-500/5"
+                    hasPendingLeave && !isContractExpired && "animate-pulse border-amber-500/50 bg-amber-500/5",
+                    isContractExpired && "bg-muted/50 border-muted grayscale-[50%] opacity-80"
                   )}
                 >
-                  {hasPendingLeave && (
-                    <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-medium">
+                  {/* Contract Expired Badge */}
+                  {isContractExpired && (
+                    <div className="absolute top-2 right-16 flex items-center gap-1 px-2 py-1 rounded-full bg-destructive/20 text-destructive text-[10px] font-medium animate-pulse">
+                      <FileWarning className="w-3 h-3" />
+                      {contractStatus.hasContract ? 'Contract Expired' : 'No Contract'}
+                    </div>
+                  )}
+                  
+                  {/* Contract Expiring Soon Badge */}
+                  {contractStatus.status === 'expiring-soon' && (
+                    <div className="absolute top-2 right-16 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-medium">
+                      <Clock className="w-3 h-3" />
+                      Contract: {(contractStatus as any).daysLeft}d left
+                    </div>
+                  )}
+                  
+                  {hasPendingLeave && !isContractExpired && contractStatus.status !== 'expiring-soon' && (
+                    <div className="absolute top-2 right-16 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-medium">
                       <Clock className="w-3 h-3" />
                       Pending Leave
                     </div>
@@ -319,6 +394,11 @@ export function EmployeesView() {
                           {visaDays && (
                             <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
                               Visa: {visaDays}d
+                            </span>
+                          )}
+                          {isContractExpired && (
+                            <span className="text-xs px-2 py-1 rounded-full bg-destructive/10 text-destructive border border-destructive/30 animate-pulse">
+                              Needs Contract Renewal
                             </span>
                           )}
                         </div>
