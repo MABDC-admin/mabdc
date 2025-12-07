@@ -31,6 +31,7 @@ export function LeaveView() {
   const [isAllocateModalOpen, setIsAllocateModalOpen] = useState(false);
   const [isBulkAllocateModalOpen, setIsBulkAllocateModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('requests');
+  const [filterEmployee, setFilterEmployee] = useState<string>('all');
 
   const [leaveForm, setLeaveForm] = useState({
     employee_id: '',
@@ -296,6 +297,29 @@ export function LeaveView() {
         {/* Leave Requests Tab */}
         <TabsContent value="requests" className="mt-4">
           <div className="glass-card rounded-2xl border border-border p-4">
+            {/* Employee Filter */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground whitespace-nowrap">Filter by Employee:</Label>
+                <Select value={filterEmployee} onValueChange={setFilterEmployee}>
+                  <SelectTrigger className="w-[200px] h-9 bg-secondary/50">
+                    <SelectValue placeholder="All Employees" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Employees</SelectItem>
+                    {employees.map(emp => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.full_name} ({emp.hrms_no})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Showing {filterEmployee === 'all' ? leave.length : leave.filter(l => l.employee_id === filterEmployee).length} requests
+              </p>
+            </div>
+            
             <div className="space-y-3">
               {isLoading ? (
                 <div className="text-center py-8 text-muted-foreground">
@@ -309,7 +333,7 @@ export function LeaveView() {
                   <p className="text-xs mt-1">Click "New Request" to submit a leave application</p>
                 </div>
               ) : (
-                leave.map((record) => (
+                (filterEmployee === 'all' ? leave : leave.filter(l => l.employee_id === filterEmployee)).map((record) => (
                   <div key={record.id} className={cn(
                     "glass-card rounded-xl border border-border p-4 hover:border-primary/30 transition-colors",
                     record.status === 'Pending' && "animate-pulse border-amber-500/50 bg-amber-500/5"
