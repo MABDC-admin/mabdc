@@ -319,8 +319,8 @@ export function ContractsView() {
                       </Select>
                     </div>
                     <div>
-                      <label className="text-xs text-muted-foreground">Job Title (Arabic)</label>
-                      <Input value={formData.job_title_arabic} onChange={(e) => setFormData({ ...formData, job_title_arabic: e.target.value })} placeholder="مخول مالك" dir="rtl" />
+                      <label className="text-xs text-muted-foreground">Job Title</label>
+                      <Input value={formData.job_title_arabic} onChange={(e) => setFormData({ ...formData, job_title_arabic: e.target.value })} placeholder="Project Manager" />
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Working Hours/Week</label>

@@ -254,22 +254,16 @@ export default function EmployeePortal() {
                     <form onSubmit={handleLeaveSubmit} className="space-y-4 mt-4">
                       <div>
                         <label className="text-xs text-muted-foreground">Leave Type</label>
-                        <Select value={leaveForm.leave_type} onValueChange={(v) => setLeaveForm({ ...leaveForm, leave_type: v })}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {leaveTypes.length > 0 ? (
-                              leaveTypes.map((type) => (
-                                <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
-                              ))
-                            ) : (
-                              <>
-                                <SelectItem value="Annual">Annual Leave</SelectItem>
-                                <SelectItem value="Sick">Sick Leave</SelectItem>
-                                <SelectItem value="Emergency">Emergency Leave</SelectItem>
-                              </>
-                            )}
-                          </SelectContent>
-                        </Select>
+                      <Select value={leaveForm.leave_type} onValueChange={(v) => setLeaveForm({ ...leaveForm, leave_type: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Annual">Annual Leave</SelectItem>
+                          <SelectItem value="Sick">Sick Leave</SelectItem>
+                          <SelectItem value="Maternity">Maternity Leave</SelectItem>
+                          <SelectItem value="Emergency">Emergency Leave</SelectItem>
+                          <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
+                        </SelectContent>
+                      </Select>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -388,17 +382,11 @@ export default function EmployeePortal() {
                       <Select value={leaveForm.leave_type} onValueChange={(v) => setLeaveForm({ ...leaveForm, leave_type: v })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {leaveTypes.length > 0 ? (
-                            leaveTypes.map((type) => (
-                              <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
-                            ))
-                          ) : (
-                            <>
-                              <SelectItem value="Annual">Annual Leave</SelectItem>
-                              <SelectItem value="Sick">Sick Leave</SelectItem>
-                              <SelectItem value="Emergency">Emergency Leave</SelectItem>
-                            </>
-                          )}
+                          <SelectItem value="Annual">Annual Leave</SelectItem>
+                          <SelectItem value="Sick">Sick Leave</SelectItem>
+                          <SelectItem value="Maternity">Maternity Leave</SelectItem>
+                          <SelectItem value="Emergency">Emergency Leave</SelectItem>
+                          <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
