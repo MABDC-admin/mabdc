@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useHRStore } from '@/store/hrStore';
+import { useAddEmployee } from '@/hooks/useEmployees';
 import {
   Dialog,
   DialogContent,
@@ -16,8 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { toast } from 'sonner';
-import type { Employee } from '@/types/hr';
 
 interface AddEmployeeModalProps {
   isOpen: boolean;
@@ -25,7 +23,7 @@ interface AddEmployeeModalProps {
 }
 
 export function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
-  const { addEmployee, employees } = useHRStore();
+  const addEmployee = useAddEmployee();
   const [formData, setFormData] = useState({
     hrms_no: '',
     full_name: '',
@@ -49,50 +47,47 @@ export function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const newEmployee: Employee = {
-      id: Date.now().toString(),
+    addEmployee.mutate({
       hrms_no: formData.hrms_no,
       full_name: formData.full_name,
       job_position: formData.job_position,
       department: formData.department,
       joining_date: formData.joining_date,
-      manager: formData.manager,
+      manager: formData.manager || undefined,
       work_email: formData.work_email,
       work_phone: formData.work_phone,
-      nationality: formData.nationality,
-      basic_salary: parseFloat(formData.basic_salary) || 0,
-      allowance: parseFloat(formData.allowance) || 0,
+      nationality: formData.nationality || undefined,
+      basic_salary: parseFloat(formData.basic_salary) || undefined,
+      allowance: parseFloat(formData.allowance) || undefined,
       leave_balance: parseInt(formData.leave_balance) || 30,
       status: formData.status,
       contract_type: formData.contract_type,
-      visa_no: formData.visa_no,
-      visa_expiration: formData.visa_expiration,
-      emirates_id: formData.emirates_id,
-    };
-
-    addEmployee(newEmployee);
-    toast.success('Employee added successfully');
-    onClose();
-    
-    // Reset form
-    setFormData({
-      hrms_no: '',
-      full_name: '',
-      job_position: '',
-      department: '',
-      joining_date: '',
-      manager: '',
-      work_email: '',
-      work_phone: '',
-      nationality: '',
-      basic_salary: '',
-      allowance: '',
-      leave_balance: '30',
-      status: 'Active',
-      contract_type: 'Unlimited',
-      visa_no: '',
-      visa_expiration: '',
-      emirates_id: '',
+      visa_no: formData.visa_no || undefined,
+      visa_expiration: formData.visa_expiration || undefined,
+      emirates_id: formData.emirates_id || undefined,
+    }, {
+      onSuccess: () => {
+        onClose();
+        setFormData({
+          hrms_no: '',
+          full_name: '',
+          job_position: '',
+          department: '',
+          joining_date: '',
+          manager: '',
+          work_email: '',
+          work_phone: '',
+          nationality: '',
+          basic_salary: '',
+          allowance: '',
+          leave_balance: '30',
+          status: 'Active',
+          contract_type: 'Unlimited',
+          visa_no: '',
+          visa_expiration: '',
+          emirates_id: '',
+        });
+      }
     });
   };
 
@@ -276,8 +271,9 @@ export function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
             <Button 
               type="submit" 
               className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
+              disabled={addEmployee.isPending}
             >
-              Add Employee
+              {addEmployee.isPending ? 'Adding...' : 'Add Employee'}
             </Button>
             <Button 
               type="button" 
