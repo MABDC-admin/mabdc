@@ -24,6 +24,7 @@ export function ContractsView() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<typeof contracts[0] | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const [employeeFilter, setEmployeeFilter] = useState<string>('all');
   const [page1Preview, setPage1Preview] = useState<string | null>(null);
   const [page2Preview, setPage2Preview] = useState<string | null>(null);
   const [page1File, setPage1File] = useState<File | null>(null);
@@ -79,36 +80,40 @@ export function ContractsView() {
 
   const getContractExpiryStatus = (contract: typeof contracts[0]) => {
     if (contract.status === 'Expired') {
-      return { status: 'expired', label: 'Expired', icon: XCircle, color: 'bg-destructive/10 text-destructive border-destructive/30' };
+      return { status: 'expired', label: 'Expired', icon: XCircle, color: 'bg-destructive/10 text-destructive border-destructive/30', daysLeft: null };
     }
     
     if (contract.status === 'Terminated') {
-      return { status: 'terminated', label: 'Terminated', icon: XCircle, color: 'bg-muted/50 text-muted-foreground border-border' };
+      return { status: 'terminated', label: 'Terminated', icon: XCircle, color: 'bg-muted/50 text-muted-foreground border-border', daysLeft: null };
     }
 
-    if (contract.contract_type === 'Unlimited') {
-      return { status: 'active', label: 'Active', icon: CheckCircle, color: 'bg-primary/10 text-primary border-primary/30' };
+    // Always check end_date if it exists, regardless of contract type
+    if (contract.end_date) {
+      const endDate = parseISO(contract.end_date);
+      const today = new Date();
+      const daysUntilExpiry = differenceInDays(endDate, today);
+
+      if (daysUntilExpiry < 0) {
+        return { status: 'expired', label: 'Expired', icon: XCircle, color: 'bg-destructive/10 text-destructive border-destructive/30', daysLeft: null };
+      } else if (daysUntilExpiry <= 30) {
+        return { status: 'expiring', label: `Expires in ${daysUntilExpiry} days`, icon: AlertTriangle, color: 'bg-amber-500/10 text-amber-400 border-amber-500/30', daysLeft: daysUntilExpiry };
+      } else if (daysUntilExpiry <= 90) {
+        return { status: 'nearing', label: `${daysUntilExpiry} days left`, icon: Clock, color: 'bg-accent/10 text-accent border-accent/30', daysLeft: daysUntilExpiry };
+      }
+      // Active but has end_date - show days left
+      return { status: 'active', label: 'Active', icon: CheckCircle, color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30', daysLeft: daysUntilExpiry };
     }
     
-    if (!contract.end_date) {
-      return { status: 'active', label: 'Active', icon: CheckCircle, color: 'bg-primary/10 text-primary border-primary/30' };
-    }
-
-    const endDate = parseISO(contract.end_date);
-    const today = new Date();
-    const daysUntilExpiry = differenceInDays(endDate, today);
-
-    if (daysUntilExpiry < 0) {
-      return { status: 'expired', label: 'Expired', icon: XCircle, color: 'bg-destructive/10 text-destructive border-destructive/30' };
-    } else if (daysUntilExpiry <= 30) {
-      return { status: 'expiring', label: `Expires in ${daysUntilExpiry} days`, icon: AlertTriangle, color: 'bg-amber-500/10 text-amber-400 border-amber-500/30' };
-    } else if (daysUntilExpiry <= 90) {
-      return { status: 'nearing', label: `${daysUntilExpiry} days left`, icon: Clock, color: 'bg-accent/10 text-accent border-accent/30' };
-    }
-    return { status: 'active', label: 'Active', icon: CheckCircle, color: 'bg-primary/10 text-primary border-primary/30' };
+    // No end_date - truly unlimited/active
+    return { status: 'active', label: 'Active', icon: CheckCircle, color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30', daysLeft: null };
   };
 
   const filteredContracts = contracts.filter(contract => {
+    // Apply employee filter first
+    if (employeeFilter !== 'all' && contract.employee_id !== employeeFilter) {
+      return false;
+    }
+    // Then apply status filter
     if (filter === 'all') return true;
     const expiryStatus = getContractExpiryStatus(contract);
     return expiryStatus.status === filter;
@@ -622,28 +627,46 @@ export function ContractsView() {
           </div>
         </div>
 
-        {/* Status Filters */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {[
-            { key: 'all', label: 'All', count: statusCounts.all },
-            { key: 'active', label: 'Active', count: statusCounts.active },
-            { key: 'nearing', label: 'Nearing Expiry', count: statusCounts.nearing },
-            { key: 'expiring', label: 'Expiring Soon', count: statusCounts.expiring },
-            { key: 'expired', label: 'Expired', count: statusCounts.expired },
-          ].map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setFilter(item.key)}
-              className={cn(
-                "px-3 py-1.5 rounded-full text-xs font-medium transition-colors border",
-                filter === item.key
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
-              )}
-            >
-              {item.label} ({item.count})
-            </button>
-          ))}
+        {/* Filters Row */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          {/* Employee Filter */}
+          <div className="w-full sm:w-64">
+            <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
+              <SelectTrigger className="bg-secondary/50 border-border">
+                <SelectValue placeholder="Filter by employee" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Employees</SelectItem>
+                {employees.map((emp) => (
+                  <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Status Filters */}
+          <div className="flex flex-wrap gap-2 flex-1">
+            {[
+              { key: 'all', label: 'All', count: statusCounts.all },
+              { key: 'active', label: 'Active', count: statusCounts.active },
+              { key: 'nearing', label: 'Nearing Expiry', count: statusCounts.nearing },
+              { key: 'expiring', label: 'Expiring Soon', count: statusCounts.expiring },
+              { key: 'expired', label: 'Expired', count: statusCounts.expired },
+            ].map((item) => (
+              <button
+                key={item.key}
+                onClick={() => setFilter(item.key)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-medium transition-colors border",
+                  filter === item.key
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
+                )}
+              >
+                {item.label} ({item.count})
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -674,6 +697,13 @@ export function ContractsView() {
                           <StatusIcon className="w-3 h-3" />
                           {expiryStatus.label}
                         </span>
+                        {/* Show days left badge for Active contracts with end_date */}
+                        {expiryStatus.status === 'active' && expiryStatus.daysLeft !== null && (
+                          <span className="text-xs px-2 py-1 rounded-full border bg-blue-500/10 text-blue-500 border-blue-500/30 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {expiryStatus.daysLeft}d left
+                          </span>
+                        )}
                         {contract.status !== 'Active' && contract.status !== 'Expired' && (
                           <span className="text-xs px-2 py-1 rounded-full border bg-muted/50 text-muted-foreground border-border">
                             {contract.status}
