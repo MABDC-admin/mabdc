@@ -15,8 +15,10 @@ import {
 import { cn } from '@/lib/utils';
 import { useHRStore } from '@/store/hrStore';
 import type { ViewType } from '@/types/hr';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ThemeSelector } from './ThemeSelector';
+import { useTheme } from '@/hooks/useTheme';
 
 const navItems: { id: ViewType; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -33,6 +35,9 @@ const navItems: { id: ViewType; label: string; icon: React.ReactNode }[] = [
 export function Sidebar() {
   const { currentView, setCurrentView } = useHRStore();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  
+  // Initialize theme on mount
+  useTheme();
 
   return (
     <>
@@ -57,14 +62,17 @@ export function Sidebar() {
         "fixed lg:static inset-y-0 left-0 z-40 w-64 glass-card border-r border-border p-4 transition-transform duration-300",
         isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}>
-        <div className="flex items-center gap-3 px-4 py-4 mb-6">
-          <div className="w-10 h-10 rounded-xl uae-gradient flex items-center justify-center">
-            <span className="text-lg font-bold text-primary-foreground">M</span>
+        <div className="flex items-center justify-between px-4 py-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl uae-gradient flex items-center justify-center">
+              <span className="text-lg font-bold text-primary-foreground">M</span>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-foreground">MABDC</h1>
+              <p className="text-xs text-muted-foreground">HR Management</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-foreground">MABDC</h1>
-            <p className="text-xs text-muted-foreground">HR Management</p>
-          </div>
+          <ThemeSelector />
         </div>
 
         <nav className="space-y-1">
