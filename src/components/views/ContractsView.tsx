@@ -1,65 +1,58 @@
-import { useHRStore } from '@/store/hrStore';
+import { useContracts, useUpdateContractStatus } from '@/hooks/useContracts';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { FileText, RefreshCw, CheckCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export function ContractsView() {
-  const { contracts } = useHRStore();
+  const { data: contracts = [], isLoading, refetch } = useContracts();
+  const updateStatus = useUpdateContractStatus();
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Active': return 'bg-primary/10 text-primary border-primary/30';
+      case 'Approved': return 'bg-accent/10 text-accent border-accent/30';
+      case 'Expired': case 'Terminated': return 'bg-destructive/10 text-destructive border-destructive/30';
+      default: return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+    }
+  };
 
   return (
     <div className="space-y-6 animate-slide-up">
       <section className="glass-card rounded-3xl border border-border p-4 sm:p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Labour Contracts</h1>
-            <p className="text-xs text-muted-foreground mt-1">MOHRE contract management</p>
+            <h1 className="text-xl font-semibold text-foreground">Contract Management</h1>
+            <p className="text-xs text-muted-foreground mt-1">MOHRE registered contracts</p>
           </div>
-          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full">
-            <Plus className="w-4 h-4 mr-2" />
-            New Contract
+          <Button variant="outline" size="sm" onClick={() => refetch()} className="border-border">
+            <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
           </Button>
         </div>
-
         <div className="space-y-3">
-          {contracts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No contracts found.</p>
+          {isLoading ? (
+            <div className="text-center py-8"><RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-muted-foreground" /><p className="text-sm text-muted-foreground">Loading...</p></div>
+          ) : contracts.length === 0 ? (
+            <div className="text-center py-8"><FileText className="w-8 h-8 mx-auto mb-2 opacity-50 text-muted-foreground" /><p className="text-sm text-muted-foreground">No contracts found</p><p className="text-xs text-muted-foreground mt-1">Contracts will appear here when added</p></div>
           ) : (
             contracts.map((contract) => (
-              <div 
-                key={contract.id} 
-                className="glass-card rounded-2xl border border-border p-4"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">
-                      {contract.employees?.full_name || 'Unknown Employee'}
-                    </h3>
-                    <p className="text-xs text-muted-foreground">{contract.contract_type} Contract</p>
+              <div key={contract.id} className="glass-card rounded-2xl border border-border p-4">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-base font-semibold text-foreground">{contract.employees?.full_name || 'Unknown'}</h3>
+                      <span className={cn("text-xs px-2 py-1 rounded-full border", getStatusColor(contract.status))}>{contract.status}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">Contract: {contract.mohre_contract_no}</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div><p className="text-[10px] uppercase text-muted-foreground">Type</p><p className="text-xs text-foreground">{contract.contract_type}</p></div>
+                      <div><p className="text-[10px] uppercase text-muted-foreground">Start</p><p className="text-xs text-foreground">{new Date(contract.start_date).toLocaleDateString('en-GB')}</p></div>
+                      <div><p className="text-[10px] uppercase text-muted-foreground">Basic</p><p className="text-xs text-foreground">AED {contract.basic_salary?.toLocaleString()}</p></div>
+                      <div><p className="text-[10px] uppercase text-muted-foreground">Total</p><p className="text-xs text-foreground">AED {contract.total_salary?.toLocaleString() || 'N/A'}</p></div>
+                    </div>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    contract.status === 'Active' 
-                      ? 'bg-primary/20 text-primary' 
-                      : 'bg-secondary text-muted-foreground'
-                  }`}>
-                    {contract.status}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">Basic Salary:</span>
-                    <span className="text-foreground ml-1">AED {Number(contract.basic_salary).toLocaleString()}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Start Date:</span>
-                    <span className="text-foreground ml-1">{new Date(contract.start_date).toLocaleDateString('en-GB')}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">MOHRE No:</span>
-                    <span className="text-foreground ml-1">{contract.mohre_contract_no || 'N/A'}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Location:</span>
-                    <span className="text-foreground ml-1">{contract.work_location || 'N/A'}</span>
-                  </div>
+                  {(contract.status === 'Draft' || contract.status === 'Approved') && (
+                    <Button size="sm" onClick={() => updateStatus.mutate({ id: contract.id, status: 'Active' })} disabled={updateStatus.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground"><CheckCircle className="w-4 h-4 mr-1" />Activate</Button>
+                  )}
                 </div>
               </div>
             ))

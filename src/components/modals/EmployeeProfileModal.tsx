@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useHRStore } from '@/store/hrStore';
+import { useDeleteEmployee } from '@/hooks/useEmployees';
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,8 @@ interface EmployeeProfileModalProps {
 type TabType = 'summary' | 'contract' | 'visa' | 'leave' | 'documents' | 'eos';
 
 export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalProps) {
-  const { currentEmployee, deleteEmployee, setCurrentEmployee } = useHRStore();
+  const { currentEmployee, setCurrentEmployee } = useHRStore();
+  const deleteEmployee = useDeleteEmployee();
   const [activeTab, setActiveTab] = useState<TabType>('summary');
   const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
 
@@ -31,7 +33,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
 
   const handleDelete = () => {
     if (confirm(`Are you sure you want to delete ${currentEmployee.full_name}? This action cannot be undone.`)) {
-      deleteEmployee(currentEmployee.id);
+      deleteEmployee.mutate(currentEmployee.id);
       setCurrentEmployee(null);
       onClose();
     }
