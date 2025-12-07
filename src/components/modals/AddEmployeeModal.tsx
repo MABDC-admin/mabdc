@@ -106,7 +106,7 @@ export function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
                 required
                 value={formData.hrms_no}
                 onChange={(e) => setFormData({ ...formData, hrms_no: e.target.value })}
-                placeholder="EMP-0001"
+                placeholder="0001"
                 className="bg-secondary/50 border-border"
               />
             </div>
