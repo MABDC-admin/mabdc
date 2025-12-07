@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
 import { AddEmployeeModal } from '@/components/modals/AddEmployeeModal';
-import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning, FilePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/hr';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -34,7 +34,7 @@ export function EmployeesView() {
   const { data: leaveRecords = [] } = useLeave();
   const { data: contracts = [] } = useContracts();
   const deleteEmployee = useDeleteEmployee();
-  const { setCurrentEmployee } = useHRStore();
+  const { setCurrentEmployee, setCurrentView } = useHRStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -304,6 +304,21 @@ export function EmployeesView() {
                         </span>
                       </div>
                     )}
+
+                    {/* Add Contract Button for expired/missing contracts */}
+                    {isContractExpired && (
+                      <div className="mt-2">
+                        <Button 
+                          size="sm"
+                          variant="outline"
+                          className="w-full border-primary/50 text-primary hover:bg-primary/10 text-xs"
+                          onClick={(e) => { e.stopPropagation(); setCurrentView('contracts'); }}
+                        >
+                          <FilePlus className="w-3 h-3 mr-1" />
+                          Add Contract
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Footer Stats */}
@@ -410,6 +425,21 @@ export function EmployeesView() {
                         </TooltipTrigger>
                         <TooltipContent>Copy employee portal link</TooltipContent>
                       </Tooltip>
+                      {isContractExpired && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              size="sm"
+                              variant="outline"
+                              className="border-primary/50 text-primary hover:bg-primary/10"
+                              onClick={() => setCurrentView('contracts')}
+                            >
+                              <FilePlus className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Add Contract</TooltipContent>
+                        </Tooltip>
+                      )}
                       <Button 
                         onClick={() => openProfile(emp)}
                         className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-full text-xs"
