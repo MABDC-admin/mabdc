@@ -111,4 +111,45 @@ export interface EOSRecord {
   created_at?: string;
 }
 
-export type ViewType = 'dashboard' | 'employees' | 'contracts' | 'attendance' | 'leave' | 'payroll' | 'eos';
+export interface CompanySettings {
+  id: string;
+  company_name: string;
+  company_name_arabic?: string;
+  trade_license_no?: string;
+  tax_registration_no?: string;
+  establishment_id?: string;
+  mol_id?: string;
+  address?: string;
+  city?: string;
+  emirate?: string;
+  country?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  logo_url?: string;
+  work_week_start?: string;
+  work_week_end?: string;
+  work_hours_per_day?: number;
+  overtime_rate?: number;
+  leave_year_start?: string;
+  currency?: string;
+  date_format?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description?: string;
+  event_type: 'General' | 'Meeting' | 'Training' | 'Holiday' | 'Company';
+  start_date: string;
+  end_date?: string;
+  start_time?: string;
+  end_time?: string;
+  is_all_day: boolean;
+  color?: string;
+  created_at?: string;
+}
+
+export type ViewType = 'dashboard' | 'employees' | 'contracts' | 'attendance' | 'leave' | 'payroll' | 'eos' | 'settings';

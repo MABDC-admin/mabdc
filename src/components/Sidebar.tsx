@@ -7,7 +7,8 @@ import {
   DollarSign, 
   Calculator,
   Menu,
-  X
+  X,
+  Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHRStore } from '@/store/hrStore';
@@ -22,6 +23,7 @@ const navItems: { id: ViewType; label: string; icon: React.ReactNode }[] = [
   { id: 'leave', label: 'Leave', icon: <CalendarDays className="w-5 h-5" /> },
   { id: 'payroll', label: 'Payroll & WPS', icon: <DollarSign className="w-5 h-5" /> },
   { id: 'eos', label: 'EOS Calculator', icon: <Calculator className="w-5 h-5" /> },
+  { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
 ];
 
 export function Sidebar() {

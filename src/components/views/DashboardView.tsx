@@ -158,45 +158,61 @@ export function DashboardView() {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Department Distribution */}
+        {/* Visa Expiry Alerts */}
         <div className="glass-card rounded-2xl border border-border p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground">Department Distribution</h2>
-            <span className="text-xs text-muted-foreground">{employees.length} total</span>
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              Visa Expiry Alerts
+            </h2>
+            <span className="text-xs text-amber-500 font-medium">{expiringVisas.length} expiring</span>
           </div>
-          <div className="h-[200px]">
-            {pieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {pieData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(222, 47%, 6%)', 
-                      border: '1px solid hsl(217, 33%, 17%)',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  <Legend 
-                    wrapperStyle={{ fontSize: '11px' }}
-                    formatter={(value) => <span className="text-muted-foreground">{value}</span>}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+          <div className="h-[200px] overflow-y-auto soft-scroll">
+            {expiringVisas.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                <CheckCircle className="w-10 h-10 mb-2 text-primary opacity-50" />
+                <p className="text-sm font-medium">All visas valid</p>
+                <p className="text-xs opacity-70">No expiring visas in the next 60 days</p>
+              </div>
             ) : (
-              <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-                No department data available
+              <div className="space-y-2">
+                {expiringVisas.slice(0, 6).map((emp) => {
+                  const days = Math.ceil((new Date(emp.visa_expiration!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                  return (
+                    <div 
+                      key={emp.id} 
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors",
+                        days <= 30 
+                          ? "bg-destructive/10 border-destructive/30 hover:bg-destructive/20" 
+                          : "bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20"
+                      )}
+                      onClick={() => setCurrentView('employees')}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold",
+                          days <= 30 ? "bg-destructive/20 text-destructive" : "bg-amber-500/20 text-amber-500"
+                        )}>
+                          {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{emp.full_name}</p>
+                          <p className="text-[10px] text-muted-foreground">{emp.hrms_no} • Visa: {emp.visa_no}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={cn(
+                          "text-lg font-bold",
+                          days <= 30 ? "text-destructive" : "text-amber-500"
+                        )}>
+                          {days}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">days left</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

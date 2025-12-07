@@ -52,6 +52,87 @@ export type Database = {
           },
         ]
       }
+      company_settings: {
+        Row: {
+          address: string | null
+          city: string | null
+          company_name: string
+          company_name_arabic: string | null
+          country: string | null
+          created_at: string
+          currency: string | null
+          date_format: string | null
+          email: string | null
+          emirate: string | null
+          establishment_id: string | null
+          id: string
+          leave_year_start: string | null
+          logo_url: string | null
+          mol_id: string | null
+          overtime_rate: number | null
+          phone: string | null
+          tax_registration_no: string | null
+          trade_license_no: string | null
+          updated_at: string
+          website: string | null
+          work_hours_per_day: number | null
+          work_week_end: string | null
+          work_week_start: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          company_name?: string
+          company_name_arabic?: string | null
+          country?: string | null
+          created_at?: string
+          currency?: string | null
+          date_format?: string | null
+          email?: string | null
+          emirate?: string | null
+          establishment_id?: string | null
+          id?: string
+          leave_year_start?: string | null
+          logo_url?: string | null
+          mol_id?: string | null
+          overtime_rate?: number | null
+          phone?: string | null
+          tax_registration_no?: string | null
+          trade_license_no?: string | null
+          updated_at?: string
+          website?: string | null
+          work_hours_per_day?: number | null
+          work_week_end?: string | null
+          work_week_start?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          company_name?: string
+          company_name_arabic?: string | null
+          country?: string | null
+          created_at?: string
+          currency?: string | null
+          date_format?: string | null
+          email?: string | null
+          emirate?: string | null
+          establishment_id?: string | null
+          id?: string
+          leave_year_start?: string | null
+          logo_url?: string | null
+          mol_id?: string | null
+          overtime_rate?: number | null
+          phone?: string | null
+          tax_registration_no?: string | null
+          trade_license_no?: string | null
+          updated_at?: string
+          website?: string | null
+          work_hours_per_day?: number | null
+          work_week_end?: string | null
+          work_week_start?: string | null
+        }
+        Relationships: []
+      }
       contracts: {
         Row: {
           annual_leave_days: number | null
@@ -238,6 +319,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      events: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          end_date: string | null
+          end_time: string | null
+          event_type: string
+          id: string
+          is_all_day: boolean | null
+          start_date: string
+          start_time: string | null
+          title: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          end_time?: string | null
+          event_type?: string
+          id?: string
+          is_all_day?: boolean | null
+          start_date: string
+          start_time?: string | null
+          title: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          end_time?: string | null
+          event_type?: string
+          id?: string
+          is_all_day?: boolean | null
+          start_date?: string
+          start_time?: string | null
+          title?: string
+        }
+        Relationships: []
       }
       leave_balances: {
         Row: {
