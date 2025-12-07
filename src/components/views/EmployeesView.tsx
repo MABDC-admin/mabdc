@@ -1,0 +1,153 @@
+import { useState } from 'react';
+import { useHRStore } from '@/store/hrStore';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
+import { AddEmployeeModal } from '@/components/modals/AddEmployeeModal';
+import { Search, Plus } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { Employee } from '@/types/hr';
+
+export function EmployeesView() {
+  const { employees, setCurrentEmployee } = useHRStore();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+
+  const filteredEmployees = employees.filter(emp =>
+    emp.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    emp.hrms_no.includes(searchQuery) ||
+    emp.job_position.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    emp.department.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const openProfile = (employee: Employee) => {
+    setCurrentEmployee(employee);
+    setIsProfileOpen(true);
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
+
+  const getVisaDaysRemaining = (employee: Employee) => {
+    if (!employee.visa_expiration) return null;
+    const days = Math.ceil((new Date(employee.visa_expiration).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+    return days > 0 && days <= 60 ? days : null;
+  };
+
+  return (
+    <div className="space-y-6 animate-slide-up">
+      <section className="glass-card rounded-3xl border border-border p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Employee Management</h1>
+            <p className="text-xs text-muted-foreground mt-1">Manage your workforce</p>
+          </div>
+          <Button 
+            onClick={() => setIsAddOpen(true)}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Employee
+          </Button>
+        </div>
+
+        <div className="mb-4 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search employees..."
+            className="pl-10 bg-secondary/50 border-border"
+          />
+        </div>
+
+        <div className="space-y-3">
+          {filteredEmployees.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No employees found.</p>
+          ) : (
+            filteredEmployees.map((emp) => {
+              const visaDays = getVisaDaysRemaining(emp);
+              return (
+                <div 
+                  key={emp.id} 
+                  className="glass-card rounded-2xl border border-border p-4 hover:border-muted-foreground/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-4">
+                      <span className="w-14 h-14 rounded-xl avatar-gradient flex items-center justify-center text-lg font-bold text-primary-foreground">
+                        {getInitials(emp.full_name)}
+                      </span>
+                      <div>
+                        <h3 className="text-base font-semibold text-foreground">{emp.full_name}</h3>
+                        <p className="text-xs text-muted-foreground">{emp.hrms_no} • {emp.department}</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary border border-primary/30">
+                            {emp.job_position}
+                          </span>
+                          <span className={cn(
+                            "text-xs px-2 py-1 rounded-full",
+                            emp.status === 'Active' 
+                              ? "bg-primary/10 text-primary border border-primary/30"
+                              : emp.status === 'On Leave'
+                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                              : "bg-destructive/10 text-destructive border border-destructive/30"
+                          )}>
+                            {emp.status || 'Active'}
+                          </span>
+                          {visaDays && (
+                            <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-200 border border-amber-500/30">
+                              Visa: {visaDays}d
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <Button 
+                      onClick={() => openProfile(emp)}
+                      className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-full text-xs"
+                      size="sm"
+                    >
+                      View Profile
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-border">
+                    <div>
+                      <p className="text-[10px] uppercase text-muted-foreground">Joining Date</p>
+                      <p className="text-xs text-foreground">
+                        {new Date(emp.joining_date).toLocaleDateString('en-GB')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-muted-foreground">Phone</p>
+                      <p className="text-xs text-foreground">{emp.work_phone}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-muted-foreground">Nationality</p>
+                      <p className="text-xs text-foreground">{emp.nationality || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-muted-foreground">Leave Balance</p>
+                      <p className="text-xs text-foreground">{emp.leave_balance || 0} days</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+
+      <EmployeeProfileModal 
+        isOpen={isProfileOpen} 
+        onClose={() => setIsProfileOpen(false)} 
+      />
+      <AddEmployeeModal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+      />
+    </div>
+  );
+}
