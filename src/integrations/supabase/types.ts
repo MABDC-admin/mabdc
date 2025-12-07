@@ -201,6 +201,47 @@ export type Database = {
           },
         ]
       }
+      employee_documents: {
+        Row: {
+          category: string | null
+          created_at: string
+          employee_id: string
+          file_size: string | null
+          file_type: string
+          file_url: string
+          id: string
+          name: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          employee_id: string
+          file_size?: string | null
+          file_type: string
+          file_url: string
+          id?: string
+          name: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          employee_id?: string
+          file_size?: string | null
+          file_type?: string
+          file_url?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_documents_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           allowance: number | null
@@ -220,6 +261,7 @@ export type Database = {
           nationality: string | null
           passport_expiry: string | null
           passport_no: string | null
+          photo_url: string | null
           status: string | null
           updated_at: string
           visa_expiration: string | null
@@ -245,6 +287,7 @@ export type Database = {
           nationality?: string | null
           passport_expiry?: string | null
           passport_no?: string | null
+          photo_url?: string | null
           status?: string | null
           updated_at?: string
           visa_expiration?: string | null
@@ -270,6 +313,7 @@ export type Database = {
           nationality?: string | null
           passport_expiry?: string | null
           passport_no?: string | null
+          photo_url?: string | null
           status?: string | null
           updated_at?: string
           visa_expiration?: string | null

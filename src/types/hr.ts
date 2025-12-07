@@ -21,6 +21,7 @@ export interface Employee {
   passport_expiry?: string;
   contract_type?: string;
   documents?: EmployeeDocument[];
+  photo_url?: string;
   created_at?: string;
 }
 
