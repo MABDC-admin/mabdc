@@ -144,6 +144,15 @@ export function useUpdateLeaveStatus() {
   
   return useMutation({
     mutationFn: async ({ id, status, rejection_reason }: { id: string; status: 'Approved' | 'Rejected'; rejection_reason?: string }) => {
+      // First get the leave record to know days_count and employee_id
+      const { data: leaveRecord, error: fetchError } = await supabase
+        .from('leave_records')
+        .select('employee_id, days_count, leave_type_id')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) throw fetchError;
+
       const updateData: Record<string, unknown> = { 
         status,
         approved_at: new Date().toISOString(),
@@ -161,11 +170,52 @@ export function useUpdateLeaveStatus() {
         .single();
       
       if (error) throw error;
+
+      // If approved, update the leave balance (deduct used_days)
+      if (status === 'Approved' && leaveRecord) {
+        const currentYear = new Date().getFullYear();
+        
+        // Try to find existing leave balance for this employee
+        const { data: existingBalance } = await supabase
+          .from('leave_balances')
+          .select('id, used_days')
+          .eq('employee_id', leaveRecord.employee_id)
+          .eq('year', currentYear)
+          .maybeSingle();
+
+        if (existingBalance) {
+          // Update existing balance
+          await supabase
+            .from('leave_balances')
+            .update({ 
+              used_days: (existingBalance.used_days || 0) + leaveRecord.days_count 
+            })
+            .eq('id', existingBalance.id);
+        }
+
+        // Also update the employee's leave_balance field directly
+        const { data: employee } = await supabase
+          .from('employees')
+          .select('leave_balance')
+          .eq('id', leaveRecord.employee_id)
+          .single();
+
+        if (employee) {
+          await supabase
+            .from('employees')
+            .update({ 
+              leave_balance: Math.max(0, (employee.leave_balance || 30) - leaveRecord.days_count)
+            })
+            .eq('id', leaveRecord.employee_id);
+        }
+      }
+
       return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leave'] });
       queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
       toast.success(`Leave request ${variables.status.toLowerCase()}`);
     },
     onError: (error: Error) => {
