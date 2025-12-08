@@ -4,110 +4,114 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 222 47% 11%;
+    --background: 0 0% 98%;
+    --foreground: 220 13% 18%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 220 13% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 220 13% 18%;
 
-    --primary: 262 83% 58%;
+    /* ClassDojo Signature Green */
+    --primary: 160 100% 40%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 200 20% 96%;
+    --secondary-foreground: 220 13% 18%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 200 20% 96%;
+    --muted-foreground: 220 9% 46%;
 
-    --accent: 339 90% 51%;
+    /* ClassDojo Blue Accent */
+    --accent: 199 89% 48%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 262 83% 58%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 160 100% 40%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
-    /* Brand Colors */
-    --uae-green: 158 64% 52%;
-    --uae-red: 0 84% 60%;
-    --uae-blue: 217 91% 60%;
-    --uae-black: 222 47% 11%;
+    /* Brand Colors - ClassDojo palette */
+    --uae-green: 160 100% 40%;
+    --uae-red: 0 72% 51%;
+    --uae-blue: 199 89% 48%;
+    --uae-black: 220 13% 18%;
 
-    /* Custom gradients and effects */
+    /* ClassDojo inspired gradients */
     --glass-bg: 0 0% 100%;
-    --glass-border: 214 32% 91%;
-    --stat-gradient: linear-gradient(135deg, hsl(262 83% 58% / 0.08), hsl(339 90% 51% / 0.05));
-    --body-gradient: linear-gradient(135deg, hsl(210 20% 98%), hsl(262 83% 58% / 0.03) 50%, hsl(339 90% 51% / 0.02));
+    --glass-border: 220 13% 91%;
+    --stat-gradient: linear-gradient(135deg, hsl(160 100% 40% / 0.08), hsl(199 89% 48% / 0.05));
+    --body-gradient: linear-gradient(160deg, hsl(0 0% 98%), hsl(160 100% 40% / 0.03) 30%, hsl(199 89% 48% / 0.02) 70%);
 
-    /* Shadows */
-    --shadow-glow: 0 0 40px hsl(262 83% 58% / 0.1);
-    --shadow-card: 0 4px 24px hsl(222 47% 11% / 0.06);
-    --shadow-hover: 0 8px 32px hsl(222 47% 11% / 0.1);
+    /* Playful shadows */
+    --shadow-glow: 0 0 40px hsl(160 100% 40% / 0.15);
+    --shadow-card: 0 4px 20px hsl(220 13% 18% / 0.06);
+    --shadow-hover: 0 8px 30px hsl(220 13% 18% / 0.1);
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 215 16% 47%;
-    --sidebar-primary: 262 83% 58%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 262 83% 58% / 0.1;
-    --sidebar-accent-foreground: 262 83% 58%;
-    --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 262 83% 58%;
+    --sidebar-background: 160 100% 40%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 160 100% 40%;
+    --sidebar-accent: 0 0% 100% / 0.15;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 160 100% 35%;
+    --sidebar-ring: 0 0% 100%;
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+    --background: 220 17% 10%;
+    --foreground: 0 0% 98%;
 
-    --card: 222 47% 14%;
-    --card-foreground: 210 40% 98%;
+    --card: 220 17% 14%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 222 47% 14%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 220 17% 14%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 262 83% 65%;
+    /* ClassDojo Green - brighter for dark mode */
+    --primary: 160 85% 45%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 17% 20%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 220 17% 20%;
+    --muted-foreground: 220 9% 60%;
 
-    --accent: 339 90% 60%;
+    /* ClassDojo Blue Accent */
+    --accent: 199 89% 55%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 217 33% 22%;
-    --input: 217 33% 22%;
-    --ring: 262 83% 65%;
+    --border: 220 17% 22%;
+    --input: 220 17% 22%;
+    --ring: 160 85% 45%;
 
     /* Dark mode gradients */
-    --glass-bg: 222 47% 14%;
-    --stat-gradient: linear-gradient(135deg, hsl(262 83% 65% / 0.15), hsl(339 90% 60% / 0.1));
-    --body-gradient: linear-gradient(135deg, hsl(222 47% 11%), hsl(262 83% 65% / 0.05) 50%, hsl(339 90% 60% / 0.03));
+    --glass-bg: 220 17% 14%;
+    --stat-gradient: linear-gradient(135deg, hsl(160 85% 45% / 0.12), hsl(199 89% 55% / 0.08));
+    --body-gradient: linear-gradient(160deg, hsl(220 17% 10%), hsl(160 85% 45% / 0.04) 30%, hsl(199 89% 55% / 0.03) 70%);
 
     /* Dark shadows */
-    --shadow-glow: 0 0 40px hsl(262 83% 65% / 0.2);
-    --shadow-card: 0 4px 24px hsl(0 0% 0% / 0.3);
-    --shadow-hover: 0 8px 32px hsl(0 0% 0% / 0.4);
+    --shadow-glow: 0 0 40px hsl(160 85% 45% / 0.2);
+    --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.25);
+    --shadow-hover: 0 8px 30px hsl(0 0% 0% / 0.35);
 
-    --sidebar-background: 222 47% 8%;
-    --sidebar-foreground: 215 20% 65%;
-    --sidebar-primary: 262 83% 65%;
+    --sidebar-background: 220 17% 8%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 160 85% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 262 83% 65% / 0.15;
-    --sidebar-accent-foreground: 262 83% 65%;
-    --sidebar-border: 217 33% 22%;
-    --sidebar-ring: 262 83% 65%;
+    --sidebar-accent: 160 85% 45% / 0.15;
+    --sidebar-accent-foreground: 160 85% 45%;
+    --sidebar-border: 220 17% 18%;
+    --sidebar-ring: 160 85% 45%;
   }
 }
 
@@ -120,6 +124,7 @@
     @apply bg-background text-foreground antialiased;
     background: var(--body-gradient);
     min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 }
 
@@ -128,16 +133,19 @@
     background: hsl(var(--glass-bg));
     box-shadow: var(--shadow-card);
     border: 1px solid hsl(var(--border));
-    transition: box-shadow 0.2s ease;
+    border-radius: 1rem;
+    transition: all 0.25s ease;
   }
 
   .glass-card:hover {
     box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
   }
 
   .stat-card {
     background: var(--stat-gradient);
     border: 1px solid hsl(var(--border));
+    border-radius: 1rem;
   }
 
   .uae-gradient {
@@ -164,7 +172,7 @@
 
   .file-drop-area {
     border: 2px dashed hsl(var(--border));
-    border-radius: 12px;
+    border-radius: 1rem;
     transition: all 0.3s ease;
   }
 
@@ -179,38 +187,38 @@
 
   .profile-tab.active {
     background: hsl(var(--secondary));
-    border-bottom: 2px solid hsl(var(--primary));
+    border-bottom: 3px solid hsl(var(--primary));
   }
 
   .file-icon {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
+    border-radius: 12px;
   }
 
-  .file-icon.pdf { background: hsl(0 84% 60% / 0.1); color: hsl(0 84% 50%); }
-  .file-icon.image { background: hsl(217 91% 60% / 0.1); color: hsl(217 91% 50%); }
-  .file-icon.excel { background: hsl(158 64% 52% / 0.1); color: hsl(158 64% 42%); }
-  .file-icon.word { background: hsl(217 91% 60% / 0.1); color: hsl(217 91% 50%); }
+  .file-icon.pdf { background: hsl(0 72% 51% / 0.1); color: hsl(0 72% 45%); }
+  .file-icon.image { background: hsl(199 89% 48% / 0.1); color: hsl(199 89% 42%); }
+  .file-icon.excel { background: hsl(160 100% 40% / 0.1); color: hsl(160 100% 32%); }
+  .file-icon.word { background: hsl(199 89% 48% / 0.1); color: hsl(199 89% 42%); }
   .file-icon.generic { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
 
   .nav-item {
     @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200;
-    color: hsl(var(--muted-foreground));
+    color: hsl(var(--sidebar-foreground) / 0.8);
   }
 
   .nav-item:hover {
-    background: hsl(var(--secondary));
-    color: hsl(var(--foreground));
+    background: hsl(var(--sidebar-accent));
+    color: hsl(var(--sidebar-foreground));
   }
 
   .nav-item.active {
-    background: hsl(var(--primary) / 0.1);
-    color: hsl(var(--primary));
-    border-left: 3px solid hsl(var(--primary));
+    background: hsl(var(--sidebar-accent));
+    color: hsl(var(--sidebar-foreground));
+    font-weight: 600;
   }
 }
 
@@ -225,6 +233,10 @@
 
   .animate-float {
     animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-bounce-soft {
+    animation: bounceSoft 2s ease-in-out infinite;
   }
 
   @keyframes fadeIn {
@@ -245,10 +257,19 @@
 
   @keyframes float {
     0%, 100% {
-      transform: translateY(0px) rotate(-2deg);
+      transform: translateY(0px) rotate(-1deg);
     }
     50% {
-      transform: translateY(-10px) rotate(2deg);
+      transform: translateY(-8px) rotate(1deg);
+    }
+  }
+
+  @keyframes bounceSoft {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
     }
   }
 }
