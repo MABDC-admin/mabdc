@@ -15,10 +15,6 @@ interface Payroll {
   employees?: {
     full_name: string;
     hrms_no: string;
-    department?: string;
-    bank_name?: string;
-    iban?: string;
-    bank_account_no?: string;
   };
 }
 
@@ -30,7 +26,7 @@ export function usePayroll() {
         .from('payroll')
         .select(`
           *,
-          employees (full_name, hrms_no, department, bank_name, iban, bank_account_no)
+          employees (full_name, hrms_no)
         `)
         .order('created_at', { ascending: false });
       
@@ -76,65 +72,6 @@ export function useGeneratePayroll() {
     },
     onError: (error: Error) => {
       toast.error(`Failed to generate payroll: ${error.message}`);
-    },
-  });
-}
-
-export function useUpdatePayroll() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ id, basicSalary, allowances, deductions }: {
-      id: string;
-      basicSalary: number;
-      allowances: number;
-      deductions: number;
-    }) => {
-      const netSalary = basicSalary + allowances - deductions;
-      
-      const { data, error } = await supabase
-        .from('payroll')
-        .update({
-          basic_salary: basicSalary,
-          allowances,
-          deductions,
-          net_salary: netSalary,
-        })
-        .eq('id', id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payroll'] });
-      toast.success('Payroll updated successfully');
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to update payroll: ${error.message}`);
-    },
-  });
-}
-
-export function useDeletePayroll() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('payroll')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payroll'] });
-      toast.success('Payroll record deleted');
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to delete payroll: ${error.message}`);
     },
   });
 }

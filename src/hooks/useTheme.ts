@@ -2,74 +2,60 @@ import { useState, useEffect } from 'react';
 
 export const themes = [
   {
-    name: 'ClassDojo Green',
-    primary: '160 100% 40%',
-    accent: '199 89% 48%',
-    ring: '160 100% 40%',
-    sidebarBg: '160 100% 40%',
-    sidebarBgLight: '160 100% 40%',
-    sidebarFgLight: '0 0% 100%',
-    sidebarFgDark: '0 0% 90%',
+    name: 'Purple Pink',
+    primary: '262 83% 58%',
+    accent: '339 90% 51%',
+    ring: '262 83% 58%',
+    sidebarBg: '262 50% 12%',
+    sidebarBgLight: '262 30% 96%',
   },
   {
-    name: 'ClassDojo Blue',
-    primary: '199 89% 48%',
-    accent: '160 100% 40%',
-    ring: '199 89% 48%',
-    sidebarBg: '199 89% 48%',
-    sidebarBgLight: '199 89% 48%',
-    sidebarFgLight: '0 0% 100%',
-    sidebarFgDark: '0 0% 90%',
+    name: 'Ocean Blue',
+    primary: '217 91% 60%',
+    accent: '172 66% 50%',
+    ring: '217 91% 60%',
+    sidebarBg: '217 50% 12%',
+    sidebarBgLight: '217 30% 96%',
   },
   {
-    name: 'ClassDojo Purple',
-    primary: '270 70% 55%',
-    accent: '320 80% 55%',
-    ring: '270 70% 55%',
-    sidebarBg: '270 70% 55%',
-    sidebarBgLight: '270 70% 55%',
-    sidebarFgLight: '0 0% 100%',
-    sidebarFgDark: '0 0% 90%',
+    name: 'Forest Green',
+    primary: '158 64% 42%',
+    accent: '45 93% 47%',
+    ring: '158 64% 42%',
+    sidebarBg: '158 40% 10%',
+    sidebarBgLight: '158 25% 96%',
   },
   {
-    name: 'ClassDojo Orange',
-    primary: '25 95% 55%',
-    accent: '45 100% 50%',
-    ring: '25 95% 55%',
-    sidebarBg: '25 95% 55%',
-    sidebarBgLight: '25 95% 55%',
-    sidebarFgLight: '0 0% 100%',
-    sidebarFgDark: '0 0% 90%',
+    name: 'Sunset Orange',
+    primary: '24 95% 53%',
+    accent: '340 82% 52%',
+    ring: '24 95% 53%',
+    sidebarBg: '24 45% 12%',
+    sidebarBgLight: '24 30% 96%',
   },
   {
-    name: 'ClassDojo Teal',
-    primary: '175 80% 40%',
-    accent: '200 85% 50%',
-    ring: '175 80% 40%',
-    sidebarBg: '175 80% 40%',
-    sidebarBgLight: '175 80% 40%',
-    sidebarFgLight: '0 0% 100%',
-    sidebarFgDark: '0 0% 90%',
+    name: 'Midnight Blue',
+    primary: '230 70% 50%',
+    accent: '260 60% 60%',
+    ring: '230 70% 50%',
+    sidebarBg: '230 50% 8%',
+    sidebarBgLight: '230 25% 95%',
   },
   {
-    name: 'ClassDojo Pink',
-    primary: '340 80% 55%',
-    accent: '280 70% 60%',
-    ring: '340 80% 55%',
-    sidebarBg: '340 80% 55%',
-    sidebarBgLight: '340 80% 55%',
-    sidebarFgLight: '0 0% 100%',
-    sidebarFgDark: '0 0% 90%',
+    name: 'Rose Gold',
+    primary: '350 60% 60%',
+    accent: '30 50% 55%',
+    ring: '350 60% 60%',
+    sidebarBg: '350 35% 12%',
+    sidebarBgLight: '350 30% 96%',
   },
   {
-    name: 'ClassDojo Navy',
-    primary: '220 70% 45%',
-    accent: '199 89% 48%',
-    ring: '220 70% 45%',
-    sidebarBg: '220 70% 45%',
-    sidebarBgLight: '220 70% 45%',
-    sidebarFgLight: '0 0% 100%',
-    sidebarFgDark: '0 0% 90%',
+    name: 'Slate Gray',
+    primary: '215 20% 50%',
+    accent: '200 30% 45%',
+    ring: '215 20% 50%',
+    sidebarBg: '215 25% 10%',
+    sidebarBgLight: '215 15% 95%',
   },
 ];
 
@@ -92,13 +78,13 @@ export function useTheme() {
     root.style.setProperty('--primary', theme.primary);
     root.style.setProperty('--accent', theme.accent);
     root.style.setProperty('--ring', theme.ring);
-    root.style.setProperty('--sidebar-primary', isDark ? theme.primary : '0 0% 100%');
-    root.style.setProperty('--sidebar-accent', `${theme.primary.split(' ')[0]} ${theme.primary.split(' ')[1]} 50% / 0.15`);
-    root.style.setProperty('--sidebar-accent-foreground', isDark ? theme.primary : '0 0% 100%');
-    root.style.setProperty('--sidebar-ring', isDark ? theme.primary : '0 0% 100%');
+    root.style.setProperty('--sidebar-primary', theme.primary);
+    root.style.setProperty('--sidebar-accent', `${theme.primary.split(' ')[0]} ${theme.primary.split(' ')[1]} ${theme.primary.split(' ')[2]} / 0.1`);
+    root.style.setProperty('--sidebar-accent-foreground', theme.primary);
+    root.style.setProperty('--sidebar-ring', theme.primary);
     
     localStorage.setItem('hr-theme-index', themeIndex.toString());
-  }, [themeIndex, isDark]);
+  }, [themeIndex]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -106,14 +92,14 @@ export function useTheme() {
     
     if (isDark) {
       root.classList.add('dark');
-      root.style.setProperty('--sidebar-background', `${theme.primary.split(' ')[0]} 40% 12%`);
-      root.style.setProperty('--sidebar-foreground', theme.sidebarFgDark);
-      root.style.setProperty('--sidebar-border', `${theme.primary.split(' ')[0]} 30% 20%`);
+      root.style.setProperty('--sidebar-background', theme.sidebarBg);
+      root.style.setProperty('--sidebar-foreground', '0 0% 95%');
+      root.style.setProperty('--sidebar-border', `${theme.primary.split(' ')[0]} 20% 20%`);
     } else {
       root.classList.remove('dark');
       root.style.setProperty('--sidebar-background', theme.sidebarBgLight);
-      root.style.setProperty('--sidebar-foreground', theme.sidebarFgLight);
-      root.style.setProperty('--sidebar-border', `${theme.primary.split(' ')[0]} 80% 35%`);
+      root.style.setProperty('--sidebar-foreground', '0 0% 15%');
+      root.style.setProperty('--sidebar-border', `${theme.primary.split(' ')[0]} 20% 85%`);
     }
     localStorage.setItem('hr-dark-mode', isDark.toString());
   }, [isDark, themeIndex]);
