@@ -2,20 +2,23 @@ import { useState, useMemo } from 'react';
 import { usePayroll, useProcessWPS, useGeneratePayroll, useDeletePayroll, useUpdatePayroll } from '@/hooks/usePayroll';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useContracts } from '@/hooks/useContracts';
+import { useCompanySettings } from '@/hooks/useSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { DollarSign, RefreshCw, CheckCircle, Plus, FileText, Trash2, Edit2, Download, Printer, Building2, CreditCard } from 'lucide-react';
+import { DollarSign, RefreshCw, CheckCircle, Plus, Trash2, Edit2, Download, Printer, CreditCard, Users, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { generatePayslipPDF, generateBulkPayrollPDF } from '@/utils/payrollPdf';
+import { toast } from 'sonner';
 
 export function PayrollView() {
   const { data: payroll = [], isLoading, refetch } = usePayroll();
   const { data: employees = [] } = useEmployees();
   const { data: contracts = [] } = useContracts();
+  const { data: settings } = useCompanySettings();
   const processWPS = useProcessWPS();
   const generatePayroll = useGeneratePayroll();
   const deletePayroll = useDeletePayroll();
@@ -27,8 +30,10 @@ export function PayrollView() {
   });
 
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
+  const [isBulkGenerateOpen, setIsBulkGenerateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingPayroll, setEditingPayroll] = useState<any>(null);
+  const [bulkGenerating, setBulkGenerating] = useState(false);
 
   const [newPayroll, setNewPayroll] = useState({
     employeeId: '',
@@ -66,6 +71,14 @@ export function PayrollView() {
     wpsProcessed: filteredPayroll.filter(p => p.wps_processed).length,
     pending: filteredPayroll.filter(p => !p.wps_processed).length,
   }), [filteredPayroll]);
+
+  // Get employees who don't have payroll for selected month
+  const employeesWithoutPayroll = useMemo(() => {
+    const payrollEmployeeIds = filteredPayroll.map(p => p.employee_id);
+    return employees.filter(e => 
+      e.status === 'Active' && !payrollEmployeeIds.includes(e.id)
+    );
+  }, [employees, filteredPayroll]);
 
   const handleEmployeeSelect = (employeeId: string) => {
     const contract = contracts.find(c => c.employee_id === employeeId && c.status === 'Active');
@@ -123,6 +136,50 @@ export function PayrollView() {
     }
   };
 
+  const handleBulkGenerate = async () => {
+    if (employeesWithoutPayroll.length === 0) {
+      toast.info('All active employees already have payroll for this month');
+      return;
+    }
+
+    setBulkGenerating(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const emp of employeesWithoutPayroll) {
+      const contract = contracts.find(c => c.employee_id === emp.id && c.status === 'Active');
+      const basicSalary = contract?.basic_salary || emp.basic_salary || 0;
+      const housingAllowance = contract?.housing_allowance || 0;
+      const transportAllowance = contract?.transportation_allowance || 0;
+      const otherAllowances = emp.allowance || 0;
+      const totalAllowances = housingAllowance + transportAllowance + otherAllowances;
+
+      try {
+        await generatePayroll.mutateAsync({
+          employeeId: emp.id,
+          month: selectedMonth,
+          basicSalary,
+          allowances: totalAllowances,
+          deductions: 0, // Default to 0, user can edit later
+        });
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to generate payroll for ${emp.full_name}:`, error);
+        errorCount++;
+      }
+    }
+
+    setBulkGenerating(false);
+    setIsBulkGenerateOpen(false);
+    
+    if (successCount > 0) {
+      toast.success(`Generated payroll for ${successCount} employees. You can now edit each record to add deductions.`);
+    }
+    if (errorCount > 0) {
+      toast.error(`Failed to generate payroll for ${errorCount} employees`);
+    }
+  };
+
   const handleEditPayroll = async () => {
     if (!editingPayroll) return;
     try {
@@ -140,12 +197,12 @@ export function PayrollView() {
   };
 
   const handlePrintPayslip = (record: any) => {
-    generatePayslipPDF(record);
+    generatePayslipPDF(record, settings);
   };
 
   const handleExportAll = () => {
     if (filteredPayroll.length === 0) return;
-    generateBulkPayrollPDF(filteredPayroll, selectedMonth);
+    generateBulkPayrollPDF(filteredPayroll, selectedMonth, settings);
   };
 
   const totalNet = newPayroll.basicSalary + newPayroll.housingAllowance + newPayroll.transportAllowance + newPayroll.otherAllowances - newPayroll.deductions;
@@ -204,6 +261,82 @@ export function PayrollView() {
             <Button variant="outline" size="sm" onClick={handleExportAll} disabled={filteredPayroll.length === 0} className="border-border">
               <Download className="w-4 h-4 mr-1" /> Export PDF
             </Button>
+            
+            {/* Bulk Generate Button */}
+            <Dialog open={isBulkGenerateOpen} onOpenChange={setIsBulkGenerateOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="border-primary text-primary hover:bg-primary/10">
+                  <Users className="w-4 h-4 mr-1" /> Bulk Generate
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <FileSpreadsheet className="w-5 h-5" />
+                    Bulk Generate Payroll
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 mt-4">
+                  <div className="bg-secondary/50 rounded-lg p-4">
+                    <p className="text-sm text-foreground mb-2">
+                      Generate payroll for all active employees for <strong>{months.find(m => m.value === selectedMonth)?.label}</strong>
+                    </p>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Employees without payroll:</span>
+                      <span className="font-bold text-primary">{employeesWithoutPayroll.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm mt-1">
+                      <span className="text-muted-foreground">Already generated:</span>
+                      <span className="text-muted-foreground">{filteredPayroll.length}</span>
+                    </div>
+                  </div>
+                  
+                  {employeesWithoutPayroll.length > 0 && (
+                    <div className="max-h-48 overflow-y-auto border border-border rounded-lg">
+                      <div className="p-2 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground">
+                        Employees to generate payroll for:
+                      </div>
+                      {employeesWithoutPayroll.map(emp => {
+                        const contract = contracts.find(c => c.employee_id === emp.id && c.status === 'Active');
+                        const salary = contract?.basic_salary || emp.basic_salary || 0;
+                        return (
+                          <div key={emp.id} className="p-2 border-b border-border last:border-0 flex justify-between items-center text-sm">
+                            <span>{emp.full_name} ({emp.hrms_no})</span>
+                            <span className="text-muted-foreground">AED {salary.toLocaleString()}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                    <p className="text-xs text-amber-600">
+                      <strong>Note:</strong> Payroll will be generated with 0 deductions. You can edit each record after generation to add deductions if needed.
+                    </p>
+                  </div>
+                  
+                  <Button 
+                    onClick={handleBulkGenerate} 
+                    disabled={bulkGenerating || employeesWithoutPayroll.length === 0} 
+                    className="w-full"
+                  >
+                    {bulkGenerating ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Users className="w-4 h-4 mr-2" />
+                        Generate for {employeesWithoutPayroll.length} Employees
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Single Generate Button */}
             <Dialog open={isGenerateOpen} onOpenChange={setIsGenerateOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
@@ -330,7 +463,7 @@ export function PayrollView() {
             <div className="text-center py-12">
               <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-30 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">No payroll records for this month</p>
-              <p className="text-xs text-muted-foreground mt-1">Click "Generate Payroll" to create records</p>
+              <p className="text-xs text-muted-foreground mt-1">Click "Bulk Generate" or "Generate Payroll" to create records</p>
             </div>
           ) : (
             filteredPayroll.map((record) => (
@@ -401,6 +534,7 @@ export function PayrollView() {
                             setIsEditOpen(true);
                           }}
                           className="border-border"
+                          title="Edit to add deductions"
                         >
                           <Edit2 className="w-4 h-4" />
                         </Button>
@@ -450,13 +584,13 @@ export function PayrollView() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Payroll</DialogTitle>
+            <DialogTitle>Edit Payroll - Add Deductions</DialogTitle>
           </DialogHeader>
           {editingPayroll && (
             <div className="space-y-4 mt-4">
-              <div>
-                <Label>Employee</Label>
-                <Input value={editingPayroll.employees?.full_name || ''} disabled />
+              <div className="bg-secondary/30 rounded-lg p-3">
+                <p className="text-sm font-medium">{editingPayroll.employees?.full_name}</p>
+                <p className="text-xs text-muted-foreground">{editingPayroll.employees?.hrms_no} • {editingPayroll.employees?.department}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -476,16 +610,26 @@ export function PayrollView() {
                   />
                 </div>
               </div>
-              <div>
-                <Label>Deductions (AED)</Label>
+              <div className="border-t border-border pt-4">
+                <Label className="text-destructive">Deductions (AED)</Label>
                 <Input
                   type="number"
                   value={editingPayroll.deductions}
                   onChange={(e) => setEditingPayroll({...editingPayroll, deductions: Number(e.target.value)})}
+                  className="border-destructive/30"
                 />
+                <p className="text-xs text-muted-foreground mt-1">Add absences, loan repayments, or other deductions</p>
               </div>
               <div className="bg-secondary/50 rounded-lg p-4">
-                <div className="flex justify-between text-lg font-bold">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Gross Salary:</span>
+                  <span className="font-medium">AED {(editingPayroll.basic_salary + editingPayroll.allowances).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm mt-1">
+                  <span className="text-muted-foreground">Deductions:</span>
+                  <span className="text-destructive">-AED {editingPayroll.deductions?.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold mt-2 pt-2 border-t border-border">
                   <span>Net Salary:</span>
                   <span className="text-primary">
                     AED {(editingPayroll.basic_salary + editingPayroll.allowances - editingPayroll.deductions).toLocaleString()}
