@@ -15,6 +15,11 @@ interface Payroll {
   employees?: {
     full_name: string;
     hrms_no: string;
+    bank_name: string | null;
+    iban: string | null;
+    bank_account_no: string | null;
+    department: string;
+    job_position: string;
   };
 }
 
@@ -26,7 +31,7 @@ export function usePayroll() {
         .from('payroll')
         .select(`
           *,
-          employees (full_name, hrms_no)
+          employees (full_name, hrms_no, bank_name, iban, bank_account_no, department, job_position)
         `)
         .order('created_at', { ascending: false });
       
@@ -93,10 +98,69 @@ export function useProcessWPS() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll'] });
-      toast.success('WPS processed successfully');
+      toast.success('Marked as Paid / WPS Processed');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to process WPS: ${error.message}`);
+      toast.error(`Failed to process: ${error.message}`);
+    },
+  });
+}
+
+export function useDeletePayroll() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (payrollId: string) => {
+      const { error } = await supabase
+        .from('payroll')
+        .delete()
+        .eq('id', payrollId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payroll'] });
+      toast.success('Payroll record deleted');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete: ${error.message}`);
+    },
+  });
+}
+
+export function useUpdatePayroll() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, basicSalary, allowances, deductions }: {
+      id: string;
+      basicSalary: number;
+      allowances: number;
+      deductions: number;
+    }) => {
+      const netSalary = basicSalary + allowances - deductions;
+      
+      const { data, error } = await supabase
+        .from('payroll')
+        .update({
+          basic_salary: basicSalary,
+          allowances,
+          deductions,
+          net_salary: netSalary,
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payroll'] });
+      toast.success('Payroll updated successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update payroll: ${error.message}`);
     },
   });
 }
