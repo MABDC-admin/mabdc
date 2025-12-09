@@ -11,6 +11,8 @@ interface Contract {
   start_date: string;
   end_date?: string;
   basic_salary: number;
+  housing_allowance?: number;
+  transportation_allowance?: number;
   total_salary?: number;
   work_location?: string;
   job_title_arabic?: string;
