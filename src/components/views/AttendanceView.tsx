@@ -65,18 +65,26 @@ export function AttendanceView() {
   };
 
   const getStatusColor = (status: string) => {
+    if (status.includes('Late') && status.includes('Undertime')) {
+      return 'bg-gradient-to-r from-amber-500/10 to-cyan-500/10 text-amber-400 border-amber-500/30';
+    }
     switch (status) {
       case 'Present': return 'bg-primary/10 text-primary border-primary/30';
       case 'Late': return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+      case 'Undertime': return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
       case 'Absent': return 'bg-destructive/10 text-destructive border-destructive/30';
       default: return 'bg-accent/10 text-accent border-accent/30';
     }
   };
 
   const getStatusIcon = (status: string) => {
+    if (status.includes('Late') && status.includes('Undertime')) {
+      return <AlertTriangle className="w-4 h-4 text-amber-400" />;
+    }
     switch (status) {
       case 'Present': return <CheckCircle className="w-4 h-4 text-primary" />;
       case 'Late': return <AlertTriangle className="w-4 h-4 text-amber-400" />;
+      case 'Undertime': return <Clock className="w-4 h-4 text-cyan-400" />;
       case 'Absent': return <X className="w-4 h-4 text-destructive" />;
       default: return <Clock className="w-4 h-4 text-accent" />;
     }
@@ -84,7 +92,8 @@ export function AttendanceView() {
 
   // Stats
   const presentCount = todayAttendance.filter(a => a.status === 'Present').length;
-  const lateCount = todayAttendance.filter(a => a.status === 'Late').length;
+  const lateCount = todayAttendance.filter(a => a.status?.includes('Late')).length;
+  const undertimeCount = todayAttendance.filter(a => a.status?.includes('Undertime')).length;
   const checkedOutCount = todayAttendance.filter(a => a.check_out).length;
 
   return (

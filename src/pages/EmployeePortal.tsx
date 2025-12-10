@@ -460,7 +460,8 @@ export default function EmployeePortal() {
                           <span className={cn(
                             "w-2 h-2 rounded-full",
                             record.status === 'Present' && "bg-primary",
-                            record.status === 'Late' && "bg-amber-500",
+                            String(record.status).includes('Late') && "bg-amber-500",
+                            String(record.status).includes('Undertime') && "bg-cyan-500",
                             record.status === 'Absent' && "bg-destructive"
                           )} />
                           <span className="font-medium">{format(parseISO(record.date), 'EEE, dd MMM yyyy')}</span>
@@ -471,7 +472,9 @@ export default function EmployeePortal() {
                           <span className={cn(
                             "px-2 py-0.5 rounded-full text-xs",
                             record.status === 'Present' && "bg-primary/20 text-primary",
+                            String(record.status).includes('Late') && String(record.status).includes('Undertime') && "bg-gradient-to-r from-amber-500/20 to-cyan-500/20 text-amber-500",
                             record.status === 'Late' && "bg-amber-500/20 text-amber-500",
+                            String(record.status) === 'Undertime' && "bg-cyan-500/20 text-cyan-500",
                             record.status === 'Absent' && "bg-destructive/20 text-destructive"
                           )}>
                             {record.status}
