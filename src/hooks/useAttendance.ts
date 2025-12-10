@@ -9,7 +9,7 @@ export interface Attendance {
   date: string;
   check_in?: string;
   check_out?: string;
-  status: 'Present' | 'Absent' | 'Late' | 'Half Day';
+  status: string; // 'Present' | 'Absent' | 'Late' | 'Undertime' | 'Late | Undertime' | 'Half Day'
   employee_remarks?: string;
   admin_remarks?: string;
   modified_by?: string;
@@ -216,7 +216,8 @@ export function useCheckOutByHRMS() {
       if (!employee) throw new Error(`Employee not found: ${hrmsNo}`);
       
       const today = new Date().toISOString().split('T')[0];
-      const checkOutTime = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const now = new Date();
+      const checkOutTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       
       // Find today's attendance record
       const { data: attendance, error: attError } = await supabase
@@ -230,9 +231,25 @@ export function useCheckOutByHRMS() {
       if (!attendance) throw new Error(`${employee.full_name} hasn't checked in today`);
       if (attendance.check_out) throw new Error(`${employee.full_name} already checked out`);
       
+      // Check if undertime (before 5:00 PM / 17:00)
+      const hour = now.getHours();
+      const isUndertime = hour < 17;
+      const wasLate = attendance.status === 'Late';
+      
+      // Determine combined status
+      let newStatus = attendance.status;
+      if (isUndertime && wasLate) {
+        newStatus = 'Late | Undertime';
+      } else if (isUndertime) {
+        newStatus = 'Undertime';
+      }
+      
       const { data, error } = await supabase
         .from('attendance')
-        .update({ check_out: checkOutTime })
+        .update({ 
+          check_out: checkOutTime,
+          status: newStatus
+        })
         .eq('id', attendance.id)
         .select()
         .single();
@@ -246,12 +263,14 @@ export function useCheckOutByHRMS() {
         jobPosition: employee.job_position,
         checkInTime: attendance.check_in,
         checkOutTime,
-        status: attendance.status
+        status: newStatus,
+        isUndertime
       };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
-      toast.success(`${data.employeeName} checked out successfully`);
+      const undertimeText = data.isUndertime ? ' (Undertime)' : '';
+      toast.success(`${data.employeeName} checked out successfully${undertimeText}`);
     },
     onError: (error: Error) => {
       toast.error(error.message);

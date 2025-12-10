@@ -57,7 +57,7 @@ export function EmployeeAttendanceTimeline() {
 
   // Calculate stats for the month
   const monthlyStats = useMemo(() => {
-    if (!selectedEmployeeId) return { present: 0, late: 0, lateClockOut: 0, noClockOut: 0, absent: 0, dayOff: 0 };
+    if (!selectedEmployeeId) return { present: 0, late: 0, undertime: 0, noClockOut: 0, absent: 0, dayOff: 0 };
     
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
@@ -66,7 +66,7 @@ export function EmployeeAttendanceTimeline() {
     const workDays = daysInMonth.filter(d => !isWeekend(d) && d <= new Date());
     const attendanceMap = new Map(employeeAttendance.map(a => [a.date, a]));
     
-    let present = 0, late = 0, noClockOut = 0, dayOff = 0, absent = 0;
+    let present = 0, late = 0, undertime = 0, noClockOut = 0, dayOff = 0, absent = 0;
     
     workDays.forEach(day => {
       const dateStr = format(day, 'yyyy-MM-dd');
@@ -74,10 +74,16 @@ export function EmployeeAttendanceTimeline() {
       
       if (!record) {
         absent++;
-      } else if (record.status === 'Late') {
-        late++;
-      } else if (record.status === 'Present') {
-        present++;
+      } else {
+        if (record.status?.includes('Late')) {
+          late++;
+        }
+        if (record.status?.includes('Undertime')) {
+          undertime++;
+        }
+        if (record.status === 'Present') {
+          present++;
+        }
       }
       
       if (record && !record.check_out) {
@@ -88,7 +94,7 @@ export function EmployeeAttendanceTimeline() {
     // Count weekends as day off
     dayOff = daysInMonth.filter(d => isWeekend(d) && d <= new Date()).length;
     
-    return { present, late, lateClockOut: 0, noClockOut, absent, dayOff };
+    return { present, late, undertime, noClockOut, absent, dayOff };
   }, [employeeAttendance, selectedEmployeeId, currentMonth]);
 
   // Calculate working duration
@@ -208,8 +214,8 @@ export function EmployeeAttendanceTimeline() {
                 <p className="text-[10px] uppercase text-muted-foreground">Late In</p>
               </div>
               <div className="text-center p-2 rounded-lg bg-background/50">
-                <p className="text-xl font-bold text-orange-500">{monthlyStats.lateClockOut}</p>
-                <p className="text-[10px] uppercase text-muted-foreground">Late Out</p>
+                <p className="text-xl font-bold text-cyan-500">{monthlyStats.undertime}</p>
+                <p className="text-[10px] uppercase text-muted-foreground">Undertime</p>
               </div>
               <div className="text-center p-2 rounded-lg bg-background/50">
                 <p className="text-xl font-bold text-red-500">{monthlyStats.noClockOut}</p>
@@ -241,13 +247,14 @@ export function EmployeeAttendanceTimeline() {
             </div>
             
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-36 bg-secondary/50 border-border">
+              <SelectTrigger className="w-40 bg-secondary/50 border-border">
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="Present">Present</SelectItem>
                 <SelectItem value="Late">Late</SelectItem>
+                <SelectItem value="Undertime">Undertime</SelectItem>
                 <SelectItem value="Absent">Absent</SelectItem>
               </SelectContent>
             </Select>
@@ -279,7 +286,17 @@ export function EmployeeAttendanceTimeline() {
             ) : (
               employeeAttendance.map((record) => {
                 const duration = calculateDuration(record.check_in, record.check_out);
-                const isLate = record.status === 'Late';
+                const isLate = record.status?.includes('Late');
+                const isUndertime = record.status?.includes('Undertime');
+                
+                const getStatusStyle = () => {
+                  if (isLate && isUndertime) return "bg-gradient-to-r from-amber-500/10 to-cyan-500/10 text-amber-500";
+                  if (record.status === 'Present') return "bg-primary/10 text-primary";
+                  if (isLate) return "bg-amber-500/10 text-amber-500";
+                  if (isUndertime) return "bg-cyan-500/10 text-cyan-500";
+                  if (record.status === 'Absent') return "bg-destructive/10 text-destructive";
+                  return "bg-muted/10 text-muted-foreground";
+                };
                 
                 return (
                   <div 
@@ -292,12 +309,7 @@ export function EmployeeAttendanceTimeline() {
                         <span className="font-medium text-foreground">
                           {format(parseISO(record.date), 'EEEE, dd')}
                         </span>
-                        <span className={cn(
-                          "text-xs px-2 py-1 rounded-full",
-                          record.status === 'Present' && "bg-primary/10 text-primary",
-                          record.status === 'Late' && "bg-amber-500/10 text-amber-500",
-                          record.status === 'Absent' && "bg-destructive/10 text-destructive"
-                        )}>
+                        <span className={cn("text-xs px-2 py-1 rounded-full", getStatusStyle())}>
                           {record.status}
                         </span>
                       </div>
@@ -327,7 +339,10 @@ export function EmployeeAttendanceTimeline() {
                             <div 
                               className={cn(
                                 "absolute h-full rounded transition-all",
-                                isLate ? "bg-gradient-to-r from-amber-500 to-amber-400" : "bg-gradient-to-r from-primary to-primary/70"
+                                isLate && isUndertime ? "bg-gradient-to-r from-amber-500 to-cyan-400" :
+                                isLate ? "bg-gradient-to-r from-amber-500 to-amber-400" :
+                                isUndertime ? "bg-gradient-to-r from-cyan-500 to-cyan-400" :
+                                "bg-gradient-to-r from-primary to-primary/70"
                               )}
                               style={{
                                 left: `${Math.max(0, getTimelinePosition(record.check_in))}%`,
@@ -367,14 +382,9 @@ export function EmployeeAttendanceTimeline() {
                         {duration || '-'}
                       </div>
                       <div className="col-span-1">
-                        <span className={cn(
-                          "inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full",
-                          record.status === 'Present' && "bg-primary/10 text-primary",
-                          record.status === 'Late' && "bg-amber-500/10 text-amber-500",
-                          record.status === 'Absent' && "bg-destructive/10 text-destructive"
-                        )}>
+                        <span className={cn("inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full", getStatusStyle())}>
                           {record.status === 'Present' && <CheckCircle className="w-3 h-3" />}
-                          {record.status === 'Late' && <AlertTriangle className="w-3 h-3" />}
+                          {isLate && <AlertTriangle className="w-3 h-3" />}
                           {record.status}
                         </span>
                       </div>

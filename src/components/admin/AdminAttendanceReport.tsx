@@ -296,7 +296,9 @@ export function AdminAttendanceReport() {
                         <span className={cn(
                           "text-xs px-2 py-1 rounded-full",
                           record.status === 'Present' && "bg-primary/10 text-primary",
+                          String(record.status).includes('Late') && String(record.status).includes('Undertime') && "bg-gradient-to-r from-amber-500/10 to-cyan-500/10 text-amber-500",
                           record.status === 'Late' && "bg-amber-500/10 text-amber-500",
+                          String(record.status) === 'Undertime' && "bg-cyan-500/10 text-cyan-500",
                           record.status === 'Absent' && "bg-destructive/10 text-destructive"
                         )}>
                           {record.status}
