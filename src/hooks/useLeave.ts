@@ -153,6 +153,16 @@ export function useUpdateLeaveStatus() {
         updateData.rejection_reason = rejection_reason;
       }
       
+      // First, get the leave record details
+      const { data: leaveRecord, error: fetchError } = await supabase
+        .from('leave_records')
+        .select('employee_id, leave_type, days_count')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      // Update the leave record status
       const { data, error } = await supabase
         .from('leave_records')
         .update(updateData)
@@ -161,11 +171,47 @@ export function useUpdateLeaveStatus() {
         .single();
       
       if (error) throw error;
+      
+      // If approved, deduct from leave balance
+      if (status === 'Approved' && leaveRecord) {
+        // Find the leave type ID
+        const { data: leaveType } = await supabase
+          .from('leave_types')
+          .select('id')
+          .eq('name', leaveRecord.leave_type)
+          .single();
+        
+        if (leaveType) {
+          const currentYear = new Date().getFullYear();
+          
+          // Get current balance
+          const { data: currentBalance } = await supabase
+            .from('leave_balances')
+            .select('id, used_days, pending_days')
+            .eq('employee_id', leaveRecord.employee_id)
+            .eq('leave_type_id', leaveType.id)
+            .eq('year', currentYear)
+            .single();
+          
+          if (currentBalance) {
+            // Update balance: increment used_days by days_count
+            await supabase
+              .from('leave_balances')
+              .update({
+                used_days: (currentBalance.used_days || 0) + leaveRecord.days_count,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', currentBalance.id);
+          }
+        }
+      }
+      
       return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leave'] });
       queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
+      queryClient.invalidateQueries({ queryKey: ['all_leave_balances'] });
       toast.success(`Leave request ${variables.status.toLowerCase()}`);
     },
     onError: (error: Error) => {
