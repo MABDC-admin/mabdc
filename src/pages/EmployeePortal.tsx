@@ -452,6 +452,7 @@ export default function EmployeePortal() {
               hrmsNo={employee.hrms_no}
               showEmployeeSelector={false}
               showBackButton={false}
+              isEmployeePortal={true}
             />
           </div>
         )}
