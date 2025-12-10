@@ -20,7 +20,8 @@ import {
   ChevronRight,
   UserCheck,
   AlertCircle,
-  Timer
+  Timer,
+  Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHRStore } from '@/store/hrStore';
@@ -49,7 +50,8 @@ const navItems: NavItem[] = [
     icon: <Users className="w-5 h-5" />,
     subItems: [
       { id: 'employees', label: 'All Employees', icon: <Users className="w-4 h-4" /> },
-      { id: 'time-shift', label: 'Time Shift', icon: <Timer className="w-4 h-4" /> }
+      { id: 'time-shift', label: 'Time Shift', icon: <Timer className="w-4 h-4" /> },
+      { id: 'e-portal', label: 'E-Portal', icon: <Eye className="w-4 h-4" /> }
     ]
   },
   { id: 'contracts', label: 'Contracts', icon: <FileText className="w-5 h-5" /> },
