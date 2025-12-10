@@ -35,7 +35,7 @@ interface ScannedEmployee {
 
 export default function AttendanceScanner() {
   const [scanMode, setScanMode] = useState<ScanMode>('check-in');
-  const [scanMethod, setScanMethod] = useState<ScanMethod>('qr');
+  const [scanMethod, setScanMethod] = useState<ScanMethod>('face');
   const [scannerState, setScannerState] = useState<ScannerState>('standby');
   const [scannedEmployee, setScannedEmployee] = useState<ScannedEmployee | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -334,13 +334,13 @@ export default function AttendanceScanner() {
             {/* Scan Method Tabs */}
             <Tabs value={scanMethod} onValueChange={(v) => setScanMethod(v as ScanMethod)} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="qr" className="gap-2">
-                  <QrCode className="w-4 h-4" />
-                  QR Code
-                </TabsTrigger>
                 <TabsTrigger value="face" className="gap-2">
                   <ScanFace className="w-4 h-4" />
                   Face ID
+                </TabsTrigger>
+                <TabsTrigger value="qr" className="gap-2">
+                  <QrCode className="w-4 h-4" />
+                  QR Code
                 </TabsTrigger>
               </TabsList>
 
@@ -545,10 +545,116 @@ export default function AttendanceScanner() {
               </TabsContent>
 
               <TabsContent value="face" className="mt-4">
-                <FaceRecognitionScanner
-                  onRecognized={handleFaceRecognized}
-                  isProcessing={faceProcessing}
-                />
+                {/* Show recognized employee result for Face ID */}
+                {scannerState === 'result' && scannedEmployee && scanMethod === 'face' ? (
+                  <Card className="overflow-hidden">
+                    <CardContent className="p-6">
+                      <div className="text-center animate-scale-in">
+                        {/* Employee Photo */}
+                        <Avatar className="w-28 h-28 mx-auto mb-4 ring-4 ring-primary/20">
+                          <AvatarImage src={scannedEmployee.photo || undefined} />
+                          <AvatarFallback className="bg-primary/10 text-primary text-2xl">
+                            {scannedEmployee.name.split(' ').map(n => n[0]).join('')}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        {/* Status Icon */}
+                        <div className={cn(
+                          "w-12 h-12 mx-auto -mt-6 mb-2 rounded-full flex items-center justify-center",
+                          scannedEmployee.isLate 
+                            ? "bg-amber-500 text-white" 
+                            : "bg-primary text-primary-foreground"
+                        )}>
+                          {scannedEmployee.isLate ? (
+                            <AlertTriangle className="w-6 h-6" />
+                          ) : (
+                            <CheckCircle className="w-6 h-6" />
+                          )}
+                        </div>
+
+                        {/* Employee Name */}
+                        <h3 className="text-xl font-bold text-foreground mb-1">
+                          {scannedEmployee.name}
+                        </h3>
+                        
+                        {/* Position & Department */}
+                        {(scannedEmployee.jobPosition || scannedEmployee.department) && (
+                          <p className="text-sm text-muted-foreground mb-3">
+                            {scannedEmployee.jobPosition}
+                            {scannedEmployee.jobPosition && scannedEmployee.department && ' • '}
+                            {scannedEmployee.department}
+                          </p>
+                        )}
+
+                        {/* Check-in/out Status */}
+                        <div className={cn(
+                          "inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-3",
+                          scannedEmployee.mode === 'check-in'
+                            ? scannedEmployee.isLate 
+                              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                              : "bg-primary/10 text-primary"
+                            : "bg-accent/10 text-accent-foreground"
+                        )}>
+                          {scannedEmployee.mode === 'check-in' ? (
+                            <>
+                              <LogIn className="w-4 h-4" />
+                              Checked In {scannedEmployee.isLate && '(Late)'}
+                            </>
+                          ) : (
+                            <>
+                              <LogOut className="w-4 h-4" />
+                              Checked Out
+                            </>
+                          )}
+                        </div>
+
+                        {/* Time Details */}
+                        <div className="flex items-center justify-center gap-4 text-sm mb-4">
+                          {scannedEmployee.checkInTime && (
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                              <LogIn className="w-4 h-4" />
+                              In: {scannedEmployee.checkInTime}
+                            </span>
+                          )}
+                          {scannedEmployee.checkOutTime && (
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                              <LogOut className="w-4 h-4" />
+                              Out: {scannedEmployee.checkOutTime}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Late Warning */}
+                        {scannedEmployee.isLate && scannedEmployee.mode === 'check-in' && (
+                          <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <p className="text-sm text-amber-800 dark:text-amber-400">
+                              <AlertTriangle className="w-4 h-4 inline mr-1" />
+                              Late arrival - HR has been notified
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Scan Again Button */}
+                        <Button
+                          onClick={() => {
+                            setScannerState('standby');
+                            setScannedEmployee(null);
+                          }}
+                          size="lg"
+                          className="gap-2"
+                        >
+                          <RefreshCw className="w-5 h-5" />
+                          Scan Again
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <FaceRecognitionScanner
+                    onRecognized={handleFaceRecognized}
+                    isProcessing={faceProcessing}
+                  />
+                )}
               </TabsContent>
             </Tabs>
           </div>
