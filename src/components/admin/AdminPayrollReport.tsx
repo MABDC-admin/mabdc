@@ -1,24 +1,34 @@
 import { useState, useMemo } from 'react';
-import { usePayroll, useGeneratePayroll } from '@/hooks/usePayroll';
+import { usePayroll, useGeneratePayroll, useUpdatePayroll, useDeletePayroll, useProcessWPS } from '@/hooks/usePayroll';
 import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, DollarSign, Calendar, Users, Plus, CheckCircle } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Download, DollarSign, Calendar, Users, Plus, CheckCircle, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export function AdminPayrollReport() {
   const { data: payroll = [] } = usePayroll();
   const { data: employees = [] } = useEmployees();
   const generatePayroll = useGeneratePayroll();
+  const updatePayroll = useUpdatePayroll();
+  const deletePayroll = useDeletePayroll();
+  const processWPS = useProcessWPS();
   
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(currentDate, 'yyyy-MM'));
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  
   const [newPayroll, setNewPayroll] = useState({
     employeeId: '',
     month: format(currentDate, 'yyyy-MM'),
@@ -26,6 +36,14 @@ export function AdminPayrollReport() {
     allowances: 0,
     deductions: 0,
   });
+
+  const [editPayroll, setEditPayroll] = useState<{
+    id: string;
+    employeeName: string;
+    basicSalary: number;
+    allowances: number;
+    deductions: number;
+  } | null>(null);
 
   const months = useMemo(() => {
     const result = [];
@@ -87,6 +105,53 @@ export function AdminPayrollReport() {
     });
   };
 
+  const handleEditClick = (record: typeof filteredPayroll[0]) => {
+    setEditPayroll({
+      id: record.id,
+      employeeName: record.employees?.full_name || 'Unknown',
+      basicSalary: record.basic_salary,
+      allowances: record.allowances || 0,
+      deductions: record.deductions || 0,
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleUpdatePayroll = async () => {
+    if (!editPayroll) return;
+    try {
+      await updatePayroll.mutateAsync({
+        id: editPayroll.id,
+        basicSalary: editPayroll.basicSalary,
+        allowances: editPayroll.allowances,
+        deductions: editPayroll.deductions,
+      });
+      setIsEditOpen(false);
+      setEditPayroll(null);
+      toast.success('Payroll updated successfully');
+    } catch (error) {
+      console.error('Failed to update payroll:', error);
+    }
+  };
+
+  const handleDeletePayroll = async () => {
+    if (!deleteConfirmId) return;
+    try {
+      await deletePayroll.mutateAsync(deleteConfirmId);
+      setDeleteConfirmId(null);
+      toast.success('Payroll record deleted');
+    } catch (error) {
+      console.error('Failed to delete payroll:', error);
+    }
+  };
+
+  const handleMarkAsPaid = async (id: string) => {
+    try {
+      await processWPS.mutateAsync(id);
+    } catch (error) {
+      console.error('Failed to process WPS:', error);
+    }
+  };
+
   const downloadCSV = () => {
     const headers = ['HRMS No', 'Employee Name', 'Month', 'Basic Salary', 'Allowances', 'Deductions', 'Net Salary', 'WPS Status'];
     const rows = filteredPayroll.map(p => [
@@ -115,7 +180,7 @@ export function AdminPayrollReport() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Monthly Payroll Report</h2>
-          <p className="text-xs text-muted-foreground">Generate payroll and download reports</p>
+          <p className="text-xs text-muted-foreground">Generate, edit, and manage payroll records</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -175,13 +240,13 @@ export function AdminPayrollReport() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
-              <TableHead>HRMS No</TableHead>
               <TableHead>Employee</TableHead>
               <TableHead className="text-right">Basic</TableHead>
               <TableHead className="text-right">Allowances</TableHead>
               <TableHead className="text-right">Deductions</TableHead>
               <TableHead className="text-right">Net Salary</TableHead>
-              <TableHead className="text-center">WPS Status</TableHead>
+              <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -194,8 +259,20 @@ export function AdminPayrollReport() {
             ) : (
               filteredPayroll.map((record) => (
                 <TableRow key={record.id}>
-                  <TableCell className="text-xs font-mono">{record.employees?.hrms_no}</TableCell>
-                  <TableCell className="text-sm font-medium">{record.employees?.full_name}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src={record.employees?.photo_url || ''} />
+                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                          {record.employees?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="text-sm font-medium">{record.employees?.full_name}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{record.employees?.hrms_no}</p>
+                      </div>
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right text-sm">AED {record.basic_salary?.toLocaleString()}</TableCell>
                   <TableCell className="text-right text-sm text-emerald-500">+{record.allowances?.toLocaleString()}</TableCell>
                   <TableCell className="text-right text-sm text-destructive">-{record.deductions?.toLocaleString()}</TableCell>
@@ -207,8 +284,36 @@ export function AdminPayrollReport() {
                         ? "bg-primary/10 text-primary" 
                         : "bg-amber-500/10 text-amber-500"
                     )}>
-                      {record.wps_processed ? 'Processed' : 'Pending'}
+                      {record.wps_processed ? 'Paid' : 'Pending'}
                     </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditClick(record)}>
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        {!record.wps_processed && (
+                          <DropdownMenuItem onClick={() => handleMarkAsPaid(record.id)}>
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Mark as Paid
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem 
+                          onClick={() => setDeleteConfirmId(record.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
@@ -294,6 +399,81 @@ export function AdminPayrollReport() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Payroll Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-primary" />
+              Edit Payroll
+            </DialogTitle>
+            <DialogDescription>
+              Editing payroll for {editPayroll?.employeeName}
+            </DialogDescription>
+          </DialogHeader>
+          {editPayroll && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Basic Salary</Label>
+                  <Input 
+                    type="number"
+                    value={editPayroll.basicSalary}
+                    onChange={(e) => setEditPayroll({...editPayroll, basicSalary: Number(e.target.value)})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Allowances</Label>
+                  <Input 
+                    type="number"
+                    value={editPayroll.allowances}
+                    onChange={(e) => setEditPayroll({...editPayroll, allowances: Number(e.target.value)})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Deductions</Label>
+                  <Input 
+                    type="number"
+                    value={editPayroll.deductions}
+                    onChange={(e) => setEditPayroll({...editPayroll, deductions: Number(e.target.value)})}
+                  />
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                <p className="text-xs text-muted-foreground">Net Salary</p>
+                <p className="text-lg font-bold text-foreground">
+                  AED {(editPayroll.basicSalary + editPayroll.allowances - editPayroll.deductions).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleUpdatePayroll} disabled={updatePayroll.isPending}>
+              {updatePayroll.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Payroll Record</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this payroll record? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeletePayroll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
