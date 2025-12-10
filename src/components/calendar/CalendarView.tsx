@@ -9,9 +9,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Calendar as CalendarIcon } from 'lucide-react';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, addWeeks, getWeeksInMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, isWeekend } from 'date-fns';
 
 interface CalendarViewProps {
   className?: string;
@@ -40,8 +41,9 @@ export function CalendarView({ className }: CalendarViewProps) {
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
   
-  // Get all weeks in the month
+  // Get all weeks in the month for calendar view
   const weeks = useMemo(() => {
     const firstWeekStart = startOfWeek(monthStart, { weekStartsOn: 0 });
     const lastWeekEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
@@ -55,6 +57,7 @@ export function CalendarView({ className }: CalendarViewProps) {
   }, [currentMonth]);
 
   const approvedLeave = leave.filter(l => l.status === 'Approved');
+  const activeEmployees = employees.filter(e => e.status === 'Active');
 
   const getEventsForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -74,6 +77,20 @@ export function CalendarView({ className }: CalendarViewProps) {
     });
 
     return { leaveItems, holidayItems, eventItems };
+  };
+
+  const getEmployeeLeaveForDate = (employeeId: string, date: Date) => {
+    return approvedLeave.find(l => {
+      if (l.employee_id !== employeeId) return false;
+      const start = parseISO(l.start_date);
+      const end = parseISO(l.end_date);
+      return date >= start && date <= end;
+    });
+  };
+
+  const getHolidayForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return holidays.find(h => h.date === dateStr);
   };
 
   const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
@@ -108,15 +125,15 @@ export function CalendarView({ className }: CalendarViewProps) {
 
   const getEmployeeById = (id: string) => employees.find(e => e.id === id);
 
-  const leaveTypeColors: Record<string, string> = {
-    'Annual': 'text-blue-600',
-    'Sick': 'text-orange-600',
-    'Emergency': 'text-red-600',
-    'Maternity': 'text-pink-600',
-    'Paternity': 'text-indigo-600',
-    'Bereavement': 'text-gray-600',
-    'Unpaid': 'text-slate-600',
-    'WFH': 'text-green-600',
+  const leaveTypeColors: Record<string, { bg: string; text: string }> = {
+    'Annual': { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300' },
+    'Sick': { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-300' },
+    'Emergency': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300' },
+    'Maternity': { bg: 'bg-pink-100 dark:bg-pink-900/30', text: 'text-pink-700 dark:text-pink-300' },
+    'Paternity': { bg: 'bg-indigo-100 dark:bg-indigo-900/30', text: 'text-indigo-700 dark:text-indigo-300' },
+    'Bereavement': { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-700 dark:text-gray-300' },
+    'Unpaid': { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-700 dark:text-slate-300' },
+    'WFH': { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-300' },
   };
 
   const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -135,7 +152,7 @@ export function CalendarView({ className }: CalendarViewProps) {
               className={cn(
                 "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
                 viewMode === 'matrix' 
-                  ? "bg-background text-foreground shadow-sm" 
+                  ? "bg-primary text-primary-foreground shadow-sm" 
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -177,143 +194,277 @@ export function CalendarView({ className }: CalendarViewProps) {
         </div>
       </div>
 
-      {/* Calendar Grid */}
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
-        {/* Day Headers */}
-        <div className="grid grid-cols-7 border-b border-border">
-          {dayNames.map((day, idx) => (
-            <div 
-              key={day} 
-              className={cn(
-                "py-3 text-center text-xs font-medium text-muted-foreground border-r border-border last:border-r-0",
-                idx === 0 && "text-destructive/70"
+      {/* Matrix View */}
+      {viewMode === 'matrix' && (
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <ScrollArea className="w-full">
+            <div className="min-w-[900px]">
+              {/* Header Row - Dates */}
+              <div className="flex border-b border-border bg-muted/30">
+                <div className="w-48 min-w-[192px] p-3 border-r border-border sticky left-0 bg-muted/50 z-10">
+                  <span className="text-xs font-semibold text-muted-foreground">EMPLOYEE</span>
+                </div>
+                <div className="flex flex-1">
+                  {daysInMonth.map(day => {
+                    const holiday = getHolidayForDate(day);
+                    const isTodayDate = isToday(day);
+                    const isWeekendDay = isWeekend(day);
+                    
+                    return (
+                      <div 
+                        key={day.toISOString()} 
+                        className={cn(
+                          "flex-1 min-w-[40px] p-2 text-center border-r border-border last:border-r-0",
+                          isWeekendDay && "bg-muted/20",
+                          holiday && "bg-destructive/5"
+                        )}
+                      >
+                        <div className={cn(
+                          "text-[10px] font-medium text-muted-foreground",
+                          isWeekendDay && "text-destructive/70"
+                        )}>
+                          {format(day, 'EEE')}
+                        </div>
+                        <div className={cn(
+                          "text-sm font-semibold",
+                          isTodayDate && "bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center mx-auto",
+                          !isTodayDate && "text-foreground"
+                        )}>
+                          {format(day, 'd')}
+                        </div>
+                        {holiday && (
+                          <div className="text-[8px] text-destructive truncate mt-0.5" title={holiday.name}>
+                            {holiday.name}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Employee Rows */}
+              {activeEmployees.map(employee => (
+                <div key={employee.id} className="flex border-b border-border last:border-b-0 hover:bg-muted/10 transition-colors">
+                  {/* Employee Info - Sticky */}
+                  <div className="w-48 min-w-[192px] p-2 border-r border-border sticky left-0 bg-card z-10 flex items-center gap-2">
+                    <Avatar className="w-7 h-7 border border-border">
+                      <AvatarImage src={employee.photo_url || ''} />
+                      <AvatarFallback className="text-[10px] bg-secondary">
+                        {employee.full_name?.charAt(0) || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">{employee.full_name}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{employee.job_position}</p>
+                    </div>
+                  </div>
+
+                  {/* Leave Cells */}
+                  <div className="flex flex-1">
+                    {daysInMonth.map(day => {
+                      const leaveRecord = getEmployeeLeaveForDate(employee.id, day);
+                      const holiday = getHolidayForDate(day);
+                      const isWeekendDay = isWeekend(day);
+                      const colors = leaveRecord ? leaveTypeColors[leaveRecord.leave_type] || leaveTypeColors['Annual'] : null;
+
+                      return (
+                        <div 
+                          key={day.toISOString()} 
+                          className={cn(
+                            "flex-1 min-w-[40px] p-1 border-r border-border last:border-r-0 flex items-center justify-center",
+                            isWeekendDay && "bg-muted/20",
+                            holiday && "bg-destructive/5"
+                          )}
+                        >
+                          {leaveRecord && (
+                            <div 
+                              className={cn(
+                                "w-full h-6 rounded text-[9px] font-medium flex items-center justify-center truncate px-0.5",
+                                colors?.bg,
+                                colors?.text
+                              )}
+                              title={`${leaveRecord.leave_type} Leave`}
+                            >
+                              {leaveRecord.leave_type.substring(0, 3)}
+                            </div>
+                          )}
+                          {holiday && !leaveRecord && (
+                            <div className="w-2 h-2 rounded-full bg-destructive/50" title={holiday.name} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              {activeEmployees.length === 0 && (
+                <div className="p-8 text-center text-muted-foreground text-sm">
+                  No active employees found
+                </div>
               )}
-            >
-              {day}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Calendar View */}
+      {viewMode === 'calendar' && (
+        <>
+          <div className="bg-card rounded-xl border border-border overflow-hidden">
+            {/* Day Headers */}
+            <div className="grid grid-cols-7 border-b border-border">
+              {dayNames.map((day, idx) => (
+                <div 
+                  key={day} 
+                  className={cn(
+                    "py-3 text-center text-xs font-medium text-muted-foreground border-r border-border last:border-r-0",
+                    idx === 0 && "text-destructive/70"
+                  )}
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar Weeks */}
+            {weeks.map((week, weekIndex) => (
+              <div key={weekIndex} className="grid grid-cols-7 border-b border-border last:border-b-0">
+                {week.map((day, dayIndex) => {
+                  const { leaveItems, holidayItems, eventItems } = getEventsForDate(day);
+                  const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
+                  const isTodayDate = isToday(day);
+
+                  // Group leave by type for display
+                  const leaveByType: Record<string, typeof leaveItems> = {};
+                  leaveItems.forEach(l => {
+                    const type = l.leave_type;
+                    if (!leaveByType[type]) leaveByType[type] = [];
+                    leaveByType[type].push(l);
+                  });
+
+                  return (
+                    <div
+                      key={day.toISOString()}
+                      className={cn(
+                        "min-h-[120px] p-2 border-r border-border last:border-r-0 transition-colors",
+                        !isCurrentMonth && "bg-muted/30",
+                        isTodayDate && "bg-primary/5"
+                      )}
+                    >
+                      {/* Day Number */}
+                      <div className="flex items-start justify-between mb-1">
+                        <span className={cn(
+                          "text-xs font-medium uppercase text-muted-foreground",
+                          dayIndex === 0 && "text-destructive/70"
+                        )}>
+                          {dayNames[dayIndex]}
+                        </span>
+                        <span className={cn(
+                          "text-lg font-semibold",
+                          !isCurrentMonth && "text-muted-foreground/50",
+                          isCurrentMonth && "text-foreground",
+                          isTodayDate && "bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center text-sm"
+                        )}>
+                          {format(day, 'd')}
+                        </span>
+                      </div>
+
+                      {/* Events Container */}
+                      <div className="space-y-1 mt-1">
+                        {/* Holidays */}
+                        {holidayItems.map(holiday => (
+                          <div key={holiday.id} className="text-xs">
+                            <span className="text-destructive font-medium">{holiday.name}</span>
+                            <p className="text-[10px] text-muted-foreground">All employees</p>
+                          </div>
+                        ))}
+
+                        {/* Leave by type with avatars */}
+                        {Object.entries(leaveByType).map(([type, items]) => {
+                          const colors = leaveTypeColors[type] || leaveTypeColors['Annual'];
+                          return (
+                            <div key={type} className="space-y-0.5">
+                              <span className={cn("text-[11px] font-medium", colors.text)}>
+                                {type} Leave
+                              </span>
+                              <div className="flex -space-x-1.5">
+                                {items.slice(0, 4).map(l => {
+                                  const employee = getEmployeeById(l.employee_id);
+                                  return (
+                                    <Avatar key={l.id} className="w-5 h-5 border border-background">
+                                      <AvatarImage src={employee?.photo_url || ''} />
+                                      <AvatarFallback className="text-[8px] bg-secondary">
+                                        {employee?.full_name?.charAt(0) || '?'}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  );
+                                })}
+                                {items.length > 4 && (
+                                  <div className="w-5 h-5 rounded-full bg-muted border border-background flex items-center justify-center">
+                                    <span className="text-[8px] text-muted-foreground">+{items.length - 4}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Custom Events */}
+                        {eventItems.map(event => (
+                          <div key={event.id} className="text-[10px] text-primary font-medium truncate">
+                            {event.title}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center gap-6 pt-2 flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="w-2.5 h-2.5 rounded-full bg-destructive" />
+              <span>Holiday</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+              <span>Sick Leave</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+              <span>Annual Leave</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="w-2.5 h-2.5 rounded-full bg-gray-500" />
+              <span>Bereavement</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+              <span>WFH</span>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Matrix View Legend */}
+      {viewMode === 'matrix' && (
+        <div className="flex items-center gap-4 pt-2 flex-wrap">
+          {Object.entries(leaveTypeColors).map(([type, colors]) => (
+            <div key={type} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className={cn("w-6 h-4 rounded text-[8px] font-medium flex items-center justify-center", colors.bg, colors.text)}>
+                {type.substring(0, 3)}
+              </span>
+              <span>{type}</span>
             </div>
           ))}
         </div>
-
-        {/* Calendar Weeks */}
-        {weeks.map((week, weekIndex) => (
-          <div key={weekIndex} className="grid grid-cols-7 border-b border-border last:border-b-0">
-            {week.map((day, dayIndex) => {
-              const { leaveItems, holidayItems, eventItems } = getEventsForDate(day);
-              const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
-              const isTodayDate = isToday(day);
-
-              // Group leave by type for display
-              const leaveByType: Record<string, typeof leaveItems> = {};
-              leaveItems.forEach(l => {
-                const type = l.leave_type;
-                if (!leaveByType[type]) leaveByType[type] = [];
-                leaveByType[type].push(l);
-              });
-
-              return (
-                <div
-                  key={day.toISOString()}
-                  className={cn(
-                    "min-h-[120px] p-2 border-r border-border last:border-r-0 transition-colors",
-                    !isCurrentMonth && "bg-muted/30",
-                    isTodayDate && "bg-primary/5"
-                  )}
-                >
-                  {/* Day Number */}
-                  <div className="flex items-start justify-between mb-1">
-                    <span className={cn(
-                      "text-xs font-medium uppercase text-muted-foreground",
-                      dayIndex === 0 && "text-destructive/70"
-                    )}>
-                      {dayNames[dayIndex]}
-                    </span>
-                    <span className={cn(
-                      "text-lg font-semibold",
-                      !isCurrentMonth && "text-muted-foreground/50",
-                      isCurrentMonth && "text-foreground",
-                      isTodayDate && "bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center text-sm"
-                    )}>
-                      {format(day, 'd')}
-                    </span>
-                  </div>
-
-                  {/* Events Container */}
-                  <div className="space-y-1 mt-1">
-                    {/* Holidays */}
-                    {holidayItems.map(holiday => (
-                      <div key={holiday.id} className="text-xs">
-                        <span className="text-destructive font-medium">{holiday.name}</span>
-                        <p className="text-[10px] text-muted-foreground">All employees</p>
-                      </div>
-                    ))}
-
-                    {/* Leave by type with avatars */}
-                    {Object.entries(leaveByType).map(([type, items]) => (
-                      <div key={type} className="space-y-0.5">
-                        <span className={cn(
-                          "text-[11px] font-medium",
-                          leaveTypeColors[type] || "text-foreground"
-                        )}>
-                          {type} Leave
-                        </span>
-                        <div className="flex -space-x-1.5">
-                          {items.slice(0, 4).map(l => {
-                            const employee = getEmployeeById(l.employee_id);
-                            return (
-                              <Avatar key={l.id} className="w-5 h-5 border border-background">
-                                <AvatarImage src={employee?.photo_url || ''} />
-                                <AvatarFallback className="text-[8px] bg-secondary">
-                                  {employee?.full_name?.charAt(0) || '?'}
-                                </AvatarFallback>
-                              </Avatar>
-                            );
-                          })}
-                          {items.length > 4 && (
-                            <div className="w-5 h-5 rounded-full bg-muted border border-background flex items-center justify-center">
-                              <span className="text-[8px] text-muted-foreground">+{items.length - 4}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Custom Events */}
-                    {eventItems.map(event => (
-                      <div key={event.id} className="text-[10px] text-primary font-medium truncate">
-                        {event.title}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-
-      {/* Legend */}
-      <div className="flex items-center gap-6 pt-2">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span className="w-2.5 h-2.5 rounded-full bg-destructive" />
-          <span>Holiday</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-          <span>Sick Leave</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-          <span>Annual Leave</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span className="w-2.5 h-2.5 rounded-full bg-gray-500" />
-          <span>Bereavement</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-          <span>WFH</span>
-        </div>
-      </div>
+      )}
 
       {/* Add Event Modal */}
       <Dialog open={isEventModalOpen} onOpenChange={setIsEventModalOpen}>
