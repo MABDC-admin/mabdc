@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useHRStore } from '@/store/hrStore';
 import { useDeleteEmployee, useEmployees, useUpdateEmployee } from '@/hooks/useEmployees';
 import { useEmployeeDocuments, useUploadDocument, useDeleteDocument, useUploadEmployeePhoto } from '@/hooks/useDocuments';
-import { useLeave, useDeleteLeave } from '@/hooks/useLeave';
+import { useLeave, useDeleteLeave, useLeaveBalances } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { useEmployeeEducation, useAddEducation, useDeleteEducation } from '@/hooks/useEducation';
 import { EditEmployeeModal } from './EditEmployeeModal';
@@ -73,8 +73,15 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
 
   // Hooks for leave records
   const { data: leaveRecords = [] } = useLeave();
+  const { data: leaveBalances = [] } = useLeaveBalances(currentEmployee?.id || '');
   const deleteLeave = useDeleteLeave();
   const employeeLeaveRecords = leaveRecords.filter(r => r.employee_id === currentEmployee?.id);
+
+  // Calculate total available leave from leave_balances table
+  const totalLeaveBalance = leaveBalances.reduce((acc, balance) => {
+    const available = (balance.entitled_days + balance.carried_forward_days) - balance.used_days - balance.pending_days;
+    return acc + Math.max(0, available);
+  }, 0);
 
   // Hooks for contracts
   const { data: contracts = [] } = useContracts();
@@ -411,7 +418,28 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                     <div className="space-y-4">
                       <div>
                         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Leave Balance</p>
-                        <p className="text-lg font-semibold text-foreground">{currentEmployee.leave_balance || 0} days</p>
+                        <p className="text-lg font-semibold text-foreground">
+                          {leaveBalances.length > 0 ? `${totalLeaveBalance} days` : 'Not allocated'}
+                        </p>
+                        {leaveBalances.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {leaveBalances.map((balance) => {
+                              const available = (balance.entitled_days + balance.carried_forward_days) - balance.used_days - balance.pending_days;
+                              const leaveTypeName = (balance as any).leave_types?.name || 'Leave';
+                              return (
+                                <div key={balance.id} className="flex items-center justify-between text-xs">
+                                  <span className="text-muted-foreground">{leaveTypeName}</span>
+                                  <span className={cn(
+                                    "font-medium",
+                                    available <= 0 ? "text-destructive" : "text-foreground"
+                                  )}>
+                                    {Math.max(0, available)}/{balance.entitled_days}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Est. Gratuity</p>
