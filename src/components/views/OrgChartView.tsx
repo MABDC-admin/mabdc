@@ -14,6 +14,8 @@ import {
   DragEndEvent,
   DragStartEvent,
   DragOverlay,
+  DragOverEvent,
+  useDroppable,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -23,7 +25,6 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { 
-  Users, 
   GripVertical, 
   Pencil, 
   Trash2, 
@@ -33,7 +34,9 @@ import {
   ChevronDown,
   ChevronRight,
   Link as LinkIcon,
-  Unlink
+  Unlink,
+  ArrowDown,
+  Move
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useOrgChart, useUpdateOrgPosition, useAddOrgPosition, useDeleteOrgPosition, OrgChartPosition } from '@/hooks/useOrgChart';
@@ -50,9 +53,11 @@ interface OrgNodeProps {
   level: number;
   expandedNodes: Set<string>;
   toggleExpand: (id: string) => void;
+  activeId: string | null;
+  overId: string | null;
 }
 
-function OrgNode({ position, children, allPositions, onEdit, onDelete, onLinkEmployee, level, expandedNodes, toggleExpand }: OrgNodeProps) {
+function OrgNode({ position, children, allPositions, onEdit, onDelete, onLinkEmployee, level, expandedNodes, toggleExpand, activeId, overId }: OrgNodeProps) {
   const {
     attributes,
     listeners,
@@ -62,6 +67,11 @@ function OrgNode({ position, children, allPositions, onEdit, onDelete, onLinkEmp
     isDragging,
   } = useSortable({ id: position.id });
 
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `drop-${position.id}`,
+    data: { positionId: position.id },
+  });
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -69,6 +79,8 @@ function OrgNode({ position, children, allPositions, onEdit, onDelete, onLinkEmp
 
   const hasChildren = children.length > 0;
   const isExpanded = expandedNodes.has(position.id);
+  const isBeingDraggedOver = overId === `drop-${position.id}` && activeId !== position.id;
+  const isActive = activeId === position.id;
 
   const getLevelColor = (lvl: number) => {
     const colors = [
@@ -82,106 +94,121 @@ function OrgNode({ position, children, allPositions, onEdit, onDelete, onLinkEmp
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={cn("relative", isDragging && "opacity-50")}>
+    <div ref={setNodeRef} style={style} className={cn("relative", isDragging && "opacity-30")}>
       <div className="flex flex-col items-center">
-        {/* Node Card */}
-        <Card className={cn(
-          "relative w-56 p-4 border-2 transition-all duration-200 hover:shadow-lg",
-          isDragging ? "shadow-2xl ring-2 ring-primary" : "shadow-md",
-          "bg-card"
-        )}>
-          {/* Gradient Header */}
-          <div className={cn(
-            "absolute top-0 left-0 right-0 h-2 rounded-t-lg bg-gradient-to-r",
-            getLevelColor(level)
-          )} />
-          
-          {/* Drag Handle */}
-          <div 
-            {...attributes} 
-            {...listeners}
-            className="absolute top-3 right-2 p-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
-          >
-            <GripVertical className="w-4 h-4" />
-          </div>
+        {/* Node Card with Drop Zone */}
+        <div ref={setDropRef} className="relative">
+          <Card className={cn(
+            "relative w-56 p-4 border-2 transition-all duration-200 hover:shadow-lg",
+            isDragging ? "shadow-2xl ring-2 ring-primary" : "shadow-md",
+            isBeingDraggedOver && "ring-2 ring-primary ring-offset-2 border-primary scale-105",
+            "bg-card"
+          )}>
+            {/* Drop Indicator */}
+            {isBeingDraggedOver && (
+              <div className="absolute -top-8 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce">
+                <ArrowDown className="w-5 h-5 text-primary" />
+                <span className="text-xs font-medium text-primary whitespace-nowrap">Drop as child</span>
+              </div>
+            )}
 
-          {/* Content */}
-          <div className="pt-2 text-center">
-            {/* Photo/Avatar */}
-            <div className="mx-auto mb-3 relative">
-              {position.employees?.photo_url ? (
-                <img 
-                  src={position.employees.photo_url} 
-                  alt={position.holder_name || position.title}
-                  className="w-16 h-16 rounded-full object-cover border-4 border-background shadow-md mx-auto"
-                />
-              ) : (
-                <div className={cn(
-                  "w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-md border-4 border-background bg-gradient-to-br",
-                  getLevelColor(level)
-                )}>
-                  <User className="w-8 h-8 text-white" />
-                </div>
-              )}
-              {position.employee_id && (
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                  <LinkIcon className="w-3 h-3 text-primary-foreground" />
-                </div>
-              )}
-            </div>
-
-            {/* Name */}
-            <h3 className="font-semibold text-foreground text-sm truncate">
-              {position.employees?.full_name || position.holder_name || 'Vacant'}
-            </h3>
-            
-            {/* Position Title */}
-            <p className={cn(
-              "text-xs font-medium mt-1 px-2 py-0.5 rounded-full inline-block bg-gradient-to-r text-white",
+            {/* Gradient Header */}
+            <div className={cn(
+              "absolute top-0 left-0 right-0 h-2 rounded-t-lg bg-gradient-to-r",
               getLevelColor(level)
-            )}>
-              {position.title}
-            </p>
-
-            {/* Actions */}
-            <div className="flex justify-center gap-1 mt-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-primary"
-                onClick={() => onLinkEmployee(position)}
-              >
-                {position.employee_id ? <Unlink className="w-3.5 h-3.5" /> : <LinkIcon className="w-3.5 h-3.5" />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-primary"
-                onClick={() => onEdit(position)}
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                onClick={() => onDelete(position.id)}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Expand/Collapse Button */}
-          {hasChildren && (
-            <button
-              onClick={() => toggleExpand(position.id)}
-              className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-md hover:scale-110 transition-transform z-10"
+            )} />
+            
+            {/* Drag Handle */}
+            <div 
+              {...attributes} 
+              {...listeners}
+              className="absolute top-3 right-2 p-1.5 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors"
+              title="Drag to move position"
             >
-              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            </button>
-          )}
-        </Card>
+              <Move className="w-4 h-4" />
+            </div>
+
+            {/* Content */}
+            <div className="pt-2 text-center">
+              {/* Photo/Avatar */}
+              <div className="mx-auto mb-3 relative">
+                {position.employees?.photo_url ? (
+                  <img 
+                    src={position.employees.photo_url} 
+                    alt={position.holder_name || position.title}
+                    className="w-16 h-16 rounded-full object-cover border-4 border-background shadow-md mx-auto"
+                  />
+                ) : (
+                  <div className={cn(
+                    "w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-md border-4 border-background bg-gradient-to-br",
+                    getLevelColor(level)
+                  )}>
+                    <User className="w-8 h-8 text-white" />
+                  </div>
+                )}
+                {position.employee_id && (
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                    <LinkIcon className="w-3 h-3 text-primary-foreground" />
+                  </div>
+                )}
+              </div>
+
+              {/* Name */}
+              <h3 className="font-semibold text-foreground text-sm truncate">
+                {position.employees?.full_name || position.holder_name || 'Vacant'}
+              </h3>
+              
+              {/* Position Title */}
+              <p className={cn(
+                "text-xs font-medium mt-1 px-2 py-0.5 rounded-full inline-block bg-gradient-to-r text-white",
+                getLevelColor(level)
+              )}>
+                {position.title}
+              </p>
+
+              {/* Actions */}
+              <div className="flex justify-center gap-1 mt-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-primary"
+                  onClick={() => onLinkEmployee(position)}
+                  title={position.employee_id ? "Unlink employee" : "Link employee"}
+                >
+                  {position.employee_id ? <Unlink className="w-3.5 h-3.5" /> : <LinkIcon className="w-3.5 h-3.5" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-primary"
+                  onClick={() => onEdit(position)}
+                  title="Edit position"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => onDelete(position.id)}
+                  title="Delete position"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Expand/Collapse Button */}
+            {hasChildren && (
+              <button
+                onClick={() => toggleExpand(position.id)}
+                className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-md hover:scale-110 transition-transform z-10"
+              >
+                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+            )}
+          </Card>
+        </div>
 
         {/* Connector Line */}
         {hasChildren && isExpanded && (
@@ -218,6 +245,8 @@ function OrgNode({ position, children, allPositions, onEdit, onDelete, onLinkEmp
                       level={level + 1}
                       expandedNodes={expandedNodes}
                       toggleExpand={toggleExpand}
+                      activeId={activeId}
+                      overId={overId}
                     />
                   </div>
                 );
@@ -227,6 +256,46 @@ function OrgNode({ position, children, allPositions, onEdit, onDelete, onLinkEmp
         )}
       </div>
     </div>
+  );
+}
+
+// Dragged item overlay component
+function DraggedPositionOverlay({ position, level }: { position: OrgChartPosition; level: number }) {
+  const getLevelColor = (lvl: number) => {
+    const colors = [
+      'from-amber-500 to-orange-600',
+      'from-blue-500 to-indigo-600',
+      'from-purple-500 to-violet-600',
+      'from-emerald-500 to-teal-600',
+      'from-rose-500 to-pink-600',
+    ];
+    return colors[Math.min(lvl, colors.length - 1)];
+  };
+
+  return (
+    <Card className="w-56 p-4 border-2 shadow-2xl bg-card ring-2 ring-primary opacity-90">
+      <div className={cn(
+        "absolute top-0 left-0 right-0 h-2 rounded-t-lg bg-gradient-to-r",
+        getLevelColor(level)
+      )} />
+      <div className="pt-2 text-center">
+        <div className={cn(
+          "w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-md border-4 border-background bg-gradient-to-br",
+          getLevelColor(level)
+        )}>
+          <User className="w-8 h-8 text-white" />
+        </div>
+        <h3 className="font-semibold text-foreground text-sm truncate mt-3">
+          {position.employees?.full_name || position.holder_name || 'Vacant'}
+        </h3>
+        <p className={cn(
+          "text-xs font-medium mt-1 px-2 py-0.5 rounded-full inline-block bg-gradient-to-r text-white",
+          getLevelColor(level)
+        )}>
+          {position.title}
+        </p>
+      </div>
+    </Card>
   );
 }
 
@@ -245,6 +314,7 @@ export function OrgChartView() {
   const [newParentId, setNewParentId] = useState<string>('');
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(positions.map(p => p.id)));
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
 
   // Update expanded nodes when positions load
   useMemo(() => {
@@ -282,27 +352,103 @@ export function OrgChartView() {
     setActiveId(event.active.id as string);
   };
 
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    setOverId(over?.id as string | null);
+  };
+
+  // Helper to check if moving would create a circular reference
+  const wouldCreateCircularRef = (positionId: string, newParentId: string): boolean => {
+    let currentId: string | null = newParentId;
+    while (currentId) {
+      if (currentId === positionId) return true;
+      const parent = positions.find(p => p.id === currentId);
+      currentId = parent?.parent_id || null;
+    }
+    return false;
+  };
+
+  // Helper to calculate new level based on parent
+  const calculateLevel = (parentId: string | null): number => {
+    if (!parentId) return 0;
+    const parent = positions.find(p => p.id === parentId);
+    return parent ? parent.level + 1 : 0;
+  };
+
+  // Recursively update levels for all descendants
+  const updateDescendantLevels = (positionId: string, newParentLevel: number) => {
+    const children = positions.filter(p => p.parent_id === positionId);
+    children.forEach(child => {
+      updatePosition.mutate({
+        id: child.id,
+        level: newParentLevel + 1,
+      });
+      updateDescendantLevels(child.id, newParentLevel + 1);
+    });
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
-    setActiveId(null);
     const { active, over } = event;
+    setActiveId(null);
+    setOverId(null);
     
-    if (over && active.id !== over.id) {
-      const activePos = positions.find(p => p.id === active.id);
+    if (!over) return;
+    
+    const activePos = positions.find(p => p.id === active.id);
+    if (!activePos) return;
+
+    // Check if dropped on a drop zone (different parent)
+    const isDropZone = String(over.id).startsWith('drop-');
+    
+    if (isDropZone) {
+      const targetParentId = String(over.id).replace('drop-', '');
+      
+      // Can't drop on itself
+      if (targetParentId === activePos.id) return;
+      
+      // Can't drop on current parent (no change)
+      if (targetParentId === activePos.parent_id) return;
+      
+      // Check for circular reference
+      if (wouldCreateCircularRef(activePos.id, targetParentId)) {
+        toast.error("Cannot move a position under its own descendant");
+        return;
+      }
+
+      const newLevel = calculateLevel(targetParentId);
+      const siblingCount = positions.filter(p => p.parent_id === targetParentId).length;
+      
+      // Update the position with new parent and level
+      updatePosition.mutate({
+        id: activePos.id,
+        parent_id: targetParentId,
+        level: newLevel,
+        sort_order: siblingCount,
+      });
+
+      // Update all descendant levels
+      updateDescendantLevels(activePos.id, newLevel);
+      
+      const targetPos = positions.find(p => p.id === targetParentId);
+      toast.success(`Moved "${activePos.title}" under "${targetPos?.title}"`);
+      
+      // Expand the target to show the moved node
+      setExpandedNodes(prev => new Set([...prev, targetParentId]));
+      
+    } else if (active.id !== over.id) {
+      // Same level reordering
       const overPos = positions.find(p => p.id === over.id);
       
-      if (activePos && overPos) {
-        // Swap sort orders within same parent
-        if (activePos.parent_id === overPos.parent_id) {
-          updatePosition.mutate({
-            id: activePos.id,
-            sort_order: overPos.sort_order,
-          });
-          updatePosition.mutate({
-            id: overPos.id,
-            sort_order: activePos.sort_order,
-          });
-          toast.success('Positions reordered');
-        }
+      if (activePos && overPos && activePos.parent_id === overPos.parent_id) {
+        updatePosition.mutate({
+          id: activePos.id,
+          sort_order: overPos.sort_order,
+        });
+        updatePosition.mutate({
+          id: overPos.id,
+          sort_order: activePos.sort_order,
+        });
+        toast.success('Positions reordered');
       }
     }
   };
@@ -326,7 +472,25 @@ export function OrgChartView() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this position? All subordinate positions will become orphaned.')) {
+    const pos = positions.find(p => p.id === id);
+    const hasChildren = positions.some(p => p.parent_id === id);
+    
+    const message = hasChildren 
+      ? `Are you sure you want to delete "${pos?.title}"? All subordinate positions will be moved to its parent.`
+      : `Are you sure you want to delete "${pos?.title}"?`;
+    
+    if (confirm(message)) {
+      // Move children to deleted position's parent
+      if (hasChildren) {
+        const children = positions.filter(p => p.parent_id === id);
+        children.forEach(child => {
+          updatePosition.mutate({
+            id: child.id,
+            parent_id: pos?.parent_id || null,
+            level: pos?.level || 0,
+          });
+        });
+      }
       deletePosition.mutate(id);
     }
   };
@@ -380,6 +544,8 @@ export function OrgChartView() {
     setExpandedNodes(new Set());
   };
 
+  const activePosition = activeId ? positions.find(p => p.id === activeId) : null;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -398,7 +564,7 @@ export function OrgChartView() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Company Hierarchy</h1>
-            <p className="text-sm text-muted-foreground">Drag and drop to rearrange positions</p>
+            <p className="text-sm text-muted-foreground">Drag positions onto other positions to change reporting structure</p>
           </div>
         </div>
 
@@ -464,12 +630,27 @@ export function OrgChartView() {
         </div>
       </div>
 
+      {/* Instructions Card */}
+      <Card className="p-4 bg-primary/5 border-primary/20">
+        <div className="flex items-start gap-3">
+          <Move className="w-5 h-5 text-primary mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium text-foreground">Drag & Drop Instructions</p>
+            <p className="text-muted-foreground mt-1">
+              Drag a position card and drop it onto another position to move it under that manager. 
+              The position will become a direct report of the target. Circular references are prevented automatically.
+            </p>
+          </div>
+        </div>
+      </Card>
+
       {/* Org Chart */}
       <Card className="p-8 overflow-x-auto">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
           <SortableContext
@@ -491,11 +672,23 @@ export function OrgChartView() {
                     level={0}
                     expandedNodes={expandedNodes}
                     toggleExpand={toggleExpand}
+                    activeId={activeId}
+                    overId={overId}
                   />
                 );
               })}
             </div>
           </SortableContext>
+          
+          {/* Drag Overlay */}
+          <DragOverlay>
+            {activePosition && (
+              <DraggedPositionOverlay 
+                position={activePosition} 
+                level={activePosition.level} 
+              />
+            )}
+          </DragOverlay>
         </DndContext>
       </Card>
 
