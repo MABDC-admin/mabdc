@@ -358,6 +358,42 @@ export type Database = {
           },
         ]
       }
+      employee_badges: {
+        Row: {
+          badge_id: string
+          earned_at: string
+          employee_id: string
+          id: string
+        }
+        Insert: {
+          badge_id: string
+          earned_at?: string
+          employee_id: string
+          id?: string
+        }
+        Update: {
+          badge_id?: string
+          earned_at?: string
+          employee_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_badges_badge_id_fkey"
+            columns: ["badge_id"]
+            isOneToOne: false
+            referencedRelation: "gamification_badges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_badges_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_corrective_actions: {
         Row: {
           action_type: string
@@ -850,6 +886,166 @@ export type Database = {
           title?: string
         }
         Relationships: []
+      }
+      gamification_badges: {
+        Row: {
+          category: string
+          condition_type: string | null
+          condition_value: number | null
+          created_at: string
+          description: string | null
+          icon: string
+          id: string
+          is_active: boolean | null
+          name: string
+          points_required: number | null
+        }
+        Insert: {
+          category?: string
+          condition_type?: string | null
+          condition_value?: number | null
+          created_at?: string
+          description?: string | null
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          points_required?: number | null
+        }
+        Update: {
+          category?: string
+          condition_type?: string | null
+          condition_value?: number | null
+          created_at?: string
+          description?: string | null
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          points_required?: number | null
+        }
+        Relationships: []
+      }
+      gamification_config: {
+        Row: {
+          action_type: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          points: number
+          updated_at: string
+          xp: number
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          points?: number
+          updated_at?: string
+          xp?: number
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          points?: number
+          updated_at?: string
+          xp?: number
+        }
+        Relationships: []
+      }
+      gamification_points: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          level: number
+          level_name: string
+          perfect_months: number
+          perfect_weeks: number
+          points: number
+          streak_days: number
+          updated_at: string
+          xp: number
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          level?: number
+          level_name?: string
+          perfect_months?: number
+          perfect_weeks?: number
+          points?: number
+          streak_days?: number
+          updated_at?: string
+          xp?: number
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          level?: number
+          level_name?: string
+          perfect_months?: number
+          perfect_weeks?: number
+          points?: number
+          streak_days?: number
+          updated_at?: string
+          xp?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gamification_points_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gamification_transactions: {
+        Row: {
+          action_type: string
+          created_at: string
+          description: string | null
+          employee_id: string
+          id: string
+          points: number
+          xp: number
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          description?: string | null
+          employee_id: string
+          id?: string
+          points: number
+          xp?: number
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          description?: string | null
+          employee_id?: string
+          id?: string
+          points?: number
+          xp?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gamification_transactions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hr_letters: {
         Row: {
