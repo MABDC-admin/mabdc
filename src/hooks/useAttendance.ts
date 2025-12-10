@@ -18,6 +18,7 @@ export interface Attendance {
   employees?: {
     full_name: string;
     hrms_no: string;
+    photo_url?: string;
   };
 }
 
@@ -29,7 +30,7 @@ export function useAttendance() {
         .from('attendance')
         .select(`
           *,
-          employees (full_name, hrms_no)
+          employees (full_name, hrms_no, photo_url)
         `)
         .order('created_at', { ascending: false });
       
@@ -49,7 +50,7 @@ export function useTodayAttendance() {
         .from('attendance')
         .select(`
           *,
-          employees (full_name, hrms_no)
+          employees (full_name, hrms_no, photo_url)
         `)
         .eq('date', today)
         .order('created_at', { ascending: false });

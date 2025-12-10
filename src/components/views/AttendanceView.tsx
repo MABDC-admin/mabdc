@@ -256,9 +256,13 @@ export function AttendanceView() {
               <div key={record.id} className="glass-card rounded-2xl border border-border p-4 animate-fade-in group">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl avatar-gradient flex items-center justify-center text-sm font-bold text-primary-foreground">
-                      {record.employees?.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '??'}
-                    </div>
+                    {record.employees?.photo_url ? (
+                      <img src={record.employees.photo_url} alt={record.employees.full_name} className="w-12 h-12 rounded-xl object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl avatar-gradient flex items-center justify-center text-sm font-bold text-primary-foreground">
+                        {record.employees?.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '??'}
+                      </div>
+                    )}
                     <div>
                       <h3 className="text-base font-semibold text-foreground">{record.employees?.full_name || 'Unknown'}</h3>
                       <p className="text-xs text-muted-foreground">{record.employees?.hrms_no}</p>
@@ -305,6 +309,13 @@ export function AttendanceView() {
           {allAttendance.slice(0, 20).map((record) => (
             <div key={record.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 border border-border group">
               <div className="flex items-center gap-3">
+                {record.employees?.photo_url ? (
+                  <img src={record.employees.photo_url} alt={record.employees.full_name} className="w-9 h-9 rounded-lg object-cover" />
+                ) : (
+                  <div className="w-9 h-9 rounded-lg avatar-gradient flex items-center justify-center text-xs font-bold text-primary-foreground">
+                    {record.employees?.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '??'}
+                  </div>
+                )}
                 <div>
                   <p className="text-sm font-medium text-foreground">{record.employees?.full_name || 'Unknown'}</p>
                   <p className="text-xs text-muted-foreground">
