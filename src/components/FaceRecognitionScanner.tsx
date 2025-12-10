@@ -93,7 +93,13 @@ export function FaceRecognitionScanner({ onRecognized, isProcessing }: FaceRecog
         
         const match = findBestMatch(detection.descriptor, storedDescriptors, 0.5);
         
-        if (match && match.employeeId !== lastRecognized) {
+        if (match) {
+          // Stop scanning immediately after recognition
+          if (scanIntervalRef.current) {
+            clearInterval(scanIntervalRef.current);
+            scanIntervalRef.current = null;
+          }
+          setIsScanning(false);
           setLastRecognized(match.employeeId);
           setRecognitionCooldown(true);
           
@@ -104,7 +110,7 @@ export function FaceRecognitionScanner({ onRecognized, isProcessing }: FaceRecog
           
           onRecognized(match.employeeId, match.name, match.hrmsNo);
           
-          // Cooldown to prevent rapid re-recognition
+          // Reset cooldown after 5 seconds for next scan
           setTimeout(() => {
             setRecognitionCooldown(false);
             setLastRecognized(null);
