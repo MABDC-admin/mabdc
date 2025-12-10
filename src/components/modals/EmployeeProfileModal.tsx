@@ -48,6 +48,20 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
   // Image preview state
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
+  // Private info edit state
+  const [isEditingPrivate, setIsEditingPrivate] = useState(false);
+  const [privateInfo, setPrivateInfo] = useState({
+    gender: '',
+    birthday: '',
+    personal_email: '',
+    personal_phone: '',
+    home_address: '',
+    place_of_birth: '',
+    country_of_birth: '',
+    family_status: '',
+    number_of_children: 0,
+  });
+
   // Education state
   const [newEducation, setNewEducation] = useState({ certificate_level: '', field_of_study: '', school: '', graduation_year: '' });
 
@@ -143,6 +157,35 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
     });
     setNewEducation({ certificate_level: '', field_of_study: '', school: '', graduation_year: '' });
     refetchEducation();
+  };
+
+  const handleEditPrivateInfo = () => {
+    setPrivateInfo({
+      gender: emp.gender || '',
+      birthday: emp.birthday || '',
+      personal_email: emp.personal_email || '',
+      personal_phone: emp.personal_phone || '',
+      home_address: emp.home_address || '',
+      place_of_birth: emp.place_of_birth || '',
+      country_of_birth: emp.country_of_birth || '',
+      family_status: emp.family_status || '',
+      number_of_children: emp.number_of_children || 0,
+    });
+    setIsEditingPrivate(true);
+  };
+
+  const handleSavePrivateInfo = async () => {
+    try {
+      await updateEmployee.mutateAsync({
+        id: currentEmployee.id,
+        ...privateInfo,
+      });
+      setIsEditingPrivate(false);
+      toast.success('Private information updated');
+      refetchEmployees();
+    } catch (error) {
+      toast.error('Failed to update private information');
+    }
   };
 
   const tabs: { id: TabType; label: string }[] = [
@@ -384,56 +427,190 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
             {activeTab === 'private' && (
               <div className="space-y-6 animate-fade-in">
                 <div className="glass-card rounded-2xl border border-border p-5">
-                  <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                    <User className="w-5 h-5 text-primary" />
-                    PRIVATE INFORMATION
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Gender</p>
-                        <p className="text-lg font-semibold text-foreground">{emp.gender || 'Not specified'}</p>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                      <User className="w-5 h-5 text-primary" />
+                      PRIVATE INFORMATION
+                    </h3>
+                    {!isEditingPrivate ? (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={handleEditPrivateInfo}
+                        className="gap-2"
+                      >
+                        <Pencil className="w-4 h-4" />
+                        Edit
+                      </Button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => setIsEditingPrivate(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          onClick={handleSavePrivateInfo}
+                          className="bg-primary hover:bg-primary/90"
+                        >
+                          Save Changes
+                        </Button>
                       </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Birthday</p>
-                        <p className="text-lg font-semibold text-foreground">
-                          {emp.birthday ? format(parseISO(emp.birthday), 'dd MMM yyyy') : 'Not specified'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Family Status</p>
-                        <p className="text-lg font-semibold text-foreground">{emp.family_status || 'Not specified'}</p>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Personal Email</p>
-                        <p className="text-lg font-semibold text-foreground">{emp.personal_email || 'Not specified'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Personal Phone</p>
-                        <p className="text-lg font-semibold text-foreground">{emp.personal_phone || 'Not specified'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Dependent Children</p>
-                        <p className="text-lg font-semibold text-foreground">{emp.number_of_children ?? 0}</p>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Place of Birth</p>
-                        <p className="text-lg font-semibold text-foreground">{emp.place_of_birth || 'Not specified'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Country of Birth</p>
-                        <p className="text-lg font-semibold text-foreground">{emp.country_of_birth || 'Not specified'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Home Address</p>
-                        <p className="text-sm font-semibold text-foreground">{emp.home_address || 'Not specified'}</p>
-                      </div>
-                    </div>
+                    )}
                   </div>
+
+                  {!isEditingPrivate ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Gender</p>
+                          <p className="text-lg font-semibold text-foreground">{emp.gender || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Birthday</p>
+                          <p className="text-lg font-semibold text-foreground">
+                            {emp.birthday ? format(parseISO(emp.birthday), 'dd MMM yyyy') : 'Not specified'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Family Status</p>
+                          <p className="text-lg font-semibold text-foreground">{emp.family_status || 'Not specified'}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Personal Email</p>
+                          <p className="text-lg font-semibold text-foreground">{emp.personal_email || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Personal Phone</p>
+                          <p className="text-lg font-semibold text-foreground">{emp.personal_phone || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Dependent Children</p>
+                          <p className="text-lg font-semibold text-foreground">{emp.number_of_children ?? 0}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Place of Birth</p>
+                          <p className="text-lg font-semibold text-foreground">{emp.place_of_birth || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Country of Birth</p>
+                          <p className="text-lg font-semibold text-foreground">{emp.country_of_birth || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Home Address</p>
+                          <p className="text-sm font-semibold text-foreground">{emp.home_address || 'Not specified'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Gender</Label>
+                          <select
+                            value={privateInfo.gender}
+                            onChange={(e) => setPrivateInfo({ ...privateInfo, gender: e.target.value })}
+                            className="w-full p-2 rounded-lg bg-secondary/50 border border-border text-foreground"
+                          >
+                            <option value="">Select...</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                          </select>
+                        </div>
+                        <div>
+                          <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Birthday</Label>
+                          <Input
+                            type="date"
+                            value={privateInfo.birthday}
+                            onChange={(e) => setPrivateInfo({ ...privateInfo, birthday: e.target.value })}
+                            className="bg-secondary/50 border-border"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Family Status</Label>
+                          <select
+                            value={privateInfo.family_status}
+                            onChange={(e) => setPrivateInfo({ ...privateInfo, family_status: e.target.value })}
+                            className="w-full p-2 rounded-lg bg-secondary/50 border border-border text-foreground"
+                          >
+                            <option value="">Select...</option>
+                            <option value="Single">Single</option>
+                            <option value="Married">Married</option>
+                            <option value="Divorced">Divorced</option>
+                            <option value="Widowed">Widowed</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div>
+                          <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Personal Email</Label>
+                          <Input
+                            type="email"
+                            value={privateInfo.personal_email}
+                            onChange={(e) => setPrivateInfo({ ...privateInfo, personal_email: e.target.value })}
+                            placeholder="personal@email.com"
+                            className="bg-secondary/50 border-border"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Personal Phone</Label>
+                          <Input
+                            type="tel"
+                            value={privateInfo.personal_phone}
+                            onChange={(e) => setPrivateInfo({ ...privateInfo, personal_phone: e.target.value })}
+                            placeholder="+971 50 XXX XXXX"
+                            className="bg-secondary/50 border-border"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Dependent Children</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={privateInfo.number_of_children}
+                            onChange={(e) => setPrivateInfo({ ...privateInfo, number_of_children: parseInt(e.target.value) || 0 })}
+                            className="bg-secondary/50 border-border"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div>
+                          <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Place of Birth</Label>
+                          <Input
+                            value={privateInfo.place_of_birth}
+                            onChange={(e) => setPrivateInfo({ ...privateInfo, place_of_birth: e.target.value })}
+                            placeholder="City"
+                            className="bg-secondary/50 border-border"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Country of Birth</Label>
+                          <Input
+                            value={privateInfo.country_of_birth}
+                            onChange={(e) => setPrivateInfo({ ...privateInfo, country_of_birth: e.target.value })}
+                            placeholder="Country"
+                            className="bg-secondary/50 border-border"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Home Address</Label>
+                          <Input
+                            value={privateInfo.home_address}
+                            onChange={(e) => setPrivateInfo({ ...privateInfo, home_address: e.target.value })}
+                            placeholder="Full address"
+                            className="bg-secondary/50 border-border"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
