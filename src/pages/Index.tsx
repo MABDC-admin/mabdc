@@ -2,6 +2,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { DashboardView } from '@/components/views/DashboardView';
 import { EmployeesView } from '@/components/views/EmployeesView';
 import TimeShiftView from '@/components/views/TimeShiftView';
+import { EmployeePortalPreview } from '@/components/views/EmployeePortalPreview';
 import { ContractsView } from '@/components/views/ContractsView';
 import { AttendanceView } from '@/components/views/AttendanceView';
 import { EmployeeAttendanceView } from '@/components/views/EmployeeAttendanceView';
@@ -28,6 +29,8 @@ const Index = () => {
         return <EmployeesView />;
       case 'time-shift':
         return <TimeShiftView />;
+      case 'e-portal':
+        return <EmployeePortalPreview />;
       case 'contracts':
         return <ContractsView />;
       case 'attendance':
