@@ -354,12 +354,22 @@ export default function EmployeePortal() {
                           </SelectContent>
                         </Select>
                         {selectedBalance && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Available: <span className={cn("font-medium", availableDays <= 0 ? "text-destructive" : "text-primary")}>{Math.max(0, availableDays)} days</span>
-                          </p>
+                          <div className="mt-2 p-2 rounded-lg bg-secondary/50 border border-border">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">{leaveForm.leave_type} Leave Balance:</span>
+                              <span className={cn("font-bold", availableDays <= 0 ? "text-destructive" : "text-primary")}>
+                                {Math.max(0, availableDays)} / {selectedBalance.entitled_days + selectedBalance.carried_forward_days} days
+                              </span>
+                            </div>
+                            <div className="flex gap-2 mt-1 text-[10px] text-muted-foreground">
+                              <span>Used: {selectedBalance.used_days}</span>
+                              <span>•</span>
+                              <span>Pending: {selectedBalance.pending_days}</span>
+                            </div>
+                          </div>
                         )}
                         {!selectedBalance && selectedLeaveType && (
-                          <p className="text-xs text-amber-500 mt-1">No allocation found for this leave type</p>
+                          <p className="text-xs text-amber-500 mt-1">No {leaveForm.leave_type} leave allocated. Contact HR.</p>
                         )}
                       </div>
                       <div className="grid grid-cols-2 gap-4">
@@ -510,16 +520,26 @@ export default function EmployeePortal() {
                             </>
                           )}
                         </SelectContent>
-                      </Select>
-                      {selectedBalance && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Available: <span className={cn("font-medium", availableDays <= 0 ? "text-destructive" : "text-primary")}>{Math.max(0, availableDays)} days</span>
-                        </p>
-                      )}
-                      {!selectedBalance && selectedLeaveType && (
-                        <p className="text-xs text-amber-500 mt-1">No allocation found for this leave type</p>
-                      )}
-                    </div>
+                        </Select>
+                        {selectedBalance && (
+                          <div className="mt-2 p-2 rounded-lg bg-secondary/50 border border-border">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">{leaveForm.leave_type} Leave Balance:</span>
+                              <span className={cn("font-bold", availableDays <= 0 ? "text-destructive" : "text-primary")}>
+                                {Math.max(0, availableDays)} / {selectedBalance.entitled_days + selectedBalance.carried_forward_days} days
+                              </span>
+                            </div>
+                            <div className="flex gap-2 mt-1 text-[10px] text-muted-foreground">
+                              <span>Used: {selectedBalance.used_days}</span>
+                              <span>•</span>
+                              <span>Pending: {selectedBalance.pending_days}</span>
+                            </div>
+                          </div>
+                        )}
+                        {!selectedBalance && selectedLeaveType && (
+                          <p className="text-xs text-amber-500 mt-1">No {leaveForm.leave_type} leave allocated. Contact HR.</p>
+                        )}
+                      </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-xs text-muted-foreground">Start Date</label>
