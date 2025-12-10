@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, isWeekend } from 'date-fns';
 
@@ -29,6 +29,9 @@ export function CalendarView({ className }: CalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [viewMode, setViewMode] = useState<'matrix' | 'calendar'>('calendar');
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+  const [leaveTypeFilter, setLeaveTypeFilter] = useState<string>('all');
   const [eventForm, setEventForm] = useState({
     title: '',
     description: '',
@@ -57,6 +60,39 @@ export function CalendarView({ className }: CalendarViewProps) {
   }, [currentMonth]);
 
   const approvedLeave = leave.filter(l => l.status === 'Approved');
+  
+  // Get unique departments for filter
+  const departments = useMemo(() => {
+    const depts = [...new Set(employees.map(e => e.department).filter(Boolean))];
+    return depts.sort();
+  }, [employees]);
+
+  // Get unique leave types for filter
+  const leaveTypes = useMemo(() => {
+    const types = [...new Set(approvedLeave.map(l => l.leave_type).filter(Boolean))];
+    return types.sort();
+  }, [approvedLeave]);
+
+  // Filter employees based on search and department
+  const filteredEmployees = useMemo(() => {
+    let filtered = employees.filter(e => e.status === 'Active');
+    
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(e => 
+        e.full_name?.toLowerCase().includes(query) ||
+        e.hrms_no?.toLowerCase().includes(query) ||
+        e.job_position?.toLowerCase().includes(query)
+      );
+    }
+    
+    if (departmentFilter !== 'all') {
+      filtered = filtered.filter(e => e.department === departmentFilter);
+    }
+    
+    return filtered;
+  }, [employees, searchQuery, departmentFilter]);
+
   const activeEmployees = employees.filter(e => e.status === 'Active');
 
   const getEventsForDate = (date: Date) => {
@@ -196,12 +232,77 @@ export function CalendarView({ className }: CalendarViewProps) {
 
       {/* Matrix View */}
       {viewMode === 'matrix' && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <ScrollArea className="w-full">
-            <div className="min-w-[900px]">
-              {/* Header Row - Dates */}
-              <div className="flex border-b border-border bg-muted/30">
-                <div className="w-48 min-w-[192px] p-3 border-r border-border sticky left-0 bg-muted/50 z-10">
+        <div className="space-y-4">
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-3 p-4 bg-card rounded-xl border border-border">
+            <div className="relative flex-1 min-w-[200px] max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search employees..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-8 h-9 bg-secondary/50 border-border"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <SelectTrigger className="w-[160px] h-9 bg-secondary/50 border-border">
+                <SelectValue placeholder="Department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map(dept => (
+                  <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={leaveTypeFilter} onValueChange={setLeaveTypeFilter}>
+              <SelectTrigger className="w-[140px] h-9 bg-secondary/50 border-border">
+                <SelectValue placeholder="Leave Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Leave Types</SelectItem>
+                {leaveTypes.map(type => (
+                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {(searchQuery || departmentFilter !== 'all' || leaveTypeFilter !== 'all') && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setSearchQuery('');
+                  setDepartmentFilter('all');
+                  setLeaveTypeFilter('all');
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Clear filters
+              </Button>
+            )}
+
+            <span className="text-xs text-muted-foreground ml-auto">
+              {filteredEmployees.length} of {activeEmployees.length} employees
+            </span>
+          </div>
+
+          <div className="bg-card rounded-xl border border-border overflow-hidden">
+            <ScrollArea className="w-full">
+              <div className="min-w-[900px]">
+                {/* Header Row - Dates */}
+                <div className="flex border-b border-border bg-muted/30">
+                  <div className="w-48 min-w-[192px] p-3 border-r border-border sticky left-0 bg-muted/50 z-10">
                   <span className="text-xs font-semibold text-muted-foreground">EMPLOYEE</span>
                 </div>
                 <div className="flex flex-1">
@@ -244,70 +345,85 @@ export function CalendarView({ className }: CalendarViewProps) {
               </div>
 
               {/* Employee Rows */}
-              {activeEmployees.map(employee => (
-                <div key={employee.id} className="flex border-b border-border last:border-b-0 hover:bg-muted/10 transition-colors">
-                  {/* Employee Info - Sticky */}
-                  <div className="w-48 min-w-[192px] p-2 border-r border-border sticky left-0 bg-card z-10 flex items-center gap-2">
-                    <Avatar className="w-7 h-7 border border-border">
-                      <AvatarImage src={employee.photo_url || ''} />
-                      <AvatarFallback className="text-[10px] bg-secondary">
-                        {employee.full_name?.charAt(0) || '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-foreground truncate">{employee.full_name}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{employee.job_position}</p>
+              {filteredEmployees.map(employee => {
+                // Check if employee has any leave matching the filter
+                const hasMatchingLeave = leaveTypeFilter === 'all' || 
+                  daysInMonth.some(day => {
+                    const leaveRecord = getEmployeeLeaveForDate(employee.id, day);
+                    return leaveRecord && leaveRecord.leave_type === leaveTypeFilter;
+                  });
+
+                if (leaveTypeFilter !== 'all' && !hasMatchingLeave) return null;
+
+                return (
+                  <div key={employee.id} className="flex border-b border-border last:border-b-0 hover:bg-muted/10 transition-colors">
+                    {/* Employee Info - Sticky */}
+                    <div className="w-48 min-w-[192px] p-2 border-r border-border sticky left-0 bg-card z-10 flex items-center gap-2">
+                      <Avatar className="w-7 h-7 border border-border">
+                        <AvatarImage src={employee.photo_url || ''} />
+                        <AvatarFallback className="text-[10px] bg-secondary">
+                          {employee.full_name?.charAt(0) || '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">{employee.full_name}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{employee.job_position}</p>
+                      </div>
+                    </div>
+
+                    {/* Leave Cells */}
+                    <div className="flex flex-1">
+                      {daysInMonth.map(day => {
+                        const leaveRecord = getEmployeeLeaveForDate(employee.id, day);
+                        const holiday = getHolidayForDate(day);
+                        const isWeekendDay = isWeekend(day);
+                        const colors = leaveRecord ? leaveTypeColors[leaveRecord.leave_type] || leaveTypeColors['Annual'] : null;
+                        
+                        // Hide leave that doesn't match filter
+                        const showLeave = leaveRecord && (leaveTypeFilter === 'all' || leaveRecord.leave_type === leaveTypeFilter);
+
+                        return (
+                          <div 
+                            key={day.toISOString()} 
+                            className={cn(
+                              "flex-1 min-w-[40px] p-1 border-r border-border last:border-r-0 flex items-center justify-center",
+                              isWeekendDay && "bg-muted/20",
+                              holiday && "bg-destructive/5"
+                            )}
+                          >
+                            {showLeave && (
+                              <div 
+                                className={cn(
+                                  "w-full h-6 rounded text-[9px] font-medium flex items-center justify-center truncate px-0.5",
+                                  colors?.bg,
+                                  colors?.text
+                                )}
+                                title={`${leaveRecord.leave_type} Leave`}
+                              >
+                                {leaveRecord.leave_type.substring(0, 3)}
+                              </div>
+                            )}
+                            {holiday && !showLeave && (
+                              <div className="w-2 h-2 rounded-full bg-destructive/50" title={holiday.name} />
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
+                );
+              })}
 
-                  {/* Leave Cells */}
-                  <div className="flex flex-1">
-                    {daysInMonth.map(day => {
-                      const leaveRecord = getEmployeeLeaveForDate(employee.id, day);
-                      const holiday = getHolidayForDate(day);
-                      const isWeekendDay = isWeekend(day);
-                      const colors = leaveRecord ? leaveTypeColors[leaveRecord.leave_type] || leaveTypeColors['Annual'] : null;
-
-                      return (
-                        <div 
-                          key={day.toISOString()} 
-                          className={cn(
-                            "flex-1 min-w-[40px] p-1 border-r border-border last:border-r-0 flex items-center justify-center",
-                            isWeekendDay && "bg-muted/20",
-                            holiday && "bg-destructive/5"
-                          )}
-                        >
-                          {leaveRecord && (
-                            <div 
-                              className={cn(
-                                "w-full h-6 rounded text-[9px] font-medium flex items-center justify-center truncate px-0.5",
-                                colors?.bg,
-                                colors?.text
-                              )}
-                              title={`${leaveRecord.leave_type} Leave`}
-                            >
-                              {leaveRecord.leave_type.substring(0, 3)}
-                            </div>
-                          )}
-                          {holiday && !leaveRecord && (
-                            <div className="w-2 h-2 rounded-full bg-destructive/50" title={holiday.name} />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-
-              {activeEmployees.length === 0 && (
+              {filteredEmployees.length === 0 && (
                 <div className="p-8 text-center text-muted-foreground text-sm">
-                  No active employees found
+                  No employees found matching your filters
                 </div>
               )}
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
         </div>
+      </div>
       )}
 
       {/* Calendar View */}
