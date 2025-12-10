@@ -32,6 +32,7 @@ export default function AttendanceScanner() {
   const [scanMode, setScanMode] = useState<ScanMode>('check-in');
   const [scannerState, setScannerState] = useState<ScannerState>('standby');
   const [scannedEmployee, setScannedEmployee] = useState<ScannedEmployee | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -63,6 +64,7 @@ export default function AttendanceScanner() {
   const startScanning = useCallback(() => {
     setScannerState('scanning');
     setScannedEmployee(null);
+    setScanError(null);
     
     // Auto-standby after 10 seconds
     if (scanTimeoutRef.current) {
@@ -158,10 +160,15 @@ export default function AttendanceScanner() {
           mode: 'check-out',
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Scan error:', error);
-      // Return to standby on error
-      setTimeout(() => setScannerState('standby'), 3000);
+      setScanError(error.message || 'Scan failed');
+      // Return to standby after showing error for 4 seconds
+      setTimeout(() => {
+        setScannerState('standby');
+        setScanError(null);
+      }, 4000);
+      return;
     }
     
     // Return to standby after showing result for 5 seconds
@@ -250,6 +257,9 @@ export default function AttendanceScanner() {
                             handleScan(result[0].rawValue);
                           }
                         }}
+                        constraints={{
+                          facingMode: 'user'
+                        }}
                         styles={{
                           container: { width: '100%', height: '100%' },
                           video: { width: '100%', height: '100%', objectFit: 'cover' }
@@ -296,6 +306,32 @@ export default function AttendanceScanner() {
                         <p className="text-xs text-muted-foreground mt-4">
                           Camera will auto-standby after 10 seconds
                         </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error State */}
+                  {scannerState === 'result' && scanError && !scannedEmployee && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-card">
+                      <div className="text-center animate-scale-in">
+                        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-destructive/10 flex items-center justify-center">
+                          <AlertTriangle className="w-10 h-10 text-destructive" />
+                        </div>
+                        <h3 className="text-lg font-bold text-destructive mb-2">
+                          Scan Failed
+                        </h3>
+                        <p className="text-sm text-muted-foreground mb-4 max-w-xs">
+                          {scanError}
+                        </p>
+                        <Button 
+                          variant="outline"
+                          onClick={() => {
+                            setScannerState('standby');
+                            setScanError(null);
+                          }}
+                        >
+                          Try Again
+                        </Button>
                       </div>
                     </div>
                   )}
