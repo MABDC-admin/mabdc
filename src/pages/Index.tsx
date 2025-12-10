@@ -8,6 +8,8 @@ import { PayrollView } from '@/components/views/PayrollView';
 import { EOSView } from '@/components/views/EOSView';
 import { SettingsView } from '@/components/views/SettingsView';
 import { CalendarPageView } from '@/components/views/CalendarPageView';
+import { PerformanceView } from '@/components/views/PerformanceView';
+import { DisciplineView } from '@/components/views/DisciplineView';
 import { useHRStore } from '@/store/hrStore';
 
 const Index = () => {
@@ -31,6 +33,10 @@ const Index = () => {
         return <EOSView />;
       case 'calendar':
         return <CalendarPageView />;
+      case 'performance':
+        return <PerformanceView />;
+      case 'discipline':
+        return <DisciplineView />;
       case 'settings':
         return <SettingsView />;
       default:
