@@ -225,6 +225,112 @@ export type Database = {
           },
         ]
       }
+      employee_corrective_actions: {
+        Row: {
+          action_type: string
+          created_at: string
+          document_name: string | null
+          document_url: string | null
+          employee_id: string
+          id: string
+          issued_by: string | null
+          issued_date: string
+          notes: string | null
+          reason: string
+          status: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          document_name?: string | null
+          document_url?: string | null
+          employee_id: string
+          id?: string
+          issued_by?: string | null
+          issued_date?: string
+          notes?: string | null
+          reason: string
+          status?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          document_name?: string | null
+          document_url?: string | null
+          employee_id?: string
+          id?: string
+          issued_by?: string | null
+          issued_date?: string
+          notes?: string | null
+          reason?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_corrective_actions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_discipline: {
+        Row: {
+          action_taken: string | null
+          created_at: string
+          description: string
+          document_name: string | null
+          document_url: string | null
+          employee_id: string
+          id: string
+          incident_date: string
+          incident_type: string
+          issued_by: string | null
+          status: string | null
+          suspension_end_date: string | null
+          suspension_start_date: string | null
+        }
+        Insert: {
+          action_taken?: string | null
+          created_at?: string
+          description: string
+          document_name?: string | null
+          document_url?: string | null
+          employee_id: string
+          id?: string
+          incident_date?: string
+          incident_type: string
+          issued_by?: string | null
+          status?: string | null
+          suspension_end_date?: string | null
+          suspension_start_date?: string | null
+        }
+        Update: {
+          action_taken?: string | null
+          created_at?: string
+          description?: string
+          document_name?: string | null
+          document_url?: string | null
+          employee_id?: string
+          id?: string
+          incident_date?: string
+          incident_type?: string
+          issued_by?: string | null
+          status?: string | null
+          suspension_end_date?: string | null
+          suspension_start_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_discipline_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_documents: {
         Row: {
           category: string | null
@@ -297,6 +403,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "employee_education_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_performance: {
+        Row: {
+          comments: string | null
+          created_at: string
+          employee_id: string
+          id: string
+          performance_type: string
+          rating: number | null
+          review_period: string
+          reviewer: string | null
+          updated_at: string
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string
+          employee_id: string
+          id?: string
+          performance_type: string
+          rating?: number | null
+          review_period: string
+          reviewer?: string | null
+          updated_at?: string
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string
+          employee_id?: string
+          id?: string
+          performance_type?: string
+          rating?: number | null
+          review_period?: string
+          reviewer?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_performance_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"

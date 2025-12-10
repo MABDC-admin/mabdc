@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   Shield, Users, Calendar, FileText, DollarSign, ClipboardList, 
   Trash2, Edit, Plus, Download, RefreshCw, Database, BarChart3,
-  ChevronDown, AlertTriangle
+  ChevronDown, AlertTriangle, Star, Scale
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -16,6 +16,8 @@ import { AdminLeaveSection } from '@/components/admin/AdminLeaveSection';
 import { AdminAttendanceReport } from '@/components/admin/AdminAttendanceReport';
 import { AdminPayrollReport } from '@/components/admin/AdminPayrollReport';
 import { AdminDataReset } from '@/components/admin/AdminDataReset';
+import { AdminPerformanceSection } from '@/components/admin/AdminPerformanceSection';
+import { AdminDisciplineSection } from '@/components/admin/AdminDisciplineSection';
 import { cn } from '@/lib/utils';
 
 export default function AdminDashboard() {
@@ -88,6 +90,12 @@ export default function AdminDashboard() {
             <TabsTrigger value="payroll-report" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <DollarSign className="w-4 h-4 mr-2" />Payroll Report
             </TabsTrigger>
+            <TabsTrigger value="performance" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Star className="w-4 h-4 mr-2" />Performance
+            </TabsTrigger>
+            <TabsTrigger value="discipline" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Scale className="w-4 h-4 mr-2" />Discipline
+            </TabsTrigger>
             <TabsTrigger value="data-reset" className="rounded-lg data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
               <Database className="w-4 h-4 mr-2" />Data Management
             </TabsTrigger>
@@ -150,6 +158,14 @@ export default function AdminDashboard() {
 
           <TabsContent value="payroll-report">
             <AdminPayrollReport />
+          </TabsContent>
+
+          <TabsContent value="performance">
+            <AdminPerformanceSection />
+          </TabsContent>
+
+          <TabsContent value="discipline">
+            <AdminDisciplineSection />
           </TabsContent>
 
           <TabsContent value="data-reset">
