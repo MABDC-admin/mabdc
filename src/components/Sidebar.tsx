@@ -19,7 +19,8 @@ import {
   ChevronDown,
   ChevronRight,
   UserCheck,
-  AlertCircle
+  AlertCircle,
+  Timer
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHRStore } from '@/store/hrStore';
@@ -42,7 +43,15 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-  { id: 'employees', label: 'Employees', icon: <Users className="w-5 h-5" /> },
+  { 
+    id: 'employees', 
+    label: 'Employees', 
+    icon: <Users className="w-5 h-5" />,
+    subItems: [
+      { id: 'employees', label: 'All Employees', icon: <Users className="w-4 h-4" /> },
+      { id: 'time-shift', label: 'Time Shift', icon: <Timer className="w-4 h-4" /> }
+    ]
+  },
   { id: 'contracts', label: 'Contracts', icon: <FileText className="w-5 h-5" /> },
   { 
     id: 'attendance', 
@@ -67,7 +76,7 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const { currentView, setCurrentView } = useHRStore();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['attendance']);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['attendance', 'employees']);
   const { signOut, user } = useAuth();
   const { data: appeals = [] } = useAttendanceAppeals();
   const navigate = useNavigate();
