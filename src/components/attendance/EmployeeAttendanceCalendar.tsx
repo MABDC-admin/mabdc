@@ -5,9 +5,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameMonth, isSameDay, isWeekend } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay } from 'date-fns';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { AttendanceDetailModal } from './AttendanceDetailModal';
+import { AttendanceAppealModal } from './AttendanceAppealModal';
 
 interface EmployeeAttendanceCalendarProps {
   employeeId?: string;
@@ -16,12 +20,7 @@ interface EmployeeAttendanceCalendarProps {
   onBack?: () => void;
   showEmployeeSelector?: boolean;
   showBackButton?: boolean;
-}
-
-interface PublicHoliday {
-  id: string;
-  name: string;
-  date: string;
+  isEmployeePortal?: boolean;
 }
 
 export function EmployeeAttendanceCalendar({
@@ -31,14 +30,30 @@ export function EmployeeAttendanceCalendar({
   onBack,
   showEmployeeSelector = false,
   showBackButton = true,
+  isEmployeePortal = false,
 }: EmployeeAttendanceCalendarProps) {
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(propEmployeeId || '');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showAppealModal, setShowAppealModal] = useState(false);
   
   const { data: allAttendance = [] } = useAttendance();
   const { data: employees = [] } = useEmployees();
+
+  // Fetch public holidays
+  const { data: publicHolidays = [] } = useQuery({
+    queryKey: ['public_holidays'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('public_holidays')
+        .select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const employeeId = propEmployeeId || selectedEmployeeId;
   
@@ -67,16 +82,29 @@ export function EmployeeAttendanceCalendar({
     let present = 0;
     let late = 0;
     let absent = 0;
-    let holidays = 0;
+    let missedPunch = 0;
+
+    // Count holidays in month
+    const monthStart = startOfMonth(new Date(selectedYear, selectedMonth));
+    const monthEnd = endOfMonth(monthStart);
+    const holidays = publicHolidays.filter(h => {
+      const date = parseISO(h.date);
+      return date >= monthStart && date <= monthEnd;
+    }).length;
 
     monthAttendance.forEach(record => {
       if (record.status === 'Present') present++;
       else if (record.status === 'Late' || record.status === 'Late | Undertime') late++;
       else if (record.status === 'Absent') absent++;
+      
+      // Check for missed punch
+      if ((record.check_in && !record.check_out) || (!record.check_in && record.check_out)) {
+        missedPunch++;
+      }
     });
 
-    return { present, late, absent, holidays };
-  }, [monthAttendance]);
+    return { present, late, absent, holidays, missedPunch };
+  }, [monthAttendance, publicHolidays, selectedMonth, selectedYear]);
 
   // Generate calendar days
   const calendarDays = useMemo(() => {
@@ -84,10 +112,7 @@ export function EmployeeAttendanceCalendar({
     const monthEnd = endOfMonth(monthStart);
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
     
-    // Get day of week for first day (0 = Sunday)
     const startDay = getDay(monthStart);
-    
-    // Add empty slots for days before start of month
     const emptySlots: null[] = Array(startDay).fill(null);
     
     return [...emptySlots, ...days];
@@ -97,33 +122,53 @@ export function EmployeeAttendanceCalendar({
     return monthAttendance.find(a => isSameDay(parseISO(a.date), date));
   };
 
+  const getHolidayForDay = (date: Date) => {
+    return publicHolidays.find(h => isSameDay(parseISO(h.date), date));
+  };
+
   const getDayStatus = (date: Date) => {
     const attendance = getAttendanceForDay(date);
+    const holiday = getHolidayForDay(date);
     const dayOfWeek = getDay(date);
     const isSat = dayOfWeek === 6;
     const isSun = dayOfWeek === 0;
     
+    // Weekend - Dark Grey
     if (isSat || isSun) {
-      return { type: 'weekend', label: 'Weekend', color: 'bg-muted/50' };
+      return { type: 'weekend', label: 'Weekend', color: 'bg-zinc-600 dark:bg-zinc-700', textColor: 'text-white' };
+    }
+    
+    // Holiday - Light Blue
+    if (holiday) {
+      return { type: 'holiday', label: holiday.name, color: 'bg-sky-400/30 border-sky-400', textColor: 'text-sky-500' };
     }
     
     if (!attendance) {
-      return { type: 'no-record', label: 'No record', color: 'bg-card' };
+      return { type: 'no-record', label: 'No record', color: 'bg-card', textColor: 'text-muted-foreground' };
+    }
+
+    // Missed Punch - Red Orange
+    const isMissedPunch = (attendance.check_in && !attendance.check_out) || (!attendance.check_in && attendance.check_out);
+    if (isMissedPunch) {
+      return { type: 'missed-punch', label: 'Missed Punch', color: 'bg-orange-500/20 border-orange-500', textColor: 'text-orange-500' };
     }
     
+    // Present - Green
     if (attendance.status === 'Present') {
-      return { type: 'present', label: 'Status: Present', color: 'bg-primary/20 border-primary' };
+      return { type: 'present', label: 'Present', color: 'bg-green-500/20 border-green-500', textColor: 'text-green-500' };
     }
     
+    // Late - Yellow
     if (attendance.status === 'Late' || attendance.status === 'Late | Undertime') {
-      return { type: 'late', label: `Status: ${attendance.status}`, color: 'bg-amber-500/20 border-amber-500' };
+      return { type: 'late', label: attendance.status, color: 'bg-yellow-500/20 border-yellow-500', textColor: 'text-yellow-500' };
     }
     
+    // Absent - Red
     if (attendance.status === 'Absent') {
-      return { type: 'absent', label: 'Status: Absent', color: 'bg-destructive/20 border-destructive' };
+      return { type: 'absent', label: 'Absent', color: 'bg-red-500/20 border-red-500', textColor: 'text-red-500' };
     }
     
-    return { type: 'present', label: `Status: ${attendance.status}`, color: 'bg-primary/20 border-primary' };
+    return { type: 'present', label: attendance.status || 'Present', color: 'bg-green-500/20 border-green-500', textColor: 'text-green-500' };
   };
 
   const months = [
@@ -133,9 +178,27 @@ export function EmployeeAttendanceCalendar({
 
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  const handleApply = () => {
-    // Stats are already updated reactively
+  const handleDayClick = (day: Date) => {
+    const dayOfWeek = getDay(day);
+    if (dayOfWeek === 0 || dayOfWeek === 6) return; // Skip weekends
+    
+    setSelectedDate(day);
+    
+    if (isEmployeePortal) {
+      const attendance = getAttendanceForDay(day);
+      // Only allow appeal for missed punch or no record
+      const isMissedPunch = attendance && ((attendance.check_in && !attendance.check_out) || (!attendance.check_in && attendance.check_out));
+      if (isMissedPunch || !attendance) {
+        setShowAppealModal(true);
+      } else {
+        setShowDetailModal(true);
+      }
+    } else {
+      setShowDetailModal(true);
+    }
   };
+
+  const selectedAttendance = selectedDate ? getAttendanceForDay(selectedDate) : null;
 
   return (
     <div className="space-y-6">
@@ -144,7 +207,7 @@ export function EmployeeAttendanceCalendar({
         <div>
           <h1 className="text-2xl font-bold text-foreground">Attendance Management</h1>
           <p className="text-sm text-muted-foreground">
-            TAMS-style calendar – <span className="text-destructive">Absent</span>, <span className="text-amber-500">Late</span>, <span className="text-primary">Holiday</span>. Sat/Sun grey.
+            Track attendance with color-coded calendar view
           </p>
         </div>
         {showBackButton && onBack && (
@@ -156,29 +219,35 @@ export function EmployeeAttendanceCalendar({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Present</p>
-            <p className="text-3xl font-bold text-foreground">{stats.present}</p>
+            <p className="text-3xl font-bold text-green-500">{stats.present}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Late</p>
-            <p className="text-3xl font-bold text-amber-500">{stats.late}</p>
+            <p className="text-3xl font-bold text-yellow-500">{stats.late}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Absent</p>
-            <p className="text-3xl font-bold text-destructive">{stats.absent}</p>
+            <p className="text-3xl font-bold text-red-500">{stats.absent}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Holidays</p>
-            <p className="text-3xl font-bold text-primary">{stats.holidays}</p>
+            <p className="text-3xl font-bold text-sky-500">{stats.holidays}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Missed Punch</p>
+            <p className="text-3xl font-bold text-orange-500">{stats.missedPunch}</p>
           </CardContent>
         </Card>
       </div>
@@ -235,31 +304,33 @@ export function EmployeeAttendanceCalendar({
             max={2030}
           />
         </div>
-        
-        <Button onClick={handleApply}>Apply</Button>
       </div>
 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-primary"></span>
+          <span className="w-3 h-3 rounded-full bg-green-500"></span>
           <span>Present</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+          <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
           <span>Late</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-destructive"></span>
+          <span className="w-3 h-3 rounded-full bg-red-500"></span>
           <span>Absent</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-primary"></span>
+          <span className="w-3 h-3 rounded-full bg-sky-400"></span>
           <span>Holiday</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-muted"></span>
-          <span>Saturday / Sunday</span>
+          <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+          <span>Missed Punch</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-zinc-600"></span>
+          <span>Weekend (Sat/Sun)</span>
         </div>
       </div>
 
@@ -285,38 +356,44 @@ export function EmployeeAttendanceCalendar({
               const status = getDayStatus(day);
               const dayOfWeek = getDay(day);
               const isWeekendDay = dayOfWeek === 0 || dayOfWeek === 6;
+              const attendance = getAttendanceForDay(day);
+              const isMissedPunch = attendance && ((attendance.check_in && !attendance.check_out) || (!attendance.check_in && attendance.check_out));
+              const isClickable = !isWeekendDay;
               
               return (
                 <div
                   key={day.toISOString()}
+                  onClick={() => isClickable && handleDayClick(day)}
                   className={cn(
-                    "h-24 p-2 rounded-lg border transition-colors",
+                    "h-24 p-2 rounded-lg border transition-all",
                     status.color,
-                    isWeekendDay ? "bg-muted/30 border-muted" : "border-border"
+                    isWeekendDay ? "border-transparent" : "border-border",
+                    isClickable && "cursor-pointer hover:ring-2 hover:ring-primary/50",
+                    isEmployeePortal && isMissedPunch && "ring-2 ring-orange-500/50"
                   )}
                 >
                   <div className="flex items-start justify-between">
                     <span className={cn(
                       "text-sm font-medium",
-                      isWeekendDay ? "text-muted-foreground" : "text-foreground"
+                      status.textColor
                     )}>
                       {format(day, 'd')}
                     </span>
                     {isWeekendDay && (
-                      <span className="text-[10px] text-muted-foreground">Weekend</span>
+                      <span className="text-[10px] text-white/80">Weekend</span>
                     )}
                   </div>
                   <div className="mt-2">
-                    <p className={cn(
-                      "text-xs",
-                      status.type === 'present' && "text-primary",
-                      status.type === 'late' && "text-amber-500",
-                      status.type === 'absent' && "text-destructive",
-                      status.type === 'weekend' && "text-muted-foreground",
-                      status.type === 'no-record' && "text-muted-foreground"
-                    )}>
+                    <p className={cn("text-xs font-medium", status.textColor)}>
                       {status.label}
                     </p>
+                    {attendance && !isWeekendDay && status.type !== 'holiday' && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        {attendance.check_in && format(parseISO(`2000-01-01T${attendance.check_in}`), 'h:mm a')}
+                        {attendance.check_in && attendance.check_out && ' - '}
+                        {attendance.check_out && format(parseISO(`2000-01-01T${attendance.check_out}`), 'h:mm a')}
+                      </p>
+                    )}
                   </div>
                 </div>
               );
@@ -324,6 +401,74 @@ export function EmployeeAttendanceCalendar({
           </div>
         </CardContent>
       </Card>
+
+      {/* Detail Modal for HR */}
+      {selectedDate && !isEmployeePortal && (
+        <AttendanceDetailModal
+          open={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedDate(null);
+          }}
+          date={selectedDate}
+          attendance={selectedAttendance ? {
+            id: selectedAttendance.id,
+            date: selectedAttendance.date,
+            check_in: selectedAttendance.check_in || null,
+            check_out: selectedAttendance.check_out || null,
+            status: selectedAttendance.status || null,
+            employee_remarks: selectedAttendance.employee_remarks || null,
+            admin_remarks: selectedAttendance.admin_remarks || null,
+          } : null}
+          employeeId={employeeId}
+          employeeName={employeeName}
+          isHRView={true}
+        />
+      )}
+
+      {/* Detail Modal for Employee (view only) */}
+      {selectedDate && isEmployeePortal && !showAppealModal && (
+        <AttendanceDetailModal
+          open={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedDate(null);
+          }}
+          date={selectedDate}
+          attendance={selectedAttendance ? {
+            id: selectedAttendance.id,
+            date: selectedAttendance.date,
+            check_in: selectedAttendance.check_in || null,
+            check_out: selectedAttendance.check_out || null,
+            status: selectedAttendance.status || null,
+            employee_remarks: selectedAttendance.employee_remarks || null,
+            admin_remarks: selectedAttendance.admin_remarks || null,
+          } : null}
+          employeeId={employeeId}
+          employeeName={employeeName}
+          isHRView={false}
+        />
+      )}
+
+      {/* Appeal Modal for Employee */}
+      {selectedDate && isEmployeePortal && (
+        <AttendanceAppealModal
+          open={showAppealModal}
+          onClose={() => {
+            setShowAppealModal(false);
+            setSelectedDate(null);
+          }}
+          date={selectedDate}
+          attendance={selectedAttendance ? {
+            id: selectedAttendance.id,
+            date: selectedAttendance.date,
+            check_in: selectedAttendance.check_in || null,
+            check_out: selectedAttendance.check_out || null,
+            status: selectedAttendance.status || null,
+          } : null}
+          employeeId={employeeId}
+        />
+      )}
     </div>
   );
 }

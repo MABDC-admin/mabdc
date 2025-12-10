@@ -64,6 +64,66 @@ export type Database = {
           },
         ]
       }
+      attendance_appeals: {
+        Row: {
+          appeal_date: string
+          appeal_message: string
+          attendance_id: string | null
+          created_at: string
+          employee_id: string
+          id: string
+          rejection_reason: string | null
+          requested_check_in: string | null
+          requested_check_out: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+        }
+        Insert: {
+          appeal_date: string
+          appeal_message: string
+          attendance_id?: string | null
+          created_at?: string
+          employee_id: string
+          id?: string
+          rejection_reason?: string | null
+          requested_check_in?: string | null
+          requested_check_out?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+        }
+        Update: {
+          appeal_date?: string
+          appeal_message?: string
+          attendance_id?: string | null
+          created_at?: string
+          employee_id?: string
+          id?: string
+          rejection_reason?: string | null
+          requested_check_in?: string | null
+          requested_check_out?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_appeals_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "attendance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_appeals_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_files: {
         Row: {
           created_at: string
