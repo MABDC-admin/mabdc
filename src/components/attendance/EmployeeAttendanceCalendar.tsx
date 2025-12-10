@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Download } from 'lucide-react';
+import { ArrowLeft, Download, Grid3X3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay } from 'date-fns';
 import { useAttendance } from '@/hooks/useAttendance';
@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AttendanceDetailModal } from './AttendanceDetailModal';
 import { AttendanceAppealModal } from './AttendanceAppealModal';
+import { AttendanceMatrixView } from './AttendanceMatrixView';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
 
@@ -41,6 +42,7 @@ export function EmployeeAttendanceCalendar({
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAppealModal, setShowAppealModal] = useState(false);
+  const [showMatrixView, setShowMatrixView] = useState(false);
   
   const { data: allAttendance = [] } = useAttendance();
   const { data: employees = [] } = useEmployees();
@@ -347,6 +349,11 @@ export function EmployeeAttendanceCalendar({
     toast.success('PDF generated successfully');
   };
 
+  // Show Matrix View if toggled
+  if (showMatrixView && !isEmployeePortal) {
+    return <AttendanceMatrixView onBack={() => setShowMatrixView(false)} />;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -404,6 +411,18 @@ export function EmployeeAttendanceCalendar({
           </CardContent>
         </Card>
       </div>
+
+      {/* Matrix View Button - Only for HR */}
+      {showEmployeeSelector && !isEmployeePortal && (
+        <Button 
+          variant="default" 
+          onClick={() => setShowMatrixView(true)}
+          className="w-full md:w-auto"
+        >
+          <Grid3X3 className="w-4 h-4 mr-2" />
+          Matrix View - All Employees
+        </Button>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4">
