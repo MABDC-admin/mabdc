@@ -8,6 +8,9 @@ import NotFound from "./pages/NotFound";
 import EmployeePortal from "./pages/EmployeePortal";
 import AttendanceScanner from "./pages/AttendanceScanner";
 import AdminDashboard from "./pages/AdminDashboard";
+import AuthPage from "./pages/AuthPage";
+import UnauthorizedPage from "./pages/UnauthorizedPage";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -18,10 +21,32 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/admin" element={<AdminDashboard />} />
+          {/* Public routes */}
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route path="/employee/:employeeId" element={<EmployeePortal />} />
           <Route path="/attendance-scanner" element={<AttendanceScanner />} />
+          
+          {/* Protected HR route */}
+          <Route 
+            path="/" 
+            element={
+              <ProtectedRoute requiredRoles={['hr', 'admin']} portal="hr">
+                <Index />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Protected Admin route */}
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute requiredRoles={['admin']} portal="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

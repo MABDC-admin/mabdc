@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   Shield, Users, Calendar, FileText, DollarSign, ClipboardList, 
   Trash2, Edit, Plus, Download, RefreshCw, Database, BarChart3,
-  ChevronDown, AlertTriangle, Star, Scale
+  ChevronDown, AlertTriangle, Star, Scale, LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,7 +18,9 @@ import { AdminPayrollReport } from '@/components/admin/AdminPayrollReport';
 import { AdminDataReset } from '@/components/admin/AdminDataReset';
 import { AdminPerformanceSection } from '@/components/admin/AdminPerformanceSection';
 import { AdminDisciplineSection } from '@/components/admin/AdminDisciplineSection';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -27,6 +29,13 @@ export default function AdminDashboard() {
   const { data: attendance = [] } = useAttendance();
   const { data: payroll = [] } = usePayroll();
   const { data: contracts = [] } = useContracts();
+  const { user, signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+    toast.success('Logged out successfully');
+    window.location.href = '/auth?portal=admin';
+  };
 
   const stats = [
     { label: 'Employees', value: employees.length, icon: Users, color: 'text-primary' },
@@ -51,9 +60,15 @@ export default function AdminDashboard() {
                 <p className="text-xs text-muted-foreground">System Management & Reports</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => window.location.href = '/'}>
-              Back to HR System
-            </Button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground hidden sm:block">{user?.email}</span>
+              <Button variant="outline" size="sm" onClick={() => window.location.href = '/'}>
+                Back to HR System
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
