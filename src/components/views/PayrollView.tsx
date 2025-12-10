@@ -471,11 +471,15 @@ export function PayrollView() {
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-sm font-bold text-primary">
-                          {record.employees?.full_name?.charAt(0) || '?'}
-                        </span>
-                      </div>
+                      {record.employees?.photo_url ? (
+                        <img src={record.employees.photo_url} alt={record.employees.full_name} className="w-10 h-10 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-sm font-bold text-primary">
+                            {record.employees?.full_name?.charAt(0) || '?'}
+                          </span>
+                        </div>
+                      )}
                       <div>
                         <h3 className="text-base font-semibold text-foreground">{record.employees?.full_name || 'Unknown'}</h3>
                         <p className="text-xs text-muted-foreground">{record.employees?.hrms_no} • {record.employees?.job_position}</p>

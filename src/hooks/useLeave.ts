@@ -23,6 +23,7 @@ interface LeaveRecord {
     full_name: string;
     hrms_no: string;
     department: string;
+    photo_url?: string;
   };
 }
 
@@ -73,7 +74,7 @@ export function useLeave() {
         .from('leave_records')
         .select(`
           *,
-          employees!leave_records_employee_id_fkey (full_name, hrms_no, department)
+          employees!leave_records_employee_id_fkey (full_name, hrms_no, department, photo_url)
         `)
         .order('created_at', { ascending: false });
       
@@ -465,13 +466,13 @@ export function useAllLeaveBalances() {
         .select(`
           *,
           leave_types (*),
-          employees (id, full_name, hrms_no, department)
+          employees (id, full_name, hrms_no, department, photo_url)
         `)
         .eq('year', new Date().getFullYear())
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data as (LeaveBalance & { employees: { id: string; full_name: string; hrms_no: string; department: string } })[];
+      return data as (LeaveBalance & { employees: { id: string; full_name: string; hrms_no: string; department: string; photo_url?: string } })[];
     },
   });
 }
