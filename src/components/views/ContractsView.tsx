@@ -692,6 +692,17 @@ export function ContractsView() {
                   <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex flex-wrap items-center gap-2 mb-2">
+                        {contract.employees?.photo_url ? (
+                          <img 
+                            src={contract.employees.photo_url} 
+                            alt={contract.employees.full_name} 
+                            className="w-8 h-8 rounded-full object-cover border border-border"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-semibold border border-border">
+                            {contract.employees?.full_name?.charAt(0) || '?'}
+                          </div>
+                        )}
                         <h3 className="text-base font-semibold text-foreground">{contract.employees?.full_name || 'Unknown Employee'}</h3>
                         <span className={cn("text-xs px-2 py-1 rounded-full border flex items-center gap-1", expiryStatus.color)}>
                           <StatusIcon className="w-3 h-3" />
