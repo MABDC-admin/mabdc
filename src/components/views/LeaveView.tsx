@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useLeave, useLeaveTypes, usePublicHolidays, useUpdateLeaveStatus, useAddLeave, useAddPublicHoliday, useAllocateLeave, useBulkAllocateLeave, useAllLeaveBalances, useLeaveBalances, useUpdateLeaveBalance } from '@/hooks/useLeave';
+import { useLeave, useLeaveTypes, usePublicHolidays, useUpdateLeaveStatus, useAddLeave, useAddPublicHoliday, useAllocateLeave, useBulkAllocateLeave, useAllLeaveBalances, useLeaveBalances, useUpdateLeaveBalance, useDeleteLeaveBalance } from '@/hooks/useLeave';
 import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Check, X, Clock, RefreshCw, Plus, Calendar, FileText, AlertCircle, CalendarDays, Users, Wallet, LayoutGrid, Pencil, CalendarX2 } from 'lucide-react';
+import { Check, X, Clock, RefreshCw, Plus, Calendar, FileText, AlertCircle, CalendarDays, Users, Wallet, LayoutGrid, Pencil, CalendarX2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -27,6 +27,7 @@ export function LeaveView() {
   const allocateLeave = useAllocateLeave();
   const bulkAllocate = useBulkAllocateLeave();
   const updateBalance = useUpdateLeaveBalance();
+  const deleteBalance = useDeleteLeaveBalance();
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
@@ -563,14 +564,29 @@ export function LeaveView() {
                             className="p-3 rounded-lg bg-secondary/30 border border-border group hover:border-primary/50 cursor-pointer transition-colors relative"
                             onClick={() => handleEditBalance(balance)}
                           >
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => { e.stopPropagation(); handleEditBalance(balance); }}
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
+                            <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0"
+                                onClick={(e) => { e.stopPropagation(); handleEditBalance(balance); }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  if (confirm(`Delete ${balance.leave_types?.name} allocation for ${employee.full_name}?`)) {
+                                    deleteBalance.mutate(balance.id);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
                             <p className="text-[10px] font-medium text-muted-foreground mb-1 truncate">
                               {balance.leave_types?.name || 'Unknown'}
                             </p>
