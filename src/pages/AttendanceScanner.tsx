@@ -1,20 +1,25 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { useCheckInByHRMS, useCheckOutByHRMS, useTodayAttendance } from '@/hooks/useAttendance';
+import { useCheckInByHRMS, useCheckOutByHRMS, useTodayAttendance, useCheckInById, useCheckOutById } from '@/hooks/useAttendance';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   QrCode, CheckCircle, Clock, Users, ArrowLeft, 
-  LogIn, LogOut, RefreshCw, Camera, AlertTriangle, User
+  LogIn, LogOut, RefreshCw, Camera, AlertTriangle, User, ScanFace, UserPlus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { FaceRecognitionScanner } from '@/components/FaceRecognitionScanner';
+import { FaceEnrollmentModal } from '@/components/FaceEnrollmentModal';
+import { toast } from 'sonner';
 
 type ScanMode = 'check-in' | 'check-out';
 type ScannerState = 'standby' | 'scanning' | 'result';
+type ScanMethod = 'qr' | 'face';
 
 interface ScannedEmployee {
   name: string;
@@ -30,14 +35,19 @@ interface ScannedEmployee {
 
 export default function AttendanceScanner() {
   const [scanMode, setScanMode] = useState<ScanMode>('check-in');
+  const [scanMethod, setScanMethod] = useState<ScanMethod>('qr');
   const [scannerState, setScannerState] = useState<ScannerState>('standby');
   const [scannedEmployee, setScannedEmployee] = useState<ScannedEmployee | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [enrollModalOpen, setEnrollModalOpen] = useState(false);
+  const [faceProcessing, setFaceProcessing] = useState(false);
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const checkIn = useCheckInByHRMS();
   const checkOut = useCheckOutByHRMS();
+  const checkInById = useCheckInById();
+  const checkOutById = useCheckOutById();
   const { data: todayAttendance = [], refetch } = useTodayAttendance();
 
   // Update current time every second
@@ -178,12 +188,72 @@ export default function AttendanceScanner() {
     }, 5000);
   };
 
+  // Handle face recognition
+  const handleFaceRecognized = async (employeeId: string, employeeName: string, hrmsNo: string) => {
+    setFaceProcessing(true);
+    
+    try {
+      if (scanMode === 'check-in') {
+        const data = await checkInById.mutateAsync(employeeId);
+        setScannedEmployee({
+          name: data.employeeName,
+          photo: data.employeePhoto,
+          department: data.department,
+          jobPosition: data.jobPosition,
+          status: data.status,
+          isLate: data.status === 'Late',
+          checkInTime: data.checkInTime,
+          mode: 'check-in',
+        });
+
+        // Send late notification if employee is late
+        if (data.status === 'Late') {
+          sendLateNotification({
+            employeeName: data.employeeName,
+            employeeId: data.employeeId,
+            hrmsNo: data.hrmsNo || hrmsNo,
+            department: data.department || '',
+            jobPosition: data.jobPosition || '',
+            checkInTime: data.checkInTime,
+            photoUrl: data.employeePhoto,
+          });
+        }
+      } else {
+        const data = await checkOutById.mutateAsync(employeeId);
+        setScannedEmployee({
+          name: data.employeeName,
+          photo: data.employeePhoto,
+          department: data.department,
+          jobPosition: data.jobPosition,
+          status: data.status || 'Present',
+          isLate: data.status === 'Late',
+          checkInTime: data.checkInTime,
+          checkOutTime: data.checkOutTime,
+          mode: 'check-out',
+        });
+      }
+      
+      setScannerState('result');
+      
+      // Return to normal after showing result
+      setTimeout(() => {
+        setScannerState('standby');
+        setScannedEmployee(null);
+      }, 5000);
+    } catch (error: any) {
+      console.error('Face recognition attendance error:', error);
+      toast.error(error.message || 'Attendance failed');
+    } finally {
+      setFaceProcessing(false);
+    }
+  };
+
   const presentCount = todayAttendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
   const lateCount = todayAttendance.filter(a => a.status === 'Late').length;
 
   // Check if current day is a work day (Monday to Friday)
   const isWorkDay = currentTime.getDay() >= 1 && currentTime.getDay() <= 5;
-  const workHours = "8:00 AM - 5:00 PM";
+  const workHours = "8:00 AM - 7:00 PM";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/5">
@@ -202,12 +272,23 @@ export default function AttendanceScanner() {
                 <p className="text-sm text-muted-foreground">{format(currentTime, 'EEEE, dd MMMM yyyy')}</p>
               </div>
             </div>
-            <div className="text-right">
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="w-4 h-4 text-muted-foreground" />
-                <span className="font-mono text-lg">{format(currentTime, 'HH:mm:ss')}</span>
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setEnrollModalOpen(true)}
+                className="gap-2"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span className="hidden sm:inline">Enroll Face</span>
+              </Button>
+              <div className="text-right">
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <span className="font-mono text-lg">{format(currentTime, 'HH:mm:ss')}</span>
+                </div>
+                <p className="text-xs text-muted-foreground hidden sm:block">Work hours: {workHours}</p>
               </div>
-              <p className="text-xs text-muted-foreground">Work hours: {workHours}</p>
             </div>
           </div>
         </div>
@@ -245,8 +326,22 @@ export default function AttendanceScanner() {
               </button>
             </div>
 
-            {/* QR Scanner */}
-            <Card className="overflow-hidden">
+            {/* Scan Method Tabs */}
+            <Tabs value={scanMethod} onValueChange={(v) => setScanMethod(v as ScanMethod)} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="qr" className="gap-2">
+                  <QrCode className="w-4 h-4" />
+                  QR Code
+                </TabsTrigger>
+                <TabsTrigger value="face" className="gap-2">
+                  <ScanFace className="w-4 h-4" />
+                  Face ID
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="qr" className="mt-4">
+                {/* QR Scanner Card */}
+                <Card className="overflow-hidden">
               <CardContent className="p-0">
                 <div className="relative aspect-square bg-gradient-to-br from-secondary to-muted">
                   {scannerState === 'scanning' && (
