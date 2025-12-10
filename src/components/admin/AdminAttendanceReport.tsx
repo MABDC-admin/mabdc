@@ -1,19 +1,33 @@
 import { useState, useMemo } from 'react';
-import { useAttendance } from '@/hooks/useAttendance';
+import { useAttendance, useDeleteAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, FileText, Calendar, Clock, Users } from 'lucide-react';
+import { Download, FileText, Calendar, Clock, Users, Trash2, Search, LogIn, LogOut, AlertTriangle } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export function AdminAttendanceReport() {
   const { data: attendance = [] } = useAttendance();
   const { data: employees = [] } = useEmployees();
+  const deleteAttendance = useDeleteAttendance();
   
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(currentDate, 'yyyy-MM'));
+  const [searchQuery, setSearchQuery] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const months = useMemo(() => {
     const result = [];
@@ -193,6 +207,140 @@ export function AdminAttendanceReport() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Individual Attendance Records Management */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-md font-semibold text-foreground">Manage Attendance Records</h3>
+            <p className="text-xs text-muted-foreground">View and delete individual check-in/check-out records</p>
+          </div>
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name or HRMS..."
+              className="pl-9 bg-secondary/50 border-border"
+            />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead>Date</TableHead>
+                <TableHead>Employee</TableHead>
+                <TableHead>HRMS</TableHead>
+                <TableHead className="text-center">Check In</TableHead>
+                <TableHead className="text-center">Check Out</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {attendance
+                .filter(a => {
+                  if (!searchQuery) return true;
+                  const emp = employees.find(e => e.id === a.employee_id);
+                  return emp?.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         emp?.hrms_no.includes(searchQuery);
+                })
+                .slice(0, 50)
+                .map((record) => {
+                  const emp = employees.find(e => e.id === record.employee_id);
+                  return (
+                    <TableRow key={record.id} className="group">
+                      <TableCell className="text-xs">
+                        {format(parseISO(record.date), 'dd MMM yyyy')}
+                      </TableCell>
+                      <TableCell className="text-sm font-medium">
+                        {emp?.full_name || 'Unknown'}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono">
+                        {emp?.hrms_no || '-'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="inline-flex items-center gap-1 text-xs">
+                          <LogIn className="w-3 h-3 text-primary" />
+                          {record.check_in || '--:--'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="inline-flex items-center gap-1 text-xs">
+                          <LogOut className="w-3 h-3 text-accent" />
+                          {record.check_out || '--:--'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className={cn(
+                          "text-xs px-2 py-1 rounded-full",
+                          record.status === 'Present' && "bg-primary/10 text-primary",
+                          record.status === 'Late' && "bg-amber-500/10 text-amber-500",
+                          record.status === 'Absent' && "bg-destructive/10 text-destructive"
+                        )}>
+                          {record.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeleteConfirm(record.id)}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              {attendance.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    No attendance records found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        {attendance.length > 50 && (
+          <p className="text-xs text-muted-foreground text-center">
+            Showing first 50 records. Use search to find specific records.
+          </p>
+        )}
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Delete Attendance Record
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this attendance record? This will permanently remove the check-in and check-out data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteConfirm) {
+                  deleteAttendance.mutate(deleteConfirm);
+                  setDeleteConfirm(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

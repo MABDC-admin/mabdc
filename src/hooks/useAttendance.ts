@@ -259,6 +259,29 @@ export function useCheckOutByHRMS() {
   });
 }
 
+export function useDeleteAttendance() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('attendance')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      toast.success('Attendance record deleted successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete attendance: ${error.message}`);
+    },
+  });
+}
+
 export function useEmployeeMonthlyLates(employeeId: string) {
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
   
