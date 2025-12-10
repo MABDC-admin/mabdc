@@ -444,7 +444,71 @@ export default function EmployeePortal() {
 
         {/* Attendance Tab */}
         {activeTab === 'attendance' && (
-          <div className="animate-fade-in">
+          <div className="animate-fade-in space-y-4">
+            {/* Attendance Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                      <CheckCircle className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">
+                        {attendance.filter(a => a.status === 'Present').length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Present</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-amber-500" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">
+                        {attendance.filter(a => String(a.status).includes('Late')).length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Late</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                      <AlertTriangle className="w-5 h-5 text-cyan-500" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">
+                        {attendance.filter(a => String(a.status).includes('Undertime')).length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Undertime</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-destructive/20 flex items-center justify-center">
+                      <XCircle className="w-5 h-5 text-destructive" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">
+                        {attendance.filter(a => a.status === 'Absent').length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Absent</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             <Card>
               <CardHeader>
                 <CardTitle>Attendance History</CardTitle>
