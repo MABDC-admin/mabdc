@@ -166,4 +166,4 @@ export interface CalendarEvent {
   created_at?: string;
 }
 
-export type ViewType = 'dashboard' | 'employees' | 'contracts' | 'attendance' | 'leave' | 'payroll' | 'eos' | 'calendar' | 'performance' | 'discipline' | 'orgchart' | 'settings';
+export type ViewType = 'dashboard' | 'employees' | 'contracts' | 'attendance' | 'leave' | 'payroll' | 'eos' | 'calendar' | 'performance' | 'discipline' | 'orgchart' | 'company-docs' | 'settings';

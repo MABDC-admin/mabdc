@@ -11,6 +11,7 @@ import { CalendarPageView } from '@/components/views/CalendarPageView';
 import { PerformanceView } from '@/components/views/PerformanceView';
 import { DisciplineView } from '@/components/views/DisciplineView';
 import { OrgChartView } from '@/components/views/OrgChartView';
+import { CompanyDocsView } from '@/components/views/CompanyDocsView';
 import { useHRStore } from '@/store/hrStore';
 
 const Index = () => {
@@ -40,6 +41,8 @@ const Index = () => {
         return <DisciplineView />;
       case 'orgchart':
         return <OrgChartView />;
+      case 'company-docs':
+        return <CompanyDocsView />;
       case 'settings':
         return <SettingsView />;
       default:
