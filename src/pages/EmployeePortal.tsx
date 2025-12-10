@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { 
   User, Calendar, FileText, Clock, CheckCircle, XCircle, 
   AlertTriangle, Download, Plus, ArrowLeft, Briefcase, Mail,
-  Eye, CreditCard, Home, Car
+  Eye, CreditCard, Home, Car, UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby
 } from 'lucide-react';
 import { ImagePreviewModal } from '@/components/modals/ImagePreviewModal';
 import { useEmployeeDocuments } from '@/hooks/useDocuments';
@@ -23,7 +23,7 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 import type { Employee } from '@/types/hr';
 
-type TabType = 'overview' | 'attendance' | 'leave' | 'contract' | 'letters';
+type TabType = 'overview' | 'attendance' | 'leave' | 'contract' | 'letters' | 'personal';
 
 export default function EmployeePortal() {
   const { employeeId } = useParams<{ employeeId: string }>();
@@ -137,6 +137,7 @@ export default function EmployeePortal() {
     { id: 'leave' as TabType, label: 'Leave', icon: Calendar },
     { id: 'contract' as TabType, label: 'Contract', icon: FileText },
     { id: 'letters' as TabType, label: 'HR Letters', icon: Mail },
+    { id: 'personal' as TabType, label: 'Personal Info', icon: UserCircle },
   ];
 
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -680,6 +681,111 @@ export default function EmployeePortal() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Personal Info Tab */}
+        {activeTab === 'personal' && (
+          <div className="animate-fade-in space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserCircle className="w-5 h-5" />
+                  Personal Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left Column */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                      <User className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Gender</p>
+                        <p className="font-medium">{employee.gender || 'Not specified'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                      <Cake className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Birthday</p>
+                        <p className="font-medium">
+                          {employee.birthday ? format(parseISO(employee.birthday), 'dd MMMM yyyy') : 'Not specified'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                      <Mail className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Personal Email</p>
+                        <p className="font-medium">{employee.personal_email || 'Not specified'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                      <Phone className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Personal Phone</p>
+                        <p className="font-medium">{employee.personal_phone || 'Not specified'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                      <MapPin className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Home Address</p>
+                        <p className="font-medium">{employee.home_address || 'Not specified'}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Right Column */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                      <Globe className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Place of Birth</p>
+                        <p className="font-medium">{employee.place_of_birth || 'Not specified'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                      <Globe className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Country of Birth</p>
+                        <p className="font-medium">{employee.country_of_birth || 'Not specified'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                      <Heart className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Family Status</p>
+                        <p className="font-medium">{employee.family_status || 'Not specified'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                      <Baby className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Number of Children</p>
+                        <p className="font-medium">{employee.number_of_children ?? 0}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                      <Globe className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Nationality</p>
+                        <p className="font-medium">{employee.nationality || 'Not specified'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
