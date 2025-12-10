@@ -99,7 +99,7 @@ export function AttendanceView() {
   return (
     <div className="space-y-6 animate-slide-up">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="stat-card rounded-2xl border border-border p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -130,6 +130,17 @@ export function AttendanceView() {
             <div>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Late</p>
               <p className="text-2xl font-bold text-amber-400">{lateCount}</p>
+            </div>
+          </div>
+        </div>
+        <div className="stat-card rounded-2xl border border-border p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center">
+              <Clock className="w-5 h-5 text-cyan-400" />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Undertime</p>
+              <p className="text-2xl font-bold text-cyan-400">{undertimeCount}</p>
             </div>
           </div>
         </div>
