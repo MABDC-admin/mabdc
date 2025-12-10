@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useLeave, useLeaveTypes, usePublicHolidays, useUpdateLeaveStatus, useAddLeave, useAddPublicHoliday, useAllocateLeave, useBulkAllocateLeave, useAllLeaveBalances } from '@/hooks/useLeave';
+import { useState, useMemo } from 'react';
+import { useLeave, useLeaveTypes, usePublicHolidays, useUpdateLeaveStatus, useAddLeave, useAddPublicHoliday, useAllocateLeave, useBulkAllocateLeave, useAllLeaveBalances, useLeaveBalances, useUpdateLeaveBalance } from '@/hooks/useLeave';
 import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,11 +8,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Check, X, Clock, RefreshCw, Plus, Calendar, FileText, AlertCircle, CalendarDays, Users, Wallet, LayoutGrid } from 'lucide-react';
+import { Check, X, Clock, RefreshCw, Plus, Calendar, FileText, AlertCircle, CalendarDays, Users, Wallet, LayoutGrid, Pencil, CalendarX2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, parseISO } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CalendarView } from '@/components/calendar/CalendarView';
+import { toast } from 'sonner';
 
 export function LeaveView() {
   const { data: leave = [], isLoading, refetch } = useLeave();
@@ -25,11 +26,13 @@ export function LeaveView() {
   const addHoliday = useAddPublicHoliday();
   const allocateLeave = useAllocateLeave();
   const bulkAllocate = useBulkAllocateLeave();
+  const updateBalance = useUpdateLeaveBalance();
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
   const [isAllocateModalOpen, setIsAllocateModalOpen] = useState(false);
   const [isBulkAllocateModalOpen, setIsBulkAllocateModalOpen] = useState(false);
+  const [isEditBalanceModalOpen, setIsEditBalanceModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('requests');
   const [filterEmployee, setFilterEmployee] = useState<string>('all');
 
@@ -62,7 +65,63 @@ export function LeaveView() {
     selected_employees: [] as string[],
   });
 
+  const [editBalanceForm, setEditBalanceForm] = useState({
+    id: '',
+    employee_name: '',
+    leave_type_name: '',
+    entitled_days: '',
+    carried_forward_days: '',
+    used_days: 0,
+    pending_days: 0,
+  });
+
   const currentYear = new Date().getFullYear();
+
+  // Check for overlapping leaves in leave request modal
+  const selectedEmployeeLeaves = leave.filter(l => 
+    l.employee_id === leaveForm.employee_id && 
+    (l.status === 'Pending' || l.status === 'Approved')
+  );
+
+  const overlappingLeave = useMemo(() => {
+    if (!leaveForm.start_date || !leaveForm.end_date || !leaveForm.employee_id) return null;
+    
+    const startDate = parseISO(leaveForm.start_date);
+    const endDate = parseISO(leaveForm.end_date);
+    
+    return selectedEmployeeLeaves.find(l => {
+      const leaveStart = parseISO(l.start_date);
+      const leaveEnd = parseISO(l.end_date);
+      return startDate <= leaveEnd && endDate >= leaveStart;
+    });
+  }, [selectedEmployeeLeaves, leaveForm.start_date, leaveForm.end_date, leaveForm.employee_id]);
+
+  // Get leave balance for selected employee and leave type
+  const selectedEmployeeBalance = useMemo(() => {
+    if (!leaveForm.employee_id || !leaveForm.leave_type) return null;
+    const leaveType = leaveTypes.find(lt => lt.name === leaveForm.leave_type);
+    if (!leaveType) return null;
+    return allBalances.find(b => 
+      b.employee_id === leaveForm.employee_id && 
+      b.leave_type_id === leaveType.id
+    );
+  }, [leaveForm.employee_id, leaveForm.leave_type, leaveTypes, allBalances]);
+
+  const hrAvailableDays = useMemo(() => {
+    if (!selectedEmployeeBalance) return 0;
+    return (selectedEmployeeBalance.entitled_days + selectedEmployeeBalance.carried_forward_days) - 
+           selectedEmployeeBalance.used_days - selectedEmployeeBalance.pending_days;
+  }, [selectedEmployeeBalance]);
+
+  const hrRequestedDays = useMemo(() => {
+    if (!leaveForm.start_date || !leaveForm.end_date) return 0;
+    const days = differenceInDays(parseISO(leaveForm.end_date), parseISO(leaveForm.start_date)) + 1;
+    return days > 0 ? days : 0;
+  }, [leaveForm.start_date, leaveForm.end_date]);
+
+  const hrHasInsufficientBalance = hrRequestedDays > 0 && hrAvailableDays < hrRequestedDays;
+  const hrHasOverlap = !!overlappingLeave;
+  const hrCanSubmit = hrRequestedDays > 0 && !hrHasInsufficientBalance && !hrHasOverlap && leaveForm.employee_id && leaveForm.leave_type;
 
   const handleApprove = (id: string) => {
     updateStatus.mutate({ id, status: 'Approved' });
@@ -75,6 +134,18 @@ export function LeaveView() {
   const handleSubmitLeave = (e: React.FormEvent) => {
     e.preventDefault();
     const days = differenceInDays(new Date(leaveForm.end_date), new Date(leaveForm.start_date)) + 1;
+    
+    // Check for overlap
+    if (hrHasOverlap) {
+      toast.error('Leave dates overlap with an existing request. Please select different dates.');
+      return;
+    }
+
+    // Check balance
+    if (hrHasInsufficientBalance) {
+      toast.error('Insufficient leave balance. Please extend allocation first.');
+      return;
+    }
     
     addLeave.mutate({
       employee_id: leaveForm.employee_id,
@@ -136,6 +207,42 @@ export function LeaveView() {
       onSuccess: () => {
         setIsBulkAllocateModalOpen(false);
         setBulkForm({ leave_type_id: '', entitled_days: '', selected_employees: [] });
+        refetchBalances();
+      }
+    });
+  };
+
+  const handleEditBalance = (balance: typeof allBalances[0]) => {
+    setEditBalanceForm({
+      id: balance.id,
+      employee_name: balance.employees?.full_name || 'Unknown',
+      leave_type_name: balance.leave_types?.name || 'Unknown',
+      entitled_days: balance.entitled_days.toString(),
+      carried_forward_days: balance.carried_forward_days.toString(),
+      used_days: balance.used_days,
+      pending_days: balance.pending_days,
+    });
+    setIsEditBalanceModalOpen(true);
+  };
+
+  const handleUpdateBalance = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateBalance.mutate({
+      id: editBalanceForm.id,
+      entitled_days: parseFloat(editBalanceForm.entitled_days),
+      carried_forward_days: parseFloat(editBalanceForm.carried_forward_days) || 0,
+    }, {
+      onSuccess: () => {
+        setIsEditBalanceModalOpen(false);
+        setEditBalanceForm({
+          id: '',
+          employee_name: '',
+          leave_type_name: '',
+          entitled_days: '',
+          carried_forward_days: '',
+          used_days: 0,
+          pending_days: 0,
+        });
         refetchBalances();
       }
     });
@@ -451,7 +558,19 @@ export function LeaveView() {
                         const remaining = Number(balance.entitled_days) + Number(balance.carried_forward_days) - Number(balance.used_days) - Number(balance.pending_days);
                         const percentUsed = ((Number(balance.used_days) + Number(balance.pending_days)) / (Number(balance.entitled_days) + Number(balance.carried_forward_days))) * 100;
                         return (
-                          <div key={balance.id} className="p-3 rounded-lg bg-secondary/30 border border-border">
+                          <div 
+                            key={balance.id} 
+                            className="p-3 rounded-lg bg-secondary/30 border border-border group hover:border-primary/50 cursor-pointer transition-colors relative"
+                            onClick={() => handleEditBalance(balance)}
+                          >
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => { e.stopPropagation(); handleEditBalance(balance); }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
                             <p className="text-[10px] font-medium text-muted-foreground mb-1 truncate">
                               {balance.leave_types?.name || 'Unknown'}
                             </p>
@@ -645,12 +764,42 @@ export function LeaveView() {
               </div>
             </div>
             {leaveForm.start_date && leaveForm.end_date && (
-              <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-                <p className="text-sm text-primary font-medium">
-                  Total: {differenceInDays(new Date(leaveForm.end_date), new Date(leaveForm.start_date)) + 1} days
+              <div className={cn("p-3 rounded-lg border", hrHasInsufficientBalance || hrHasOverlap ? "bg-destructive/10 border-destructive/30" : "bg-primary/10 border-primary/20")}>
+                <p className={cn("text-sm font-medium", hrHasInsufficientBalance || hrHasOverlap ? "text-destructive" : "text-primary")}>
+                  Total: {hrRequestedDays} days
                 </p>
+                {selectedEmployeeBalance && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Available: {hrAvailableDays} days
+                  </p>
+                )}
               </div>
             )}
+
+            {hrHasOverlap && overlappingLeave && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <CalendarX2 className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                <div className="text-sm text-amber-700 dark:text-amber-400">
+                  <p className="font-medium">Overlapping Leave Detected</p>
+                  <p className="text-xs mt-0.5">
+                    Employee has {overlappingLeave.status.toLowerCase()} {overlappingLeave.leave_type} leave from{' '}
+                    {format(new Date(overlappingLeave.start_date), 'dd MMM')} to{' '}
+                    {format(new Date(overlappingLeave.end_date), 'dd MMM')}.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {hrHasInsufficientBalance && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+                <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                <div className="text-sm text-destructive">
+                  <p className="font-medium">Insufficient leave balance</p>
+                  <p className="text-xs mt-0.5">Available: {hrAvailableDays} days. Requesting: {hrRequestedDays} days. Please extend allocation first.</p>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Reason</Label>
               <Textarea
@@ -671,7 +820,7 @@ export function LeaveView() {
               </Label>
             </div>
             <div className="flex gap-2 pt-4 border-t border-border">
-              <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90" disabled={addLeave.isPending}>
+              <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90" disabled={!hrCanSubmit || addLeave.isPending}>
                 {addLeave.isPending ? 'Submitting...' : 'Submit Request'}
               </Button>
               <Button type="button" variant="outline" onClick={() => setIsRequestModalOpen(false)} className="border-border">
@@ -893,6 +1042,66 @@ export function LeaveView() {
                 {addHoliday.isPending ? 'Adding...' : 'Add Holiday'}
               </Button>
               <Button type="button" variant="outline" onClick={() => setIsHolidayModalOpen(false)} className="border-border">
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Leave Balance Modal */}
+      <Dialog open={isEditBalanceModalOpen} onOpenChange={setIsEditBalanceModalOpen}>
+        <DialogContent className="max-w-md glass-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-foreground">Edit Leave Allocation</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateBalance} className="space-y-4">
+            <div className="p-3 rounded-lg bg-secondary/30 border border-border">
+              <p className="text-sm font-medium text-foreground">{editBalanceForm.employee_name}</p>
+              <p className="text-xs text-muted-foreground">{editBalanceForm.leave_type_name} - {currentYear}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Entitled Days *</Label>
+                <Input
+                  type="number"
+                  required
+                  min="0"
+                  step="0.5"
+                  value={editBalanceForm.entitled_days}
+                  onChange={(e) => setEditBalanceForm({ ...editBalanceForm, entitled_days: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Carry Forward</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={editBalanceForm.carried_forward_days}
+                  onChange={(e) => setEditBalanceForm({ ...editBalanceForm, carried_forward_days: e.target.value })}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div><span className="text-muted-foreground">Used:</span> <span className="font-medium">{editBalanceForm.used_days} days</span></div>
+                <div><span className="text-muted-foreground">Pending:</span> <span className="font-medium">{editBalanceForm.pending_days} days</span></div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">New Available:</span>{' '}
+                  <span className="font-medium text-primary">
+                    {Math.max(0, (parseFloat(editBalanceForm.entitled_days) || 0) + (parseFloat(editBalanceForm.carried_forward_days) || 0) - editBalanceForm.used_days - editBalanceForm.pending_days).toFixed(0)} days
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-4 border-t border-border">
+              <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90" disabled={updateBalance.isPending}>
+                {updateBalance.isPending ? 'Updating...' : 'Update Allocation'}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setIsEditBalanceModalOpen(false)} className="border-border">
                 Cancel
               </Button>
             </div>

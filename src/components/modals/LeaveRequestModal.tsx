@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useAddLeave, useLeaveTypes, useLeaveBalances } from '@/hooks/useLeave';
+import { useState, useMemo, useEffect } from 'react';
+import { useAddLeave, useLeaveTypes, useLeaveBalances, useLeave } from '@/hooks/useLeave';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { differenceInDays, parseISO } from 'date-fns';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, CalendarX2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface LeaveRequestModalProps {
@@ -32,12 +32,31 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName }:
   const addLeave = useAddLeave();
   const { data: leaveTypes = [] } = useLeaveTypes();
   const { data: leaveBalances = [] } = useLeaveBalances(employeeId);
+  const { data: allLeave = [] } = useLeave();
   const [formData, setFormData] = useState({
     leave_type: 'Annual',
     start_date: '',
     end_date: '',
     reason: '',
   });
+
+  // Check for overlapping leaves
+  const overlappingLeave = useMemo(() => {
+    if (!formData.start_date || !formData.end_date) return null;
+    const employeeLeaves = allLeave.filter(l => 
+      l.employee_id === employeeId && 
+      (l.status === 'Pending' || l.status === 'Approved')
+    );
+    
+    const startDate = parseISO(formData.start_date);
+    const endDate = parseISO(formData.end_date);
+    
+    return employeeLeaves.find(leave => {
+      const leaveStart = parseISO(leave.start_date);
+      const leaveEnd = parseISO(leave.end_date);
+      return startDate <= leaveEnd && endDate >= leaveStart;
+    });
+  }, [allLeave, employeeId, formData.start_date, formData.end_date]);
 
   const calculateDays = () => {
     if (!formData.start_date || !formData.end_date) return 0;
@@ -63,6 +82,8 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName }:
 
   const requestedDays = calculateDays();
   const hasInsufficientBalance = requestedDays > 0 && availableDays < requestedDays;
+  const hasOverlap = !!overlappingLeave;
+  const canSubmit = requestedDays > 0 && !hasInsufficientBalance && !hasOverlap && !addLeave.isPending;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,10 +93,16 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName }:
       return;
     }
 
+    // Check for overlap
+    if (hasOverlap) {
+      toast.error('Leave dates overlap with an existing request. Please select different dates.');
+      return;
+    }
+
     // Check if balance is insufficient
     if (hasInsufficientBalance) {
       toast.error(
-        'Insufficient leave balance. Please contact HR for assistance.',
+        'Insufficient leave balance. Please contact HR to extend your allocation.',
         { duration: 5000 }
       );
       return;
@@ -174,12 +201,26 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName }:
             </div>
           )}
 
+          {hasOverlap && overlappingLeave && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <CalendarX2 className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+              <div className="text-sm text-amber-700 dark:text-amber-400">
+                <p className="font-medium">Overlapping Leave Detected</p>
+                <p className="text-xs mt-0.5">
+                  You have {overlappingLeave.status.toLowerCase()} {overlappingLeave.leave_type} leave from{' '}
+                  {new Date(overlappingLeave.start_date).toLocaleDateString()} to{' '}
+                  {new Date(overlappingLeave.end_date).toLocaleDateString()}. Please select different dates.
+                </p>
+              </div>
+            </div>
+          )}
+
           {hasInsufficientBalance && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
               <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
               <div className="text-sm text-destructive">
                 <p className="font-medium">Insufficient leave balance</p>
-                <p className="text-xs mt-0.5">You have {availableDays} day(s) available but requesting {requestedDays} day(s). Please contact HR for assistance.</p>
+                <p className="text-xs mt-0.5">You have {availableDays} day(s) available but requesting {requestedDays} day(s). Please contact HR to extend your allocation.</p>
               </div>
             </div>
           )}
@@ -198,7 +239,7 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName }:
             <Button 
               type="submit" 
               className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
-              disabled={addLeave.isPending || calculateDays() <= 0}
+              disabled={!canSubmit}
             >
               {addLeave.isPending ? 'Submitting...' : 'Submit Request'}
             </Button>
