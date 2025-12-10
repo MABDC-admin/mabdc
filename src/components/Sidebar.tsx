@@ -13,15 +13,18 @@ import {
   QrCode,
   Star,
   Scale,
-  Network
+  Network,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHRStore } from '@/store/hrStore';
 import type { ViewType } from '@/types/hr';
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { ThemeSelector } from './ThemeSelector';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 const navItems: { id: ViewType; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -41,9 +44,21 @@ const navItems: { id: ViewType; label: string; icon: React.ReactNode }[] = [
 export function Sidebar() {
   const { currentView, setCurrentView } = useHRStore();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const { signOut, user } = useAuth();
+  const navigate = useNavigate();
   
   // Initialize theme on mount
   useTheme();
+
+  const handleLogout = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast.error('Failed to sign out');
+    } else {
+      toast.success('Signed out successfully');
+      navigate('/auth?portal=hr');
+    }
+  };
 
   return (
     <>
@@ -109,14 +124,25 @@ export function Sidebar() {
           </Link>
         </nav>
 
-        <div className="absolute bottom-4 left-4 right-4">
+        <div className="absolute bottom-4 left-4 right-4 space-y-3">
+          {user && (
+            <div className="glass-card rounded-xl border border-border p-3">
+              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              <button
+                onClick={handleLogout}
+                className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors text-sm font-medium"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </button>
+            </div>
+          )}
           <div className="glass-card rounded-xl border border-border p-4">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               <span className="text-xs text-muted-foreground">System Status</span>
             </div>
             <p className="text-sm font-medium text-foreground">Connected</p>
-            <p className="text-xs text-muted-foreground mt-1">Demo Mode Active</p>
           </div>
         </div>
       </aside>
