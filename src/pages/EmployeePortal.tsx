@@ -5,6 +5,8 @@ import { useAttendance } from '@/hooks/useAttendance';
 import { useLeave, useAddLeave, useLeaveTypes } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { useEmployeeHRLetters } from '@/hooks/useHRLetters';
+import { useEmployeePerformance, useEmployeeCorrectiveActions } from '@/hooks/usePerformance';
+import { useEmployeeDiscipline } from '@/hooks/useDiscipline';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { 
   User, Calendar, FileText, Clock, CheckCircle, XCircle, 
   AlertTriangle, Download, Plus, ArrowLeft, Briefcase, Mail,
-  Eye, CreditCard, Home, Car, UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby, Pencil, Save, X
+  Eye, CreditCard, Home, Car, UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby, Pencil, Save, X, Star, Scale
 } from 'lucide-react';
 import { ImagePreviewModal } from '@/components/modals/ImagePreviewModal';
 import { useEmployeeDocuments } from '@/hooks/useDocuments';
@@ -23,7 +25,7 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 import type { Employee } from '@/types/hr';
 
-type TabType = 'overview' | 'attendance' | 'leave' | 'contract' | 'letters' | 'personal';
+type TabType = 'overview' | 'attendance' | 'leave' | 'contract' | 'letters' | 'personal' | 'records';
 
 export default function EmployeePortal() {
   const { employeeId } = useParams<{ employeeId: string }>();
@@ -79,6 +81,9 @@ export default function EmployeePortal() {
   const { data: leaveTypes = [] } = useLeaveTypes();
   const addLeave = useAddLeave();
   const { data: documents = [] } = useEmployeeDocuments(employeeId || '');
+  const { data: performanceRecords = [] } = useEmployeePerformance(employeeId || '');
+  const { data: correctiveActions = [] } = useEmployeeCorrectiveActions(employeeId || '');
+  const { data: disciplineRecords = [] } = useEmployeeDiscipline(employeeId || '');
 
   // Filter data for this employee
   const attendance = allAttendance.filter(a => a.employee_id === employeeId);
@@ -152,6 +157,7 @@ export default function EmployeePortal() {
     { id: 'leave' as TabType, label: 'Leave', icon: Calendar },
     { id: 'contract' as TabType, label: 'Contract', icon: FileText },
     { id: 'letters' as TabType, label: 'HR Letters', icon: Mail },
+    { id: 'records' as TabType, label: 'Records', icon: Scale },
   ];
 
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -936,6 +942,112 @@ export default function EmployeePortal() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Records Tab - Performance & Discipline */}
+        {activeTab === 'records' && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Performance Reviews */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="w-5 h-5 text-primary" />
+                  Performance Reviews
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {performanceRecords.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">No performance reviews found</p>
+                ) : (
+                  <div className="space-y-3">
+                    {performanceRecords.map((record) => (
+                      <div key={record.id} className="p-4 rounded-lg bg-secondary/30 border border-border">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">{record.performance_type}</p>
+                            <p className="text-sm text-muted-foreground">Period: {record.review_period}</p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} className={cn("w-4 h-4", i < record.rating ? "text-primary fill-primary" : "text-muted-foreground/30")} />
+                            ))}
+                          </div>
+                        </div>
+                        {record.comments && <p className="text-sm mt-2 text-muted-foreground">{record.comments}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Corrective Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                  Corrective Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {correctiveActions.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">No corrective actions</p>
+                ) : (
+                  <div className="space-y-3">
+                    {correctiveActions.map((action) => (
+                      <div key={action.id} className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-500">{action.action_type}</span>
+                            <p className="text-sm mt-2">{action.reason}</p>
+                          </div>
+                          {action.document_url && (
+                            <a href={action.document_url} target="_blank" rel="noopener noreferrer" className="text-primary text-xs flex items-center gap-1">
+                              <Eye className="w-3 h-3" />View Doc
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Discipline Records */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Scale className="w-5 h-5 text-destructive" />
+                  Discipline Records
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {disciplineRecords.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">No discipline records</p>
+                ) : (
+                  <div className="space-y-3">
+                    {disciplineRecords.map((record) => (
+                      <div key={record.id} className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-destructive/20 text-destructive">{record.incident_type}</span>
+                            <p className="text-sm mt-2">{record.description}</p>
+                            {record.action_taken && <p className="text-xs text-muted-foreground mt-1">Action: {record.action_taken}</p>}
+                          </div>
+                          {record.document_url && (
+                            <a href={record.document_url} target="_blank" rel="noopener noreferrer" className="text-primary text-xs flex items-center gap-1">
+                              <Eye className="w-3 h-3" />View Doc
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
