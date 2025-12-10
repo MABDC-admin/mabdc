@@ -38,7 +38,6 @@ export function EditEmployeeModal({ isOpen, onClose, employee }: EditEmployeeMod
     nationality: '',
     basic_salary: '',
     allowance: '',
-    leave_balance: '',
     status: 'Active' as 'Active' | 'On Leave' | 'Terminated',
     contract_type: 'Unlimited',
     visa_no: '',
@@ -66,7 +65,6 @@ export function EditEmployeeModal({ isOpen, onClose, employee }: EditEmployeeMod
         nationality: employee.nationality || '',
         basic_salary: employee.basic_salary?.toString() || '',
         allowance: employee.allowance?.toString() || '',
-        leave_balance: employee.leave_balance?.toString() || '30',
         status: (employee.status as 'Active' | 'On Leave' | 'Terminated') || 'Active',
         contract_type: employee.contract_type || 'Unlimited',
         visa_no: employee.visa_no || '',
@@ -98,7 +96,6 @@ export function EditEmployeeModal({ isOpen, onClose, employee }: EditEmployeeMod
       nationality: formData.nationality || undefined,
       basic_salary: parseFloat(formData.basic_salary) || undefined,
       allowance: parseFloat(formData.allowance) || undefined,
-      leave_balance: parseInt(formData.leave_balance) || 30,
       status: formData.status,
       contract_type: formData.contract_type,
       visa_no: formData.visa_no || undefined,
@@ -244,7 +241,7 @@ export function EditEmployeeModal({ isOpen, onClose, employee }: EditEmployeeMod
 
           <div className="pt-4 border-t border-border">
             <h3 className="text-sm font-semibold text-foreground mb-3">Salary & Benefits</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Basic Salary (AED)</Label>
                 <Input
@@ -260,15 +257,6 @@ export function EditEmployeeModal({ isOpen, onClose, employee }: EditEmployeeMod
                   type="number"
                   value={formData.allowance}
                   onChange={(e) => setFormData({ ...formData, allowance: e.target.value })}
-                  className="bg-secondary/50 border-border"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Leave Balance (Days)</Label>
-                <Input
-                  type="number"
-                  value={formData.leave_balance}
-                  onChange={(e) => setFormData({ ...formData, leave_balance: e.target.value })}
                   className="bg-secondary/50 border-border"
                 />
               </div>
