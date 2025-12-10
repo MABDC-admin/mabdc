@@ -25,6 +25,7 @@ export interface Contract {
   created_at?: string;
   employees?: {
     full_name: string;
+    photo_url?: string;
   };
 }
 
@@ -36,7 +37,7 @@ export function useContracts() {
         .from('contracts')
         .select(`
           *,
-          employees (full_name)
+          employees (full_name, photo_url)
         `)
         .order('created_at', { ascending: false });
       
