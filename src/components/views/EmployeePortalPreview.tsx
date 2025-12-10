@@ -10,6 +10,7 @@ import { useEmployeeDocuments } from '@/hooks/useDocuments';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { EmployeeAttendanceCalendar } from '@/components/attendance/EmployeeAttendanceCalendar';
 import { 
   User, Calendar, FileText, Clock, CheckCircle, XCircle, 
   AlertTriangle, Briefcase, Mail, Eye, CreditCard, Home, Car, 
@@ -249,38 +250,12 @@ export function EmployeePortalPreview() {
             )}
 
             {/* Attendance Tab */}
-            {activeTab === 'attendance' && (
-              <div className="space-y-4 animate-fade-in">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Clock className="w-5 h-5" />
-                      Recent Attendance
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {attendance.length > 0 ? (
-                      <div className="space-y-2">
-                        {attendance.slice(0, 10).map((record) => (
-                          <div key={record.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border">
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-medium">{format(parseISO(record.date), 'EEE, MMM dd')}</span>
-                              <Badge variant={record.status === 'Present' ? 'default' : record.status === 'Late' ? 'secondary' : 'destructive'}>
-                                {record.status}
-                              </Badge>
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {record.check_in && <span>In: {record.check_in}</span>}
-                              {record.check_out && <span className="ml-4">Out: {record.check_out}</span>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-muted-foreground text-center py-8">No attendance records found</p>
-                    )}
-                  </CardContent>
-                </Card>
+            {activeTab === 'attendance' && selectedEmployee && (
+              <div className="animate-fade-in">
+                <EmployeeAttendanceCalendar 
+                  employeeId={selectedEmployeeId} 
+                  isEmployeePortal={true}
+                />
               </div>
             )}
 
