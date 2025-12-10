@@ -14,7 +14,8 @@ import {
   Star,
   Scale,
   Network,
-  LogOut
+  LogOut,
+  FolderOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHRStore } from '@/store/hrStore';
@@ -38,6 +39,7 @@ const navItems: { id: ViewType; label: string; icon: React.ReactNode }[] = [
   { id: 'performance', label: 'Performance', icon: <Star className="w-5 h-5" /> },
   { id: 'discipline', label: 'Discipline', icon: <Scale className="w-5 h-5" /> },
   { id: 'orgchart', label: 'Hierarchy', icon: <Network className="w-5 h-5" /> },
+  { id: 'company-docs', label: 'Company Docs', icon: <FolderOpen className="w-5 h-5" /> },
   { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
 ];
 
