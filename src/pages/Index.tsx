@@ -4,6 +4,7 @@ import { EmployeesView } from '@/components/views/EmployeesView';
 import { ContractsView } from '@/components/views/ContractsView';
 import { AttendanceView } from '@/components/views/AttendanceView';
 import { EmployeeAttendanceView } from '@/components/views/EmployeeAttendanceView';
+import { AttendanceAppealsView } from '@/components/views/AttendanceAppealsView';
 import { LeaveView } from '@/components/views/LeaveView';
 import { PayrollView } from '@/components/views/PayrollView';
 import { EOSView } from '@/components/views/EOSView';
@@ -30,6 +31,8 @@ const Index = () => {
         return <AttendanceView />;
       case 'employee-attendance':
         return <EmployeeAttendanceView />;
+      case 'attendance-appeals':
+        return <AttendanceAppealsView />;
       case 'leave':
         return <LeaveView />;
       case 'payroll':
