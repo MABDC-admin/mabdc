@@ -18,7 +18,8 @@ import {
   FolderOpen,
   ChevronDown,
   ChevronRight,
-  UserCheck
+  UserCheck,
+  AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHRStore } from '@/store/hrStore';
@@ -28,13 +29,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ThemeSelector } from './ThemeSelector';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
+import { useAttendanceAppeals } from '@/hooks/useAttendanceAppeals';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 
 interface NavItem {
   id: ViewType;
   label: string;
   icon: React.ReactNode;
-  subItems?: { id: ViewType; label: string; icon: React.ReactNode }[];
+  subItems?: { id: ViewType; label: string; icon: React.ReactNode; badge?: number }[];
 }
 
 const navItems: NavItem[] = [
@@ -46,7 +49,8 @@ const navItems: NavItem[] = [
     label: 'Attendance', 
     icon: <Clock className="w-5 h-5" />,
     subItems: [
-      { id: 'employee-attendance', label: 'Employee Attendance', icon: <UserCheck className="w-4 h-4" /> }
+      { id: 'employee-attendance', label: 'Employee Attendance', icon: <UserCheck className="w-4 h-4" /> },
+      { id: 'attendance-appeals', label: 'Appeals', icon: <AlertCircle className="w-4 h-4" /> }
     ]
   },
   { id: 'leave', label: 'Leave', icon: <CalendarDays className="w-5 h-5" /> },
@@ -65,7 +69,11 @@ export function Sidebar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['attendance']);
   const { signOut, user } = useAuth();
+  const { data: appeals = [] } = useAttendanceAppeals();
   const navigate = useNavigate();
+  
+  // Get pending appeals count
+  const pendingAppealsCount = appeals.filter(a => a.status === 'Pending').length;
   
   // Initialize theme on mount
   useTheme();
@@ -157,22 +165,32 @@ export function Sidebar() {
                   {/* Submenu items */}
                   {expandedMenus.includes(item.id) && (
                     <div className="ml-4 pl-4 border-l border-border space-y-1 mt-1">
-                      {item.subItems.map((subItem) => (
-                        <button
-                          key={subItem.id}
-                          onClick={() => {
-                            setCurrentView(subItem.id);
-                            setIsMobileOpen(false);
-                          }}
-                          className={cn(
-                            "nav-item w-full text-left text-muted-foreground text-sm py-2",
-                            currentView === subItem.id && "active text-primary"
-                          )}
-                        >
-                          {subItem.icon}
-                          <span>{subItem.label}</span>
-                        </button>
-                      ))}
+                      {item.subItems.map((subItem) => {
+                        const badgeCount = subItem.id === 'attendance-appeals' ? pendingAppealsCount : 0;
+                        return (
+                          <button
+                            key={subItem.id}
+                            onClick={() => {
+                              setCurrentView(subItem.id);
+                              setIsMobileOpen(false);
+                            }}
+                            className={cn(
+                              "nav-item w-full text-left text-muted-foreground text-sm py-2 flex items-center justify-between",
+                              currentView === subItem.id && "active text-primary"
+                            )}
+                          >
+                            <div className="flex items-center gap-2">
+                              {subItem.icon}
+                              <span>{subItem.label}</span>
+                            </div>
+                            {badgeCount > 0 && (
+                              <Badge variant="destructive" className="animate-pulse text-[10px] px-1.5 py-0 h-5">
+                                {badgeCount}
+                              </Badge>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </>
