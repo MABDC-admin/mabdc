@@ -342,201 +342,210 @@ export default function AttendanceScanner() {
               <TabsContent value="qr" className="mt-4">
                 {/* QR Scanner Card */}
                 <Card className="overflow-hidden">
-              <CardContent className="p-0">
-                <div className="relative aspect-square bg-gradient-to-br from-secondary to-muted">
-                  {scannerState === 'scanning' && (
-                    <>
-                      <Scanner
-                        onScan={(result) => {
-                          if (result && result[0]?.rawValue) {
-                            handleScan(result[0].rawValue);
-                          }
-                        }}
-                        constraints={{
-                          facingMode: 'user'
-                        }}
-                        styles={{
-                          container: { width: '100%', height: '100%' },
-                          video: { width: '100%', height: '100%', objectFit: 'cover' }
-                        }}
-                      />
-                      {/* Scan Frame Overlay */}
-                      <div className="absolute inset-0 pointer-events-none">
-                        <div className="absolute inset-8 border-2 border-white/30 rounded-3xl">
-                          <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-2xl" />
-                          <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-2xl" />
-                          <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-2xl" />
-                          <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-2xl" />
-                        </div>
-                        <div className="absolute inset-x-0 top-1/2 h-0.5 bg-primary/50 animate-pulse" />
-                        {/* Timer indicator */}
-                        <div className="absolute top-4 left-4 bg-black/60 px-3 py-1 rounded-full text-white text-sm flex items-center gap-2">
-                          <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                          Scanning...
-                        </div>
-                      </div>
-                    </>
-                  )}
+                  <CardContent className="p-0">
+                    <div className="relative aspect-square bg-gradient-to-br from-secondary to-muted">
+                      {scannerState === 'scanning' && scanMethod === 'qr' && (
+                        <>
+                          <Scanner
+                            onScan={(result) => {
+                              if (result && result[0]?.rawValue) {
+                                handleScan(result[0].rawValue);
+                              }
+                            }}
+                            constraints={{
+                              facingMode: 'user'
+                            }}
+                            styles={{
+                              container: { width: '100%', height: '100%' },
+                              video: { width: '100%', height: '100%', objectFit: 'cover' }
+                            }}
+                          />
+                          {/* Scan Frame Overlay */}
+                          <div className="absolute inset-0 pointer-events-none">
+                            <div className="absolute inset-8 border-2 border-white/30 rounded-3xl">
+                              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-2xl" />
+                              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-2xl" />
+                              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-2xl" />
+                              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-2xl" />
+                            </div>
+                            <div className="absolute inset-x-0 top-1/2 h-0.5 bg-primary/50 animate-pulse" />
+                            {/* Timer indicator */}
+                            <div className="absolute top-4 left-4 bg-black/60 px-3 py-1 rounded-full text-white text-sm flex items-center gap-2">
+                              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                              Scanning...
+                            </div>
+                          </div>
+                        </>
+                      )}
 
-                  {scannerState === 'standby' && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="text-center">
-                        <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Camera className="w-12 h-12 text-primary" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground mb-2">
-                          Ready to Scan
-                        </h3>
-                        <p className="text-sm text-muted-foreground mb-6">
-                          Tap the button below to activate camera
-                        </p>
-                        <Button 
-                          onClick={startScanning}
-                          size="lg"
-                          className="gap-2"
-                        >
-                          <QrCode className="w-5 h-5" />
-                          Start Scanning
-                        </Button>
-                        <p className="text-xs text-muted-foreground mt-4">
-                          Camera will auto-standby after 10 seconds
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Error State */}
-                  {scannerState === 'result' && scanError && !scannedEmployee && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-card">
-                      <div className="text-center animate-scale-in">
-                        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-destructive/10 flex items-center justify-center">
-                          <AlertTriangle className="w-10 h-10 text-destructive" />
-                        </div>
-                        <h3 className="text-lg font-bold text-destructive mb-2">
-                          Scan Failed
-                        </h3>
-                        <p className="text-sm text-muted-foreground mb-4 max-w-xs">
-                          {scanError}
-                        </p>
-                        <Button 
-                          variant="outline"
-                          onClick={() => {
-                            setScannerState('standby');
-                            setScanError(null);
-                          }}
-                        >
-                          Try Again
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {scannerState === 'result' && scannedEmployee && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-card">
-                      <div className="text-center animate-scale-in">
-                        {/* Employee Photo */}
-                        <Avatar className="w-28 h-28 mx-auto mb-4 ring-4 ring-primary/20">
-                          <AvatarImage src={scannedEmployee.photo || undefined} />
-                          <AvatarFallback className="bg-primary/10 text-primary text-2xl">
-                            {scannedEmployee.name.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-
-                        {/* Status Icon */}
-                        <div className={cn(
-                          "w-12 h-12 mx-auto -mt-6 mb-2 rounded-full flex items-center justify-center",
-                          scannedEmployee.isLate 
-                            ? "bg-amber-500 text-white" 
-                            : "bg-primary text-primary-foreground"
-                        )}>
-                          {scannedEmployee.isLate ? (
-                            <AlertTriangle className="w-6 h-6" />
-                          ) : (
-                            <CheckCircle className="w-6 h-6" />
-                          )}
-                        </div>
-
-                        {/* Employee Name */}
-                        <h3 className="text-xl font-bold text-foreground mb-1">
-                          {scannedEmployee.name}
-                        </h3>
-                        
-                        {/* Position & Department */}
-                        {(scannedEmployee.jobPosition || scannedEmployee.department) && (
-                          <p className="text-sm text-muted-foreground mb-3">
-                            {scannedEmployee.jobPosition}
-                            {scannedEmployee.jobPosition && scannedEmployee.department && ' • '}
-                            {scannedEmployee.department}
-                          </p>
-                        )}
-
-                        {/* Check-in/out Status */}
-                        <div className={cn(
-                          "inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-3",
-                          scannedEmployee.mode === 'check-in'
-                            ? scannedEmployee.isLate 
-                              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-                              : "bg-primary/10 text-primary"
-                            : "bg-accent/10 text-accent-foreground"
-                        )}>
-                          {scannedEmployee.mode === 'check-in' ? (
-                            <>
-                              <LogIn className="w-4 h-4" />
-                              Checked In {scannedEmployee.isLate && '(Late)'}
-                            </>
-                          ) : (
-                            <>
-                              <LogOut className="w-4 h-4" />
-                              Checked Out
-                            </>
-                          )}
-                        </div>
-
-                        {/* Time Details */}
-                        <div className="flex items-center justify-center gap-4 text-sm">
-                          {scannedEmployee.checkInTime && (
-                            <span className="flex items-center gap-1 text-muted-foreground">
-                              <LogIn className="w-4 h-4" />
-                              In: {scannedEmployee.checkInTime}
-                            </span>
-                          )}
-                          {scannedEmployee.checkOutTime && (
-                            <span className="flex items-center gap-1 text-muted-foreground">
-                              <LogOut className="w-4 h-4" />
-                              Out: {scannedEmployee.checkOutTime}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Late Warning */}
-                        {scannedEmployee.isLate && scannedEmployee.mode === 'check-in' && (
-                          <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-                            <p className="text-sm text-amber-800 dark:text-amber-400">
-                              <AlertTriangle className="w-4 h-4 inline mr-1" />
-                              Late arrival - HR has been notified
+                      {scannerState === 'standby' && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
+                          <div className="text-center">
+                            <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
+                              <Camera className="w-12 h-12 text-primary" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-foreground mb-2">
+                              Ready to Scan
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-6">
+                              Tap the button below to activate camera
+                            </p>
+                            <Button 
+                              onClick={startScanning}
+                              size="lg"
+                              className="gap-2"
+                            >
+                              <QrCode className="w-5 h-5" />
+                              Start Scanning
+                            </Button>
+                            <p className="text-xs text-muted-foreground mt-4">
+                              Camera will auto-standby after 10 seconds
                             </p>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
+
+                      {/* Error State */}
+                      {scannerState === 'result' && scanError && !scannedEmployee && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-card">
+                          <div className="text-center animate-scale-in">
+                            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-destructive/10 flex items-center justify-center">
+                              <AlertTriangle className="w-10 h-10 text-destructive" />
+                            </div>
+                            <h3 className="text-lg font-bold text-destructive mb-2">
+                              Scan Failed
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-4 max-w-xs">
+                              {scanError}
+                            </p>
+                            <Button 
+                              variant="outline"
+                              onClick={() => {
+                                setScannerState('standby');
+                                setScanError(null);
+                              }}
+                            >
+                              Try Again
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {scannerState === 'result' && scannedEmployee && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-card">
+                          <div className="text-center animate-scale-in">
+                            {/* Employee Photo */}
+                            <Avatar className="w-28 h-28 mx-auto mb-4 ring-4 ring-primary/20">
+                              <AvatarImage src={scannedEmployee.photo || undefined} />
+                              <AvatarFallback className="bg-primary/10 text-primary text-2xl">
+                                {scannedEmployee.name.split(' ').map(n => n[0]).join('')}
+                              </AvatarFallback>
+                            </Avatar>
+
+                            {/* Status Icon */}
+                            <div className={cn(
+                              "w-12 h-12 mx-auto -mt-6 mb-2 rounded-full flex items-center justify-center",
+                              scannedEmployee.isLate 
+                                ? "bg-amber-500 text-white" 
+                                : "bg-primary text-primary-foreground"
+                            )}>
+                              {scannedEmployee.isLate ? (
+                                <AlertTriangle className="w-6 h-6" />
+                              ) : (
+                                <CheckCircle className="w-6 h-6" />
+                              )}
+                            </div>
+
+                            {/* Employee Name */}
+                            <h3 className="text-xl font-bold text-foreground mb-1">
+                              {scannedEmployee.name}
+                            </h3>
+                            
+                            {/* Position & Department */}
+                            {(scannedEmployee.jobPosition || scannedEmployee.department) && (
+                              <p className="text-sm text-muted-foreground mb-3">
+                                {scannedEmployee.jobPosition}
+                                {scannedEmployee.jobPosition && scannedEmployee.department && ' • '}
+                                {scannedEmployee.department}
+                              </p>
+                            )}
+
+                            {/* Check-in/out Status */}
+                            <div className={cn(
+                              "inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-3",
+                              scannedEmployee.mode === 'check-in'
+                                ? scannedEmployee.isLate 
+                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                                  : "bg-primary/10 text-primary"
+                                : "bg-accent/10 text-accent-foreground"
+                            )}>
+                              {scannedEmployee.mode === 'check-in' ? (
+                                <>
+                                  <LogIn className="w-4 h-4" />
+                                  Checked In {scannedEmployee.isLate && '(Late)'}
+                                </>
+                              ) : (
+                                <>
+                                  <LogOut className="w-4 h-4" />
+                                  Checked Out
+                                </>
+                              )}
+                            </div>
+
+                            {/* Time Details */}
+                            <div className="flex items-center justify-center gap-4 text-sm">
+                              {scannedEmployee.checkInTime && (
+                                <span className="flex items-center gap-1 text-muted-foreground">
+                                  <LogIn className="w-4 h-4" />
+                                  In: {scannedEmployee.checkInTime}
+                                </span>
+                              )}
+                              {scannedEmployee.checkOutTime && (
+                                <span className="flex items-center gap-1 text-muted-foreground">
+                                  <LogOut className="w-4 h-4" />
+                                  Out: {scannedEmployee.checkOutTime}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Late Warning */}
+                            {scannedEmployee.isLate && scannedEmployee.mode === 'check-in' && (
+                              <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                                <p className="text-sm text-amber-800 dark:text-amber-400">
+                                  <AlertTriangle className="w-4 h-4 inline mr-1" />
+                                  Late arrival - HR has been notified
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                
-                <div className="p-4 text-center bg-card border-t border-border">
-                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <QrCode className="w-4 h-4" />
-                    {scannerState === 'scanning' && "Position QR code in frame"}
-                    {scannerState === 'standby' && `Ready for ${scanMode === 'check-in' ? 'check-in' : 'check-out'}`}
-                    {scannerState === 'result' && "Processing complete"}
-                  </div>
-                  {!isWorkDay && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                      Note: Today is not a regular work day (Mon-Fri)
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                    
+                    <div className="p-4 text-center bg-card border-t border-border">
+                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <QrCode className="w-4 h-4" />
+                        {scannerState === 'scanning' && "Position QR code in frame"}
+                        {scannerState === 'standby' && `Ready for ${scanMode === 'check-in' ? 'check-in' : 'check-out'}`}
+                        {scannerState === 'result' && "Processing complete"}
+                      </div>
+                      {!isWorkDay && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                          Note: Today is not a regular work day (Mon-Fri)
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="face" className="mt-4">
+                <FaceRecognitionScanner
+                  onRecognized={handleFaceRecognized}
+                  isProcessing={faceProcessing}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Stats & Recent Activity */}
