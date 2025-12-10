@@ -11,6 +11,7 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AttendanceEditModal } from '@/components/attendance/AttendanceEditModal';
 import { AttendanceReportModal } from '@/components/attendance/AttendanceReportModal';
+import { EmployeeAttendanceTimeline } from '@/components/attendance/EmployeeAttendanceTimeline';
 
 export function AttendanceView() {
   const { data: allAttendance = [], isLoading, refetch } = useAttendance();
@@ -199,6 +200,9 @@ export function AttendanceView() {
           </div>
         </div>
       </section>
+
+      {/* Employee Attendance Timeline */}
+      <EmployeeAttendanceTimeline />
 
       {/* Today's Attendance - Realtime */}
       <section className="glass-card rounded-3xl border border-border p-4 sm:p-6">
