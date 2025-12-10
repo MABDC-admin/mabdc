@@ -23,7 +23,7 @@ import uaeVisa from '@/assets/uae-visa.png';
 import passportIcon from '@/assets/passport-icon.png';
 import contractIcon from '@/assets/contract-icon.png';
 import photoPlaceholder from '@/assets/photo-placeholder.png';
-import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase, MessageCircle } from 'lucide-react';
+import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase, MessageCircle, Link2, Copy } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -294,6 +294,19 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  className="border-primary/50 text-primary hover:bg-primary/10"
+                  onClick={() => {
+                    const link = `${window.location.origin}/employee/${currentEmployee.id}`;
+                    navigator.clipboard.writeText(link);
+                    toast.success('Portal link copied to clipboard!');
+                  }}
+                >
+                  <Link2 className="w-4 h-4 mr-1" />
+                  Copy Portal Link
+                </Button>
                 <Button 
                   size="sm" 
                   className="bg-accent hover:bg-accent/90 text-accent-foreground"
