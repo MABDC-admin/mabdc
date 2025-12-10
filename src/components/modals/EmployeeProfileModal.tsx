@@ -23,7 +23,7 @@ import uaeVisa from '@/assets/uae-visa.png';
 import passportIcon from '@/assets/passport-icon.png';
 import contractIcon from '@/assets/contract-icon.png';
 import photoPlaceholder from '@/assets/photo-placeholder.png';
-import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase } from 'lucide-react';
+import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase, MessageCircle } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -515,7 +515,18 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Personal Phone</p>
-                          <p className="text-lg font-semibold text-foreground">{emp.personal_phone || 'Not specified'}</p>
+                          <p className="text-lg font-semibold text-foreground flex items-center gap-2">
+                            {emp.personal_phone || 'Not specified'}
+                            {emp.personal_phone && (
+                              <button 
+                                onClick={() => window.open(`https://wa.me/${emp.personal_phone?.replace(/\D/g, '')}`, '_blank')}
+                                className="text-emerald-500 hover:text-emerald-600 transition-colors"
+                                title="Send WhatsApp message"
+                              >
+                                <MessageCircle className="w-5 h-5" />
+                              </button>
+                            )}
+                          </p>
                         </div>
                         <div>
                           <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Dependent Children</p>

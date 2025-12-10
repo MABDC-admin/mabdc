@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { 
   User, Calendar, FileText, Clock, CheckCircle, XCircle, 
   AlertTriangle, Download, Plus, ArrowLeft, Briefcase, Mail,
-  Eye, CreditCard, Home, Car, UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby, Pencil, Save, X, Star, Scale
+  Eye, CreditCard, Home, Car, UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby, Pencil, Save, X, Star, Scale, MessageCircle
 } from 'lucide-react';
 import { ImagePreviewModal } from '@/components/modals/ImagePreviewModal';
 import { useEmployeeDocuments } from '@/hooks/useDocuments';
@@ -1028,9 +1028,20 @@ export default function EmployeePortal() {
                       
                       <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
                         <Phone className="w-5 h-5 text-muted-foreground" />
-                        <div>
+                        <div className="flex-1">
                           <p className="text-xs text-muted-foreground uppercase">Personal Phone</p>
-                          <p className="font-medium">{employee.personal_phone || 'Not specified'}</p>
+                          <p className="font-medium flex items-center gap-2">
+                            {employee.personal_phone || 'Not specified'}
+                            {employee.personal_phone && (
+                              <button 
+                                onClick={() => window.open(`https://wa.me/${employee.personal_phone?.replace(/\D/g, '')}`, '_blank')}
+                                className="text-emerald-500 hover:text-emerald-600 transition-colors"
+                                title="Send WhatsApp message"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                              </button>
+                            )}
+                          </p>
                         </div>
                       </div>
                       
