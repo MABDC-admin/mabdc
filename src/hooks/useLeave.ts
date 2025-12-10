@@ -537,3 +537,26 @@ export function useCheckOverlappingLeave() {
     },
   });
 }
+
+export function useDeleteLeaveBalance() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('leave_balances')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
+      queryClient.invalidateQueries({ queryKey: ['all_leave_balances'] });
+      toast.success('Leave allocation deleted');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete allocation: ${error.message}`);
+    },
+  });
+}
