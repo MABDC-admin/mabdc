@@ -13,8 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
   User, Calendar, FileText, Clock, CheckCircle, XCircle, 
-  AlertTriangle, Download, Plus, ArrowLeft, Briefcase, Mail
+  AlertTriangle, Download, Plus, ArrowLeft, Briefcase, Mail,
+  Eye, CreditCard, Home, Car
 } from 'lucide-react';
+import { ImagePreviewModal } from '@/components/modals/ImagePreviewModal';
+import { useEmployeeDocuments } from '@/hooks/useDocuments';
 import { cn } from '@/lib/utils';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
@@ -28,6 +31,7 @@ export default function EmployeePortal() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
   // Fetch employee data
   useEffect(() => {
@@ -60,6 +64,7 @@ export default function EmployeePortal() {
   const { data: letters = [] } = useEmployeeHRLetters(employeeId || '');
   const { data: leaveTypes = [] } = useLeaveTypes();
   const addLeave = useAddLeave();
+  const { data: documents = [] } = useEmployeeDocuments(employeeId || '');
 
   // Filter data for this employee
   const attendance = allAttendance.filter(a => a.employee_id === employeeId);
@@ -446,55 +451,186 @@ export default function EmployeePortal() {
 
         {/* Contract Tab */}
         {activeTab === 'contract' && (
-          <div className="animate-fade-in">
+          <div className="animate-fade-in space-y-6">
             {employeeContract ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Contract Details</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">Contract Type</p>
-                        <p className="text-lg font-semibold">{employeeContract.contract_type}</p>
+              <>
+                {/* Contract Details */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Contract Details</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">Contract Type</p>
+                          <p className="text-lg font-semibold">{employeeContract.contract_type}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">MOHRE Contract No.</p>
+                          <p className="text-lg font-semibold">{employeeContract.mohre_contract_no}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">Start Date</p>
+                          <p className="text-lg font-semibold">{format(parseISO(employeeContract.start_date), 'dd MMM yyyy')}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">End Date</p>
+                          <p className="text-lg font-semibold">
+                            {employeeContract.end_date ? format(parseISO(employeeContract.end_date), 'dd MMM yyyy') : 'N/A'}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">MOHRE Contract No.</p>
-                        <p className="text-lg font-semibold">{employeeContract.mohre_contract_no}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">Start Date</p>
-                        <p className="text-lg font-semibold">{format(parseISO(employeeContract.start_date), 'dd MMM yyyy')}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">End Date</p>
-                        <p className="text-lg font-semibold">
-                          {employeeContract.end_date ? format(parseISO(employeeContract.end_date), 'dd MMM yyyy') : 'N/A'}
-                        </p>
+                      <div className="space-y-4">
+                        <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                          <p className="text-xs text-muted-foreground uppercase">Total Salary</p>
+                          <p className="text-2xl font-bold text-primary">
+                            AED {employeeContract.total_salary?.toLocaleString() || 
+                              ((employeeContract.basic_salary || 0) + 
+                               (employeeContract.housing_allowance || 0) + 
+                               (employeeContract.transportation_allowance || 0)).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="p-2 rounded bg-secondary/50 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase">Basic</p>
+                            <p className="text-sm font-semibold">AED {employeeContract.basic_salary?.toLocaleString()}</p>
+                          </div>
+                          <div className="p-2 rounded bg-secondary/50 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase flex items-center justify-center gap-1"><Home className="w-3 h-3" /> Housing</p>
+                            <p className="text-sm font-semibold">AED {(employeeContract.housing_allowance || 0).toLocaleString()}</p>
+                          </div>
+                          <div className="p-2 rounded bg-secondary/50 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase flex items-center justify-center gap-1"><Car className="w-3 h-3" /> Transport</p>
+                            <p className="text-sm font-semibold">AED {(employeeContract.transportation_allowance || 0).toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-muted-foreground uppercase">Working Hours</p>
+                            <p className="text-lg font-semibold">{employeeContract.working_hours || 48} hrs/week</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground uppercase">Annual Leave</p>
+                            <p className="text-lg font-semibold">{employeeContract.annual_leave_days || 30} days</p>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">Basic Salary</p>
-                        <p className="text-lg font-semibold text-primary">AED {employeeContract.basic_salary?.toLocaleString()}</p>
+                  </CardContent>
+                </Card>
+
+                {/* Contract Documents */}
+                {(employeeContract.page1_url || employeeContract.page2_url) && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="w-5 h-5" />
+                        Contract Documents
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-4">
+                        {employeeContract.page1_url && (
+                          <div 
+                            className="relative group cursor-pointer rounded-lg overflow-hidden border border-border hover:border-primary transition-colors"
+                            onClick={() => setPreviewImage({ url: employeeContract.page1_url!, title: 'Contract - Page 1' })}
+                          >
+                            <img 
+                              src={employeeContract.page1_url} 
+                              alt="Contract Page 1" 
+                              className="w-full h-40 object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              <Eye className="w-8 h-8 text-white" />
+                            </div>
+                            <p className="text-center py-2 text-sm font-medium bg-secondary/50">Page 1</p>
+                          </div>
+                        )}
+                        {employeeContract.page2_url && (
+                          <div 
+                            className="relative group cursor-pointer rounded-lg overflow-hidden border border-border hover:border-primary transition-colors"
+                            onClick={() => setPreviewImage({ url: employeeContract.page2_url!, title: 'Contract - Page 2' })}
+                          >
+                            <img 
+                              src={employeeContract.page2_url} 
+                              alt="Contract Page 2" 
+                              className="w-full h-40 object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              <Eye className="w-8 h-8 text-white" />
+                            </div>
+                            <p className="text-center py-2 text-sm font-medium bg-secondary/50">Page 2</p>
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">Working Hours</p>
-                        <p className="text-lg font-semibold">{employeeContract.working_hours || 48} hrs/week</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">Annual Leave</p>
-                        <p className="text-lg font-semibold">{employeeContract.annual_leave_days || 30} days</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">Notice Period</p>
-                        <p className="text-lg font-semibold">{employeeContract.notice_period || 30} days</p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Employee Documents */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="w-5 h-5" />
+                      Identity Documents
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const docCategories = ['Passport', 'Emirates ID', 'Visa', 'Work Permit'];
+                      const categoryDocs = docCategories.map(cat => ({
+                        category: cat,
+                        doc: documents.find(d => d.category === cat)
+                      }));
+                      
+                      const hasAnyDoc = categoryDocs.some(cd => cd.doc);
+                      
+                      if (!hasAnyDoc) {
+                        return (
+                          <p className="text-center text-muted-foreground py-6">No identity documents uploaded yet</p>
+                        );
+                      }
+                      
+                      return (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {categoryDocs.map(({ category, doc }) => (
+                            doc ? (
+                              <div 
+                                key={category}
+                                className="relative group cursor-pointer rounded-lg overflow-hidden border border-border hover:border-primary transition-colors"
+                                onClick={() => setPreviewImage({ url: doc.file_url, title: category })}
+                              >
+                                {doc.file_type?.startsWith('image/') || doc.file_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                                  <img 
+                                    src={doc.file_url} 
+                                    alt={category} 
+                                    className="w-full h-28 object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-28 bg-secondary/50 flex items-center justify-center">
+                                    <FileText className="w-12 h-12 text-muted-foreground" />
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                  <Eye className="w-6 h-6 text-white" />
+                                </div>
+                                <p className="text-center py-2 text-xs font-medium bg-secondary/50">{category}</p>
+                              </div>
+                            ) : (
+                              <div key={category} className="rounded-lg border border-dashed border-border p-4 text-center opacity-50">
+                                <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                                <p className="text-xs text-muted-foreground">{category}</p>
+                                <p className="text-[10px] text-muted-foreground">Not uploaded</p>
+                              </div>
+                            )
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+              </>
             ) : (
               <Card>
                 <CardContent className="py-12 text-center">
@@ -549,6 +685,14 @@ export default function EmployeePortal() {
           </div>
         )}
       </main>
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        isOpen={!!previewImage}
+        onClose={() => setPreviewImage(null)}
+        imageUrl={previewImage?.url || ''}
+        title={previewImage?.title}
+      />
     </div>
   );
 }

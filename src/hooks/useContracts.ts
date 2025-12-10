@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-interface Contract {
+export interface Contract {
   id: string;
   employee_id: string;
   mohre_contract_no: string;
@@ -20,6 +20,8 @@ interface Contract {
   notice_period: number;
   annual_leave_days: number;
   probation_period: number;
+  page1_url?: string;
+  page2_url?: string;
   created_at?: string;
   employees?: {
     full_name: string;
