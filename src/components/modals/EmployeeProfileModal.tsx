@@ -1,11 +1,13 @@
 import { useState, useRef } from 'react';
 import { useHRStore } from '@/store/hrStore';
-import { useDeleteEmployee, useEmployees } from '@/hooks/useEmployees';
+import { useDeleteEmployee, useEmployees, useUpdateEmployee } from '@/hooks/useEmployees';
 import { useEmployeeDocuments, useUploadDocument, useDeleteDocument, useUploadEmployeePhoto } from '@/hooks/useDocuments';
-import { useLeave, useDeleteLeave, useUpdateLeave } from '@/hooks/useLeave';
+import { useLeave, useDeleteLeave } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
+import { useEmployeeEducation, useAddEducation, useDeleteEducation } from '@/hooks/useEducation';
 import { EditEmployeeModal } from './EditEmployeeModal';
 import { LeaveRequestModal } from './LeaveRequestModal';
+import { ImagePreviewModal } from './ImagePreviewModal';
 import {
   Dialog,
   DialogContent,
@@ -13,13 +15,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import emiratesIdCard from '@/assets/emirates-id-card.png';
 import uaeVisa from '@/assets/uae-visa.png';
 import passportIcon from '@/assets/passport-icon.png';
 import contractIcon from '@/assets/contract-icon.png';
 import photoPlaceholder from '@/assets/photo-placeholder.png';
-import { Pencil, Trash2, FileText, Upload, Download, X, Camera, Calendar, Bell, AlertTriangle } from 'lucide-react';
+import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -28,17 +32,24 @@ interface EmployeeProfileModalProps {
   onClose: () => void;
 }
 
-type TabType = 'summary' | 'contract' | 'visa' | 'leave' | 'documents' | 'eos';
+type TabType = 'summary' | 'private' | 'education' | 'contract' | 'visa' | 'leave' | 'documents' | 'eos';
 
 export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalProps) {
   const { currentEmployee, setCurrentEmployee } = useHRStore();
   const { refetch: refetchEmployees } = useEmployees();
   const deleteEmployee = useDeleteEmployee();
+  const updateEmployee = useUpdateEmployee();
   const [activeTab, setActiveTab] = useState<TabType>('summary');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isLeaveOpen, setIsLeaveOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  
+  // Image preview state
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+
+  // Education state
+  const [newEducation, setNewEducation] = useState({ certificate_level: '', field_of_study: '', school: '', graduation_year: '' });
 
   // Hooks for documents
   const { data: documents = [], refetch: refetchDocs } = useEmployeeDocuments(currentEmployee?.id || '');
@@ -47,14 +58,18 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
   const uploadPhoto = useUploadEmployeePhoto();
 
   // Hooks for leave records
-  const { data: leaveRecords = [], refetch: refetchLeave } = useLeave();
+  const { data: leaveRecords = [] } = useLeave();
   const deleteLeave = useDeleteLeave();
-  const [editingLeave, setEditingLeave] = useState<string | null>(null);
   const employeeLeaveRecords = leaveRecords.filter(r => r.employee_id === currentEmployee?.id);
 
   // Hooks for contracts
   const { data: contracts = [] } = useContracts();
   const employeeContract = contracts.find(c => c.employee_id === currentEmployee?.id && c.status === 'Active');
+
+  // Hooks for education
+  const { data: education = [], refetch: refetchEducation } = useEmployeeEducation(currentEmployee?.id || '');
+  const addEducation = useAddEducation();
+  const deleteEducation = useDeleteEducation();
 
   if (!currentEmployee) return null;
 
@@ -114,8 +129,26 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
     }
   };
 
+  const handleAddEducation = async () => {
+    if (!newEducation.certificate_level) {
+      toast.error('Certificate level is required');
+      return;
+    }
+    await addEducation.mutateAsync({
+      employee_id: currentEmployee.id,
+      certificate_level: newEducation.certificate_level,
+      field_of_study: newEducation.field_of_study || undefined,
+      school: newEducation.school || undefined,
+      graduation_year: newEducation.graduation_year ? parseInt(newEducation.graduation_year) : undefined,
+    });
+    setNewEducation({ certificate_level: '', field_of_study: '', school: '', graduation_year: '' });
+    refetchEducation();
+  };
+
   const tabs: { id: TabType; label: string }[] = [
     { id: 'summary', label: 'Summary' },
+    { id: 'private', label: '👤 Private' },
+    { id: 'education', label: '🎓 Education' },
     { id: 'contract', label: 'Contract' },
     { id: 'visa', label: 'Visa & ID' },
     { id: 'leave', label: 'Leave' },
@@ -155,13 +188,18 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
     return null;
   };
 
-  const getFileIcon = (fileType: string) => {
-    if (fileType.includes('pdf')) return '📄';
-    if (fileType.includes('image')) return '🖼️';
-    if (fileType.includes('word') || fileType.includes('doc')) return '📝';
-    if (fileType.includes('excel') || fileType.includes('sheet')) return '📊';
-    return '📁';
+  const handleDocumentClick = (doc: any, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (doc?.file_url && doc.file_url.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+      setPreviewImage({ url: doc.file_url, title: doc.category || 'Document' });
+    } else if (doc?.file_url) {
+      window.open(doc.file_url, '_blank');
+    }
   };
+
+  // Get employee with extended fields
+  const emp = currentEmployee as any;
 
   return (
     <>
@@ -280,24 +318,6 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                           <span className="text-sm text-foreground">Visa: {getExpiryWarning(currentEmployee.visa_expiration)?.text}</span>
                         </div>
                       )}
-                      {getExpiryWarning(currentEmployee.emirates_id_expiry) && (
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle className={cn("w-4 h-4", 
-                            getExpiryWarning(currentEmployee.emirates_id_expiry)?.type === 'expired' ? 'text-destructive' :
-                            getExpiryWarning(currentEmployee.emirates_id_expiry)?.type === 'urgent' ? 'text-amber-400' : 'text-yellow-400'
-                          )} />
-                          <span className="text-sm text-foreground">Emirates ID: {getExpiryWarning(currentEmployee.emirates_id_expiry)?.text}</span>
-                        </div>
-                      )}
-                      {getExpiryWarning(currentEmployee.passport_expiry) && (
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle className={cn("w-4 h-4", 
-                            getExpiryWarning(currentEmployee.passport_expiry)?.type === 'expired' ? 'text-destructive' :
-                            getExpiryWarning(currentEmployee.passport_expiry)?.type === 'urgent' ? 'text-amber-400' : 'text-yellow-400'
-                          )} />
-                          <span className="text-sm text-foreground">Passport: {getExpiryWarning(currentEmployee.passport_expiry)?.text}</span>
-                        </div>
-                      )}
                       {!getExpiryWarning(currentEmployee.visa_expiration) && 
                        !getExpiryWarning(currentEmployee.emirates_id_expiry) && 
                        !getExpiryWarning(currentEmployee.passport_expiry) && (
@@ -339,72 +359,182 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Housing Allowance</p>
-                        <p className="text-xl font-bold text-primary">
-                          AED {((employeeContract as any)?.housing_allowance || 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Transportation Allowance</p>
-                        <p className="text-xl font-bold text-primary">
-                          AED {((employeeContract as any)?.transportation_allowance || 0).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">General Allowance</p>
-                        <p className="text-xl font-bold text-primary">
-                          AED {(currentEmployee.allowance || 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
                         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Total Salary</p>
                         <p className="text-xl font-bold text-accent">
                           AED {(employeeContract?.total_salary || (currentEmployee.basic_salary || 0) + (currentEmployee.allowance || 0)).toLocaleString()}
                         </p>
                       </div>
+                    </div>
+                    <div className="space-y-4">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Contract Type</p>
-                        <p className="text-lg font-semibold text-foreground">{employeeContract?.contract_type || currentEmployee.contract_type || 'Unlimited'}</p>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Leave Balance</p>
+                        <p className="text-lg font-semibold text-foreground">{currentEmployee.leave_balance || 0} days</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Est. Gratuity</p>
+                        <p className="text-lg font-semibold text-primary">AED {estimateGratuity().toLocaleString()}</p>
                       </div>
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
 
+            {/* Private Information Tab */}
+            {activeTab === 'private' && (
+              <div className="space-y-6 animate-fade-in">
                 <div className="glass-card rounded-2xl border border-border p-5">
-                  <h3 className="text-lg font-semibold text-foreground mb-4">BANK DETAILS (WPS)</h3>
+                  <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <User className="w-5 h-5 text-primary" />
+                    PRIVATE INFORMATION
+                  </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Bank Name</p>
-                      <p className="text-lg font-semibold text-foreground">{(currentEmployee as any).bank_name || 'Not set'}</p>
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Gender</p>
+                        <p className="text-lg font-semibold text-foreground">{emp.gender || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Birthday</p>
+                        <p className="text-lg font-semibold text-foreground">
+                          {emp.birthday ? format(parseISO(emp.birthday), 'dd MMM yyyy') : 'Not specified'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Family Status</p>
+                        <p className="text-lg font-semibold text-foreground">{emp.family_status || 'Not specified'}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">IBAN</p>
-                      <p className="text-lg font-semibold text-foreground font-mono">{(currentEmployee as any).iban || 'Not set'}</p>
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Personal Email</p>
+                        <p className="text-lg font-semibold text-foreground">{emp.personal_email || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Personal Phone</p>
+                        <p className="text-lg font-semibold text-foreground">{emp.personal_phone || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Dependent Children</p>
+                        <p className="text-lg font-semibold text-foreground">{emp.number_of_children ?? 0}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Account Number</p>
-                      <p className="text-lg font-semibold text-foreground font-mono">{(currentEmployee as any).bank_account_no || 'Not set'}</p>
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Place of Birth</p>
+                        <p className="text-lg font-semibold text-foreground">{emp.place_of_birth || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Country of Birth</p>
+                        <p className="text-lg font-semibold text-foreground">{emp.country_of_birth || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Home Address</p>
+                        <p className="text-sm font-semibold text-foreground">{emp.home_address || 'Not specified'}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
 
+            {/* Education Tab */}
+            {activeTab === 'education' && (
+              <div className="space-y-6 animate-fade-in">
                 <div className="glass-card rounded-2xl border border-border p-5">
-                  <h3 className="text-lg font-semibold text-foreground mb-4">CURRENT LEAVE</h3>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Annual leave balance</p>
-                      <p className="text-3xl font-bold text-foreground">{currentEmployee.leave_balance || 0} days</p>
+                  <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5 text-primary" />
+                    EDUCATION HISTORY
+                  </h3>
+                  
+                  {/* Add Education Form */}
+                  <div className="p-4 rounded-xl bg-secondary/30 border border-border mb-6">
+                    <p className="text-sm font-medium text-foreground mb-3">Add Education Record</p>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <div>
+                        <Label className="text-xs">Certificate Level *</Label>
+                        <select
+                          value={newEducation.certificate_level}
+                          onChange={(e) => setNewEducation({ ...newEducation, certificate_level: e.target.value })}
+                          className="w-full p-2 rounded-lg bg-secondary/50 border border-border text-foreground text-sm"
+                        >
+                          <option value="">Select...</option>
+                          <option value="High School">High School</option>
+                          <option value="Diploma">Diploma</option>
+                          <option value="Bachelor's Degree">Bachelor's Degree</option>
+                          <option value="Master's Degree">Master's Degree</option>
+                          <option value="PhD">PhD</option>
+                          <option value="Professional Certificate">Professional Certificate</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Field of Study</Label>
+                        <Input
+                          value={newEducation.field_of_study}
+                          onChange={(e) => setNewEducation({ ...newEducation, field_of_study: e.target.value })}
+                          placeholder="e.g., Computer Science"
+                          className="bg-secondary/50 border-border"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">School/University</Label>
+                        <Input
+                          value={newEducation.school}
+                          onChange={(e) => setNewEducation({ ...newEducation, school: e.target.value })}
+                          placeholder="e.g., University of..."
+                          className="bg-secondary/50 border-border"
+                        />
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1">
+                          <Label className="text-xs">Year</Label>
+                          <Input
+                            type="number"
+                            value={newEducation.graduation_year}
+                            onChange={(e) => setNewEducation({ ...newEducation, graduation_year: e.target.value })}
+                            placeholder="2020"
+                            className="bg-secondary/50 border-border"
+                          />
+                        </div>
+                        <Button onClick={handleAddEducation} size="icon" className="bg-primary hover:bg-primary/90">
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <Button 
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full"
-                      onClick={() => setIsLeaveOpen(true)}
-                    >
-                      <Calendar className="w-4 h-4 mr-1" />
-                      Book leave
-                    </Button>
                   </div>
+
+                  {/* Education List */}
+                  {education.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">No education records found</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {education.map((edu) => (
+                        <div key={edu.id} className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 border border-border group">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <GraduationCap className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-foreground">{edu.certificate_level}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {edu.field_of_study && `${edu.field_of_study} • `}
+                                {edu.school}
+                                {edu.graduation_year && ` (${edu.graduation_year})`}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteEducation.mutate({ id: edu.id, employeeId: currentEmployee.id })}
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -413,53 +543,41 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
             {activeTab === 'contract' && (
               <div className="space-y-6 animate-fade-in">
                 <div className="glass-card rounded-2xl border border-border p-5">
-                  <h3 className="text-lg font-semibold text-foreground mb-4">LABOUR CONTRACT DETAILS</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Contract type</p>
-                        <p className="text-lg font-semibold text-foreground">{employeeContract?.contract_type || currentEmployee.contract_type || 'Unlimited'} (UAE)</p>
+                  <h3 className="text-lg font-semibold text-foreground mb-4">CONTRACT DETAILS</h3>
+                  {employeeContract ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">MOHRE Contract No</p>
+                          <p className="text-lg font-semibold text-foreground">{employeeContract.mohre_contract_no}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Contract Type</p>
+                          <p className="text-lg font-semibold text-foreground">{employeeContract.contract_type}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Start Date</p>
+                          <p className="text-lg font-semibold text-foreground">{format(parseISO(employeeContract.start_date), 'dd MMM yyyy')}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Start date</p>
-                        <p className="text-lg font-semibold text-foreground">
-                          {employeeContract?.start_date 
-                            ? format(parseISO(employeeContract.start_date), 'dd/MM/yyyy')
-                            : new Date(currentEmployee.joining_date).toLocaleDateString('en-GB')}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">End date</p>
-                        <p className="text-lg font-semibold text-foreground">
-                          {employeeContract?.end_date 
-                            ? format(parseISO(employeeContract.end_date), 'dd/MM/yyyy')
-                            : 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Weekly hours</p>
-                        <p className="text-lg font-semibold text-foreground">{employeeContract?.working_hours || 48} hours</p>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">MOHRE contract no.</p>
-                        <p className="text-lg font-semibold text-foreground">{employeeContract?.mohre_contract_no || `CNTR-${currentEmployee.hrms_no}`}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Basic Salary</p>
-                        <p className="text-lg font-semibold text-primary">AED {(employeeContract?.basic_salary || currentEmployee.basic_salary || 0).toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Notice period</p>
-                        <p className="text-lg font-semibold text-foreground">{employeeContract?.notice_period || 30} days</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Annual Leave</p>
-                        <p className="text-lg font-semibold text-foreground">{employeeContract?.annual_leave_days || 30} days</p>
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Basic Salary</p>
+                          <p className="text-lg font-semibold text-primary">AED {employeeContract.basic_salary.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Total Salary</p>
+                          <p className="text-lg font-semibold text-accent">AED {(employeeContract.total_salary || 0).toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Work Location</p>
+                          <p className="text-lg font-semibold text-foreground">{employeeContract.work_location || 'N/A'}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <p className="text-muted-foreground text-center py-8">No active contract found</p>
+                  )}
                 </div>
               </div>
             )}
@@ -468,92 +586,44 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
             {activeTab === 'visa' && (
               <div className="space-y-6 animate-fade-in">
                 <div className="glass-card rounded-2xl border border-border p-5">
-                  <h3 className="text-lg font-semibold text-foreground mb-4">VISA & EMIRATES ID</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <h3 className="text-lg font-semibold text-foreground mb-4">VISA & IDENTIFICATION</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Visa number</p>
-                        <p className="text-lg font-semibold text-foreground">{currentEmployee.visa_no || 'Not set'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Visa expiry</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-lg font-semibold text-primary">
-                            {currentEmployee.visa_expiration 
-                              ? new Date(currentEmployee.visa_expiration).toLocaleDateString('en-GB')
-                              : 'Not set'}
-                          </p>
-                          {getExpiryWarning(currentEmployee.visa_expiration) && (
-                            <span className={cn(
-                              "px-2 py-0.5 rounded-full text-xs",
-                              getExpiryWarning(currentEmployee.visa_expiration)?.type === 'expired' ? 'bg-destructive/20 text-destructive' :
-                              getExpiryWarning(currentEmployee.visa_expiration)?.type === 'urgent' ? 'bg-amber-500/20 text-amber-400' : 'bg-yellow-500/20 text-yellow-400'
-                            )}>
-                              {getExpiryWarning(currentEmployee.visa_expiration)?.text}
-                            </span>
-                          )}
-                        </div>
-                      </div>
                       <div>
                         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Emirates ID</p>
-                        <p className="text-lg font-semibold text-foreground">{currentEmployee.emirates_id || 'Not set'}</p>
+                        <p className="text-lg font-semibold text-foreground">{currentEmployee.emirates_id || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Expiry</p>
+                        <p className="text-lg font-semibold text-foreground">
+                          {currentEmployee.emirates_id_expiry ? format(parseISO(currentEmployee.emirates_id_expiry), 'dd MMM yyyy') : 'N/A'}
+                        </p>
                       </div>
                     </div>
                     <div className="space-y-4">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">EID expiry</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-lg font-semibold text-primary">
-                            {currentEmployee.emirates_id_expiry 
-                              ? new Date(currentEmployee.emirates_id_expiry).toLocaleDateString('en-GB')
-                              : 'Not set'}
-                          </p>
-                          {getExpiryWarning(currentEmployee.emirates_id_expiry) && (
-                            <span className={cn(
-                              "px-2 py-0.5 rounded-full text-xs",
-                              getExpiryWarning(currentEmployee.emirates_id_expiry)?.type === 'expired' ? 'bg-destructive/20 text-destructive' :
-                              getExpiryWarning(currentEmployee.emirates_id_expiry)?.type === 'urgent' ? 'bg-amber-500/20 text-amber-400' : 'bg-yellow-500/20 text-yellow-400'
-                            )}>
-                              {getExpiryWarning(currentEmployee.emirates_id_expiry)?.text}
-                            </span>
-                          )}
-                        </div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Passport No</p>
+                        <p className="text-lg font-semibold text-foreground">{currentEmployee.passport_no || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Passport no.</p>
-                        <p className="text-lg font-semibold text-foreground">{currentEmployee.passport_no || 'Not set'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Passport expiry</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-lg font-semibold text-primary">
-                            {currentEmployee.passport_expiry 
-                              ? new Date(currentEmployee.passport_expiry).toLocaleDateString('en-GB')
-                              : 'Not set'}
-                          </p>
-                          {getExpiryWarning(currentEmployee.passport_expiry) && (
-                            <span className={cn(
-                              "px-2 py-0.5 rounded-full text-xs",
-                              getExpiryWarning(currentEmployee.passport_expiry)?.type === 'expired' ? 'bg-destructive/20 text-destructive' :
-                              getExpiryWarning(currentEmployee.passport_expiry)?.type === 'urgent' ? 'bg-amber-500/20 text-amber-400' : 'bg-yellow-500/20 text-yellow-400'
-                            )}>
-                              {getExpiryWarning(currentEmployee.passport_expiry)?.text}
-                            </span>
-                          )}
-                        </div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Expiry</p>
+                        <p className="text-lg font-semibold text-foreground">
+                          {currentEmployee.passport_expiry ? format(parseISO(currentEmployee.passport_expiry), 'dd MMM yyyy') : 'N/A'}
+                        </p>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex gap-2 mt-6">
-                    <Button 
-                      className="bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-full"
-                      onClick={() => {
-                        setActiveTab('documents');
-                      }}
-                    >
-                      <Upload className="w-4 h-4 mr-1" />
-                      Upload visa copy
-                    </Button>
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Visa No</p>
+                        <p className="text-lg font-semibold text-foreground">{currentEmployee.visa_no || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Expiry</p>
+                        <p className="text-lg font-semibold text-foreground">
+                          {currentEmployee.visa_expiration ? format(parseISO(currentEmployee.visa_expiration), 'dd MMM yyyy') : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -564,76 +634,42 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
               <div className="space-y-6 animate-fade-in">
                 <div className="glass-card rounded-2xl border border-border p-5">
                   <h3 className="text-lg font-semibold text-foreground mb-4">LEAVE HISTORY</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Annual entitlement</p>
-                        <p className="text-lg font-semibold text-foreground">30 days / year</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Current balance</p>
-                        <p className="text-lg font-semibold text-foreground">{currentEmployee.leave_balance || 0} days</p>
-                      </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Annual entitlement</p>
+                      <p className="text-lg font-semibold text-foreground">30 days / year</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Current balance</p>
+                      <p className="text-lg font-semibold text-foreground">{currentEmployee.leave_balance || 0} days</p>
                     </div>
                   </div>
-
-                  <div className="mt-6">
-                    <h4 className="text-sm font-semibold text-foreground mb-3">Recent leave requests</h4>
-                    {employeeLeaveRecords.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No leave records found</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {employeeLeaveRecords.slice(0, 5).map((record) => (
-                          <div key={record.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 group">
-                            <span className="text-sm text-foreground">
-                              {record.leave_type} – {record.days_count} day(s)
-                              <span className="text-xs text-muted-foreground ml-2">
-                                ({format(parseISO(record.start_date), 'dd MMM')} - {format(parseISO(record.end_date), 'dd MMM yyyy')})
-                              </span>
+                  
+                  {employeeLeaveRecords.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No leave records found</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {employeeLeaveRecords.slice(0, 5).map((record) => (
+                        <div key={record.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 group">
+                          <span className="text-sm text-foreground">
+                            {record.leave_type} – {record.days_count} day(s)
+                            <span className="text-xs text-muted-foreground ml-2">
+                              ({format(parseISO(record.start_date), 'dd MMM')} - {format(parseISO(record.end_date), 'dd MMM yyyy')})
                             </span>
-                            <div className="flex items-center gap-2">
-                              <span className={cn(
-                                "px-2 py-1 rounded-full text-xs font-medium",
-                                record.status === 'Approved' && "bg-primary/20 text-primary",
-                                record.status === 'Pending' && "bg-amber-500/20 text-amber-400",
-                                record.status === 'Rejected' && "bg-destructive/20 text-destructive"
-                              )}>
-                                {record.status}
-                              </span>
-                              {record.status === 'Pending' && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={() => {
-                                      setEditingLeave(record.id);
-                                      setIsLeaveOpen(true);
-                                    }}
-                                  >
-                                    <Pencil className="w-3.5 h-3.5" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={() => {
-                                      if (confirm('Are you sure you want to delete this leave request?')) {
-                                        deleteLeave.mutate(record.id);
-                                      }
-                                    }}
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
+                          </span>
+                          <span className={cn(
+                            "px-2 py-1 rounded-full text-xs font-medium",
+                            record.status === 'Approved' && "bg-primary/20 text-primary",
+                            record.status === 'Pending' && "bg-amber-500/20 text-amber-400",
+                            record.status === 'Rejected' && "bg-destructive/20 text-destructive"
+                          )}>
+                            {record.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
                   <Button 
                     className="mt-6 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full"
                     onClick={() => setIsLeaveOpen(true)}
@@ -650,50 +686,31 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                 <div className="glass-card rounded-2xl border border-border p-5">
                   <h3 className="text-lg font-semibold text-foreground mb-6 text-center">EMPLOYEE DOCUMENTS</h3>
                   
-                  {/* Document Cards Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-                    {/* Photo Card - Auto updates avatar */}
+                  {/* Document Cards Grid - with Work Permit */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                    {/* Photo Card */}
                     <div className="relative group">
-                      <input
-                        type="file"
-                        id="photo-upload-doc"
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            await uploadPhoto.mutateAsync({ file, employeeId: currentEmployee.id });
-                            refetchEmployees();
-                          }
-                        }}
-                        className="hidden"
-                      />
+                      <input type="file" id="photo-upload-doc" accept="image/*" onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          await uploadPhoto.mutateAsync({ file, employeeId: currentEmployee.id });
+                          refetchEmployees();
+                        }
+                      }} className="hidden" />
                       <label htmlFor="photo-upload-doc" className="block cursor-pointer">
-                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-pink-500/5 to-purple-500/5 hover:border-pink-500/50 transition-all duration-300 hover:shadow-lg">
+                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-pink-500/5 to-purple-500/5 hover:border-pink-500/50 transition-all duration-300">
                           <div className="flex flex-col items-center">
                             {currentEmployee.photo_url ? (
                               <>
-                                <div className="relative mb-2">
-                                  <img 
-                                    src={currentEmployee.photo_url} 
-                                    alt="Employee Photo" 
-                                    className="w-20 h-20 rounded-full object-cover shadow-md animate-float"
-                                  />
-                                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-pink-500 flex items-center justify-center">
-                                    <Camera className="w-2.5 h-2.5 text-white" />
-                                  </div>
-                                </div>
+                                <img src={currentEmployee.photo_url} alt="Photo" className="w-16 h-16 rounded-full object-cover mb-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPreviewImage({ url: currentEmployee.photo_url!, title: 'Employee Photo' }); }} />
                                 <p className="text-xs font-medium text-foreground">Photo</p>
-                                <p className="text-[10px] text-pink-500">Click to change</p>
+                                <Button size="sm" variant="ghost" className="text-[10px] h-6 px-2 mt-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('photo-upload-doc')?.click(); }}>Change</Button>
                               </>
                             ) : (
                               <>
-                                <img 
-                                  src={photoPlaceholder} 
-                                  alt="Photo placeholder" 
-                                  className="w-20 h-auto mb-2 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
-                                />
+                                <img src={photoPlaceholder} alt="Photo" className="w-16 h-auto mb-2 opacity-60" />
                                 <p className="text-xs font-medium text-foreground">Photo</p>
-                                <p className="text-[10px] text-muted-foreground">Click to upload</p>
+                                <p className="text-[10px] text-muted-foreground">Upload</p>
                               </>
                             )}
                           </div>
@@ -701,44 +718,26 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                       </label>
                     </div>
 
-                    {/* Emirates ID Card */}
+                    {/* Emirates ID */}
                     <div className="relative group">
-                      <input
-                        type="file"
-                        id="eid-upload"
-                        accept="image/*,.pdf"
-                        onChange={(e) => handleFileUpload(e, 'Emirates ID')}
-                        className="hidden"
-                      />
+                      <input type="file" id="eid-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Emirates ID')} className="hidden" />
                       <label htmlFor="eid-upload" className="block cursor-pointer">
-                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-primary/5 to-accent/5 hover:border-primary/50 transition-all duration-300 hover:shadow-lg">
+                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-primary/5 to-accent/5 hover:border-primary/50 transition-all">
                           <div className="flex flex-col items-center">
                             {documents.find(d => d.category === 'Emirates ID') ? (
                               <>
-                                <div className="relative mb-2">
-                                  <img 
-                                    src={documents.find(d => d.category === 'Emirates ID')?.file_url || emiratesIdCard} 
-                                    alt="Emirates ID" 
-                                    className="w-20 h-auto rounded-lg shadow-md animate-float"
-                                    style={{ animationDelay: '0.2s' }}
-                                  />
-                                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                                    <Pencil className="w-2.5 h-2.5 text-primary-foreground" />
-                                  </div>
-                                </div>
+                                <img src={documents.find(d => d.category === 'Emirates ID')?.file_url || emiratesIdCard} alt="EID" className="w-16 h-auto rounded-lg mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Emirates ID'), e)} />
                                 <p className="text-xs font-medium text-foreground">Emirates ID</p>
-                                <p className="text-[10px] text-primary">Click to change</p>
+                                <div className="flex gap-1 mt-1">
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-6 px-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Emirates ID'), e)}><Eye className="w-3 h-3" /></Button>
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-6 px-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('eid-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                </div>
                               </>
                             ) : (
                               <>
-                                <img 
-                                  src={emiratesIdCard} 
-                                  alt="Emirates ID placeholder" 
-                                  className="w-20 h-auto mb-2 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
-                                  style={{ animationDelay: '0.2s' }}
-                                />
+                                <img src={emiratesIdCard} alt="EID" className="w-16 h-auto mb-2 opacity-60" />
                                 <p className="text-xs font-medium text-foreground">Emirates ID</p>
-                                <p className="text-[10px] text-muted-foreground">Click to upload</p>
+                                <p className="text-[10px] text-muted-foreground">Upload</p>
                               </>
                             )}
                           </div>
@@ -746,44 +745,26 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                       </label>
                     </div>
 
-                    {/* Visa Card */}
+                    {/* Visa */}
                     <div className="relative group">
-                      <input
-                        type="file"
-                        id="visa-upload"
-                        accept="image/*,.pdf"
-                        onChange={(e) => handleFileUpload(e, 'Visa')}
-                        className="hidden"
-                      />
+                      <input type="file" id="visa-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Visa')} className="hidden" />
                       <label htmlFor="visa-upload" className="block cursor-pointer">
-                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-accent/5 to-primary/5 hover:border-accent/50 transition-all duration-300 hover:shadow-lg">
+                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-accent/5 to-primary/5 hover:border-accent/50 transition-all">
                           <div className="flex flex-col items-center">
                             {documents.find(d => d.category === 'Visa') ? (
                               <>
-                                <div className="relative mb-2">
-                                  <img 
-                                    src={documents.find(d => d.category === 'Visa')?.file_url || uaeVisa} 
-                                    alt="UAE Visa" 
-                                    className="w-20 h-auto rounded-lg shadow-md animate-float"
-                                    style={{ animationDelay: '0.4s' }}
-                                  />
-                                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent flex items-center justify-center">
-                                    <Pencil className="w-2.5 h-2.5 text-accent-foreground" />
-                                  </div>
-                                </div>
+                                <img src={documents.find(d => d.category === 'Visa')?.file_url || uaeVisa} alt="Visa" className="w-16 h-auto rounded-lg mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Visa'), e)} />
                                 <p className="text-xs font-medium text-foreground">Visa</p>
-                                <p className="text-[10px] text-accent">Click to change</p>
+                                <div className="flex gap-1 mt-1">
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-6 px-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Visa'), e)}><Eye className="w-3 h-3" /></Button>
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-6 px-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('visa-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                </div>
                               </>
                             ) : (
                               <>
-                                <img 
-                                  src={uaeVisa} 
-                                  alt="UAE Visa placeholder" 
-                                  className="w-20 h-auto mb-2 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
-                                  style={{ animationDelay: '0.4s' }}
-                                />
+                                <img src={uaeVisa} alt="Visa" className="w-16 h-auto mb-2 opacity-60" />
                                 <p className="text-xs font-medium text-foreground">Visa</p>
-                                <p className="text-[10px] text-muted-foreground">Click to upload</p>
+                                <p className="text-[10px] text-muted-foreground">Upload</p>
                               </>
                             )}
                           </div>
@@ -791,44 +772,26 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                       </label>
                     </div>
 
-                    {/* Passport Card */}
+                    {/* Passport */}
                     <div className="relative group">
-                      <input
-                        type="file"
-                        id="passport-upload"
-                        accept="image/*,.pdf"
-                        onChange={(e) => handleFileUpload(e, 'Passport')}
-                        className="hidden"
-                      />
+                      <input type="file" id="passport-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Passport')} className="hidden" />
                       <label htmlFor="passport-upload" className="block cursor-pointer">
-                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-blue-500/5 to-indigo-500/5 hover:border-blue-500/50 transition-all duration-300 hover:shadow-lg">
+                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-blue-500/5 to-indigo-500/5 hover:border-blue-500/50 transition-all">
                           <div className="flex flex-col items-center">
                             {documents.find(d => d.category === 'Passport') ? (
                               <>
-                                <div className="relative mb-2">
-                                  <img 
-                                    src={documents.find(d => d.category === 'Passport')?.file_url || passportIcon} 
-                                    alt="Passport" 
-                                    className="w-20 h-auto rounded-lg shadow-md animate-float"
-                                    style={{ animationDelay: '0.6s' }}
-                                  />
-                                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                                    <Pencil className="w-2.5 h-2.5 text-white" />
-                                  </div>
-                                </div>
+                                <img src={documents.find(d => d.category === 'Passport')?.file_url || passportIcon} alt="Passport" className="w-16 h-auto rounded-lg mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Passport'), e)} />
                                 <p className="text-xs font-medium text-foreground">Passport</p>
-                                <p className="text-[10px] text-blue-500">Click to change</p>
+                                <div className="flex gap-1 mt-1">
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-6 px-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Passport'), e)}><Eye className="w-3 h-3" /></Button>
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-6 px-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('passport-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                </div>
                               </>
                             ) : (
                               <>
-                                <img 
-                                  src={passportIcon} 
-                                  alt="Passport placeholder" 
-                                  className="w-20 h-auto mb-2 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
-                                  style={{ animationDelay: '0.6s' }}
-                                />
+                                <img src={passportIcon} alt="Passport" className="w-16 h-auto mb-2 opacity-60" />
                                 <p className="text-xs font-medium text-foreground">Passport</p>
-                                <p className="text-[10px] text-muted-foreground">Click to upload</p>
+                                <p className="text-[10px] text-muted-foreground">Upload</p>
                               </>
                             )}
                           </div>
@@ -836,44 +799,57 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                       </label>
                     </div>
 
-                    {/* Contract Card */}
+                    {/* Contract */}
                     <div className="relative group">
-                      <input
-                        type="file"
-                        id="contract-upload"
-                        accept="image/*,.pdf"
-                        onChange={(e) => handleFileUpload(e, 'Contract')}
-                        className="hidden"
-                      />
+                      <input type="file" id="contract-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Contract')} className="hidden" />
                       <label htmlFor="contract-upload" className="block cursor-pointer">
-                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-green-500/5 to-emerald-500/5 hover:border-green-500/50 transition-all duration-300 hover:shadow-lg">
+                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-green-500/5 to-emerald-500/5 hover:border-green-500/50 transition-all">
                           <div className="flex flex-col items-center">
                             {documents.find(d => d.category === 'Contract') ? (
                               <>
-                                <div className="relative mb-2">
-                                  <img 
-                                    src={documents.find(d => d.category === 'Contract')?.file_url || contractIcon} 
-                                    alt="Contract" 
-                                    className="w-20 h-auto rounded-lg shadow-md animate-float"
-                                    style={{ animationDelay: '0.8s' }}
-                                  />
-                                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
-                                    <Pencil className="w-2.5 h-2.5 text-white" />
-                                  </div>
-                                </div>
+                                <img src={documents.find(d => d.category === 'Contract')?.file_url || contractIcon} alt="Contract" className="w-16 h-auto rounded-lg mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Contract'), e)} />
                                 <p className="text-xs font-medium text-foreground">Contract</p>
-                                <p className="text-[10px] text-green-500">Click to change</p>
+                                <div className="flex gap-1 mt-1">
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-6 px-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Contract'), e)}><Eye className="w-3 h-3" /></Button>
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-6 px-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('contract-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                </div>
                               </>
                             ) : (
                               <>
-                                <img 
-                                  src={contractIcon} 
-                                  alt="Contract placeholder" 
-                                  className="w-20 h-auto mb-2 opacity-60 group-hover:opacity-100 animate-float transition-opacity"
-                                  style={{ animationDelay: '0.8s' }}
-                                />
+                                <img src={contractIcon} alt="Contract" className="w-16 h-auto mb-2 opacity-60" />
                                 <p className="text-xs font-medium text-foreground">Contract</p>
-                                <p className="text-[10px] text-muted-foreground">Click to upload</p>
+                                <p className="text-[10px] text-muted-foreground">Upload</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Work Permit */}
+                    <div className="relative group">
+                      <input type="file" id="workpermit-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Work Permit')} className="hidden" />
+                      <label htmlFor="workpermit-upload" className="block cursor-pointer">
+                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-orange-500/5 to-amber-500/5 hover:border-orange-500/50 transition-all">
+                          <div className="flex flex-col items-center">
+                            {documents.find(d => d.category === 'Work Permit') ? (
+                              <>
+                                <div className="w-16 h-16 rounded-lg bg-orange-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Work Permit'), e)}>
+                                  <Briefcase className="w-8 h-8 text-orange-500" />
+                                </div>
+                                <p className="text-xs font-medium text-foreground">Work Permit</p>
+                                <div className="flex gap-1 mt-1">
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-6 px-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Work Permit'), e)}><Eye className="w-3 h-3" /></Button>
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-6 px-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('workpermit-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="w-16 h-16 rounded-lg bg-orange-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                  <Briefcase className="w-8 h-8 text-orange-400" />
+                                </div>
+                                <p className="text-xs font-medium text-foreground">Work Permit</p>
+                                <p className="text-[10px] text-muted-foreground">Upload</p>
                               </>
                             )}
                           </div>
@@ -887,68 +863,37 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                     className="file-drop-area p-6 text-center mb-6 border-2 border-dashed border-border rounded-xl hover:border-primary/50 transition-colors cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <div className="mb-3">
-                      <Upload className="w-10 h-10 mx-auto text-muted-foreground" />
-                    </div>
+                    <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
                     <p className="text-base font-semibold text-foreground mb-1">Other Documents</p>
-                    <p className="text-sm text-muted-foreground mb-2">Drag & drop or click to browse</p>
-                    <p className="text-xs text-muted-foreground">Supported: JPG, PNG, PDF, XLSX, DOC, DOCX (Max 10MB)</p>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      accept=".jpg,.jpeg,.png,.pdf,.xlsx,.xls,.doc,.docx"
-                      onChange={(e) => handleFileUpload(e, 'Other')}
-                      className="hidden"
-                    />
+                    <p className="text-sm text-muted-foreground">Drag & drop or click to browse</p>
+                    <input ref={fileInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.pdf,.xlsx,.xls,.doc,.docx" onChange={(e) => handleFileUpload(e)} className="hidden" />
                   </div>
 
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-sm font-semibold text-foreground">Uploaded Documents</h4>
-                      <span className="text-xs text-muted-foreground">{documents.length} files</span>
-                    </div>
-                    
-                    {documents.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">No documents uploaded yet</p>
-                        <p className="text-xs mt-1">Upload files to get started</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {documents.map((doc) => (
-                          <div key={doc.id} className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 border border-border">
-                            <div className="flex items-center gap-3">
-                              <span className="text-lg">{getFileIcon(doc.file_type)}</span>
-                              <div>
-                                <p className="text-sm font-medium text-foreground">{doc.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {doc.file_size} • {format(parseISO(doc.created_at), 'dd MMM yyyy')}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <a
-                                href={doc.file_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-2 rounded-lg hover:bg-secondary transition-colors"
-                              >
-                                <Download className="w-4 h-4 text-muted-foreground" />
-                              </a>
-                              <button
-                                onClick={() => handleDeleteDocument(doc.id, doc.file_url)}
-                                className="p-2 rounded-lg hover:bg-destructive/20 transition-colors"
-                              >
-                                <X className="w-4 h-4 text-destructive" />
-                              </button>
+                  {/* Uploaded Documents List */}
+                  {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit'].includes(d.category || '')).length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-foreground mb-2">Other Uploaded Documents</p>
+                      {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit'].includes(d.category || '')).map((doc) => (
+                        <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border group">
+                          <div className="flex items-center gap-3">
+                            <FileText className="w-5 h-5 text-primary" />
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{doc.name}</p>
+                              <p className="text-xs text-muted-foreground">{doc.file_size}</p>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                          <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.open(doc.file_url, '_blank')}>
+                              <Download className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteDocument(doc.id, doc.file_url)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -957,41 +902,20 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
             {activeTab === 'eos' && (
               <div className="space-y-6 animate-fade-in">
                 <div className="glass-card rounded-2xl border border-border p-5">
-                  <h3 className="text-lg font-semibold text-foreground mb-4">END OF SERVICE (EOS)</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Service start date</p>
-                        <p className="text-lg font-semibold text-foreground">
-                          {new Date(currentEmployee.joining_date).toLocaleDateString('en-GB')}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Service length (today)</p>
-                        <p className="text-2xl font-bold text-foreground">{calculateServiceLength()}</p>
-                      </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-4">END OF SERVICE GRATUITY</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Service Length</p>
+                      <p className="text-lg font-semibold text-foreground">{calculateServiceLength()}</p>
                     </div>
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Gratuity basis</p>
-                        <p className="text-lg font-semibold text-foreground">Basic salary only</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Current estimate</p>
-                        <p className="text-2xl font-bold text-primary">AED {estimateGratuity().toLocaleString()} (approx.)</p>
-                      </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Estimated Gratuity</p>
+                      <p className="text-2xl font-bold text-primary">AED {estimateGratuity().toLocaleString()}</p>
                     </div>
                   </div>
-
-                  <div className="p-4 rounded-lg bg-secondary/30">
-                    <h4 className="text-sm font-semibold text-foreground mb-2">Calculation summary (for reference):</h4>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                      <li>• First 5 years: 21 days per year of basic salary.</li>
-                      <li>• After 5 years: 30 days per year (if applicable).</li>
-                      <li>• Exact entitlement depends on termination reason and UAE labour law.</li>
-                    </ul>
-                  </div>
+                  <p className="text-xs text-muted-foreground mt-4">
+                    * Calculated based on UAE Labor Law: 21 days salary per year for first 5 years, 30 days per year thereafter.
+                  </p>
                 </div>
               </div>
             )}
@@ -999,27 +923,24 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
         </DialogContent>
       </Dialog>
 
-      {/* Edit Employee Modal */}
-      {currentEmployee && (
-        <EditEmployeeModal
-          isOpen={isEditOpen}
-          onClose={() => {
-            setIsEditOpen(false);
-            refetchEmployees();
-          }}
-          employee={currentEmployee}
-        />
-      )}
+      <EditEmployeeModal 
+        isOpen={isEditOpen} 
+        onClose={() => setIsEditOpen(false)} 
+        employee={currentEmployee} 
+      />
 
-      {/* Leave Request Modal */}
-      {currentEmployee && (
-        <LeaveRequestModal
-          isOpen={isLeaveOpen}
-          onClose={() => setIsLeaveOpen(false)}
-          employeeId={currentEmployee.id}
-          employeeName={currentEmployee.full_name}
-        />
-      )}
+      <LeaveRequestModal
+        isOpen={isLeaveOpen}
+        onClose={() => setIsLeaveOpen(false)}
+        employeeId={currentEmployee.id}
+      />
+
+      <ImagePreviewModal
+        isOpen={!!previewImage}
+        onClose={() => setPreviewImage(null)}
+        imageUrl={previewImage?.url || ''}
+        title={previewImage?.title}
+      />
     </>
   );
 }

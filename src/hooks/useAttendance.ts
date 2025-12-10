@@ -10,6 +10,10 @@ export interface Attendance {
   check_in?: string;
   check_out?: string;
   status: 'Present' | 'Absent' | 'Late' | 'Half Day';
+  employee_remarks?: string;
+  admin_remarks?: string;
+  modified_by?: string;
+  modified_at?: string;
   created_at?: string;
   employees?: {
     full_name: string;
@@ -80,6 +84,44 @@ export function useRealtimeAttendance() {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
+}
+
+export function useUpdateAttendance() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: {
+      id: string;
+      check_in?: string;
+      check_out?: string;
+      status?: string;
+      employee_remarks?: string;
+      admin_remarks?: string;
+    }) => {
+      const { id, ...updateData } = data;
+      
+      const { data: result, error } = await supabase
+        .from('attendance')
+        .update({
+          ...updateData,
+          modified_at: new Date().toISOString(),
+          modified_by: 'Admin',
+        })
+        .eq('id', id)
+        .select(`*, employees (full_name, hrms_no)`)
+        .single();
+      
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      toast.success('Attendance updated successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update attendance: ${error.message}`);
+    },
+  });
 }
 
 export function useCheckInByHRMS() {
@@ -214,5 +256,29 @@ export function useCheckOutByHRMS() {
     onError: (error: Error) => {
       toast.error(error.message);
     },
+  });
+}
+
+export function useEmployeeMonthlyLates(employeeId: string) {
+  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+  
+  return useQuery({
+    queryKey: ['attendance', 'monthly-lates', employeeId, currentMonth],
+    queryFn: async () => {
+      const startOfMonth = `${currentMonth}-01`;
+      const endOfMonth = new Date(new Date(startOfMonth).getFullYear(), new Date(startOfMonth).getMonth() + 1, 0).toISOString().split('T')[0];
+      
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .eq('status', 'Late')
+        .gte('date', startOfMonth)
+        .lte('date', endOfMonth);
+      
+      if (error) throw error;
+      return data?.length || 0;
+    },
+    enabled: !!employeeId,
   });
 }

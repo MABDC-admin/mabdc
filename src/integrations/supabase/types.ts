@@ -16,30 +16,42 @@ export type Database = {
     Tables: {
       attendance: {
         Row: {
+          admin_remarks: string | null
           check_in: string | null
           check_out: string | null
           created_at: string
           date: string
           employee_id: string
+          employee_remarks: string | null
           id: string
+          modified_at: string | null
+          modified_by: string | null
           status: string | null
         }
         Insert: {
+          admin_remarks?: string | null
           check_in?: string | null
           check_out?: string | null
           created_at?: string
           date: string
           employee_id: string
+          employee_remarks?: string | null
           id?: string
+          modified_at?: string | null
+          modified_by?: string | null
           status?: string | null
         }
         Update: {
+          admin_remarks?: string | null
           check_in?: string | null
           check_out?: string | null
           created_at?: string
           date?: string
           employee_id?: string
+          employee_remarks?: string | null
           id?: string
+          modified_at?: string | null
+          modified_by?: string | null
           status?: string | null
         }
         Relationships: [
@@ -254,18 +266,61 @@ export type Database = {
           },
         ]
       }
+      employee_education: {
+        Row: {
+          certificate_level: string
+          created_at: string
+          employee_id: string
+          field_of_study: string | null
+          graduation_year: number | null
+          id: string
+          school: string | null
+        }
+        Insert: {
+          certificate_level: string
+          created_at?: string
+          employee_id: string
+          field_of_study?: string | null
+          graduation_year?: number | null
+          id?: string
+          school?: string | null
+        }
+        Update: {
+          certificate_level?: string
+          created_at?: string
+          employee_id?: string
+          field_of_study?: string | null
+          graduation_year?: number | null
+          id?: string
+          school?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_education_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           allowance: number | null
           bank_account_no: string | null
           bank_name: string | null
           basic_salary: number | null
+          birthday: string | null
           contract_type: string | null
+          country_of_birth: string | null
           created_at: string
           department: string
           emirates_id: string | null
           emirates_id_expiry: string | null
+          family_status: string | null
           full_name: string
+          gender: string | null
+          home_address: string | null
           hrms_no: string
           iban: string | null
           id: string
@@ -274,9 +329,13 @@ export type Database = {
           leave_balance: number | null
           manager: string | null
           nationality: string | null
+          number_of_children: number | null
           passport_expiry: string | null
           passport_no: string | null
+          personal_email: string | null
+          personal_phone: string | null
           photo_url: string | null
+          place_of_birth: string | null
           status: string | null
           updated_at: string
           visa_expiration: string | null
@@ -289,12 +348,17 @@ export type Database = {
           bank_account_no?: string | null
           bank_name?: string | null
           basic_salary?: number | null
+          birthday?: string | null
           contract_type?: string | null
+          country_of_birth?: string | null
           created_at?: string
           department: string
           emirates_id?: string | null
           emirates_id_expiry?: string | null
+          family_status?: string | null
           full_name: string
+          gender?: string | null
+          home_address?: string | null
           hrms_no: string
           iban?: string | null
           id?: string
@@ -303,9 +367,13 @@ export type Database = {
           leave_balance?: number | null
           manager?: string | null
           nationality?: string | null
+          number_of_children?: number | null
           passport_expiry?: string | null
           passport_no?: string | null
+          personal_email?: string | null
+          personal_phone?: string | null
           photo_url?: string | null
+          place_of_birth?: string | null
           status?: string | null
           updated_at?: string
           visa_expiration?: string | null
@@ -318,12 +386,17 @@ export type Database = {
           bank_account_no?: string | null
           bank_name?: string | null
           basic_salary?: number | null
+          birthday?: string | null
           contract_type?: string | null
+          country_of_birth?: string | null
           created_at?: string
           department?: string
           emirates_id?: string | null
           emirates_id_expiry?: string | null
+          family_status?: string | null
           full_name?: string
+          gender?: string | null
+          home_address?: string | null
           hrms_no?: string
           iban?: string | null
           id?: string
@@ -332,9 +405,13 @@ export type Database = {
           leave_balance?: number | null
           manager?: string | null
           nationality?: string | null
+          number_of_children?: number | null
           passport_expiry?: string | null
           passport_no?: string | null
+          personal_email?: string | null
+          personal_phone?: string | null
           photo_url?: string | null
+          place_of_birth?: string | null
           status?: string | null
           updated_at?: string
           visa_expiration?: string | null

@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
-import { useAttendance, useTodayAttendance, useRealtimeAttendance, useCheckInByHRMS, useCheckOutByHRMS } from '@/hooks/useAttendance';
+import { useState } from 'react';
+import { useAttendance, useTodayAttendance, useRealtimeAttendance, useCheckInByHRMS, useCheckOutByHRMS, useUpdateAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Clock, LogIn, LogOut, RefreshCw, QrCode, Users, AlertTriangle, CheckCircle, X, Scan } from 'lucide-react';
+import { Clock, LogIn, LogOut, RefreshCw, QrCode, Users, AlertTriangle, CheckCircle, X, Scan, FileText, Pencil, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { QRCodeSVG } from 'qrcode.react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AttendanceEditModal } from '@/components/attendance/AttendanceEditModal';
+import { AttendanceReportModal } from '@/components/attendance/AttendanceReportModal';
 
 export function AttendanceView() {
   const { data: allAttendance = [], isLoading, refetch } = useAttendance();
@@ -16,6 +18,7 @@ export function AttendanceView() {
   const { data: employees = [] } = useEmployees();
   const checkIn = useCheckInByHRMS();
   const checkOut = useCheckOutByHRMS();
+  const updateAttendance = useUpdateAttendance();
   
   // Enable realtime updates
   useRealtimeAttendance();
@@ -25,6 +28,9 @@ export function AttendanceView() {
   const [scanMode, setScanMode] = useState<'check-in' | 'check-out'>('check-in');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [manualHRMS, setManualHRMS] = useState('');
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<any>(null);
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   const handleScan = (result: string) => {
     if (result) {
@@ -46,6 +52,15 @@ export function AttendanceView() {
       }
       setManualHRMS('');
     }
+  };
+
+  const handleEditRecord = (record: any) => {
+    setEditingRecord(record);
+    setIsEditOpen(true);
+  };
+
+  const handleSaveAttendance = (data: any) => {
+    updateAttendance.mutate(data);
   };
 
   const getStatusColor = (status: string) => {
@@ -123,7 +138,17 @@ export function AttendanceView() {
 
       {/* QR Actions */}
       <section className="glass-card rounded-3xl border border-border p-4 sm:p-6">
-        <h2 className="text-lg font-semibold text-foreground mb-4">QR Code Attendance</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-foreground">QR Code Attendance</h2>
+          <Button
+            onClick={() => setIsReportOpen(true)}
+            variant="outline"
+            className="border-primary text-primary hover:bg-primary/10"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Attendance Report
+          </Button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 rounded-2xl bg-secondary/30 border border-border">
             <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
@@ -204,7 +229,7 @@ export function AttendanceView() {
             </div>
           ) : (
             todayAttendance.map((record) => (
-              <div key={record.id} className="glass-card rounded-2xl border border-border p-4 animate-fade-in">
+              <div key={record.id} className="glass-card rounded-2xl border border-border p-4 animate-fade-in group">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-xl avatar-gradient flex items-center justify-center text-sm font-bold text-primary-foreground">
@@ -220,6 +245,11 @@ export function AttendanceView() {
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
                           <LogOut className="w-3 h-3" /> {record.check_out || '--:--'}
                         </span>
+                        {(record.employee_remarks || record.admin_remarks) && (
+                          <span className="text-xs text-accent flex items-center gap-1">
+                            <MessageSquare className="w-3 h-3" /> Has remarks
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -228,6 +258,14 @@ export function AttendanceView() {
                       {getStatusIcon(record.status)}
                       {record.status}
                     </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEditRecord(record)}
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -241,18 +279,34 @@ export function AttendanceView() {
         <h2 className="text-lg font-semibold text-foreground mb-4">Recent Attendance History</h2>
         <div className="space-y-2 max-h-96 overflow-y-auto soft-scroll">
           {allAttendance.slice(0, 20).map((record) => (
-            <div key={record.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 border border-border">
+            <div key={record.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 border border-border group">
               <div className="flex items-center gap-3">
                 <div>
                   <p className="text-sm font-medium text-foreground">{record.employees?.full_name || 'Unknown'}</p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(record.date).toLocaleDateString('en-GB')} • {record.check_in || '--:--'} - {record.check_out || '--:--'}
                   </p>
+                  {(record.employee_remarks || record.admin_remarks) && (
+                    <p className="text-xs text-accent mt-1 flex items-center gap-1">
+                      <MessageSquare className="w-3 h-3" />
+                      {record.admin_remarks || record.employee_remarks}
+                    </p>
+                  )}
                 </div>
               </div>
-              <span className={cn("text-xs px-2 py-1 rounded-full border", getStatusColor(record.status))}>
-                {record.status}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={cn("text-xs px-2 py-1 rounded-full border", getStatusColor(record.status))}>
+                  {record.status}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleEditRecord(record)}
+                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>
@@ -336,6 +390,26 @@ export function AttendanceView() {
           </Tabs>
         </DialogContent>
       </Dialog>
+
+      {/* Attendance Edit Modal */}
+      <AttendanceEditModal
+        isOpen={isEditOpen}
+        onClose={() => {
+          setIsEditOpen(false);
+          setEditingRecord(null);
+        }}
+        record={editingRecord}
+        onSave={handleSaveAttendance}
+        isAdmin={true}
+      />
+
+      {/* Attendance Report Modal */}
+      <AttendanceReportModal
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        attendance={allAttendance as any}
+        employees={employees as any}
+      />
     </div>
   );
 }
