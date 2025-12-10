@@ -16,17 +16,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { 
   User, Calendar, FileText, Clock, CheckCircle, XCircle, 
   AlertTriangle, Download, Plus, ArrowLeft, Briefcase, Mail,
-  Eye, CreditCard, Home, Car, UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby, Pencil, Save, X, Star, Scale, MessageCircle
+  Eye, CreditCard, Home, Car, UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby, Pencil, Save, X, Star, Scale, MessageCircle, Trophy
 } from 'lucide-react';
 import { ImagePreviewModal } from '@/components/modals/ImagePreviewModal';
 import { useEmployeeDocuments } from '@/hooks/useDocuments';
 import { EmployeeAttendanceCalendar } from '@/components/attendance/EmployeeAttendanceCalendar';
+import { EmployeeGamificationCard } from '@/components/gamification/EmployeeGamificationCard';
 import { cn } from '@/lib/utils';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 import type { Employee } from '@/types/hr';
 
-type TabType = 'overview' | 'attendance' | 'leave' | 'contract' | 'letters' | 'personal' | 'records';
+type TabType = 'overview' | 'attendance' | 'leave' | 'contract' | 'letters' | 'personal' | 'records' | 'gamification';
 
 export default function EmployeePortal() {
   const { employeeId } = useParams<{ employeeId: string }>();
@@ -198,6 +199,7 @@ export default function EmployeePortal() {
     { id: 'contract' as TabType, label: 'Contract', icon: FileText },
     { id: 'letters' as TabType, label: 'HR Letters', icon: Mail },
     { id: 'records' as TabType, label: 'Records', icon: Scale },
+    { id: 'gamification' as TabType, label: 'Points & Badges', icon: Trophy },
   ];
 
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -1177,6 +1179,13 @@ export default function EmployeePortal() {
                 )}
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {/* Gamification Tab */}
+        {activeTab === 'gamification' && employeeId && (
+          <div className="animate-fade-in">
+            <EmployeeGamificationCard employeeId={employeeId} />
           </div>
         )}
       </main>

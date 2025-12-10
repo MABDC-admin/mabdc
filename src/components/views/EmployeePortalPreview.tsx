@@ -11,16 +11,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { EmployeeAttendanceCalendar } from '@/components/attendance/EmployeeAttendanceCalendar';
+import { EmployeeGamificationCard } from '@/components/gamification/EmployeeGamificationCard';
 import { 
   User, Calendar, FileText, Clock, CheckCircle, XCircle, 
   AlertTriangle, Briefcase, Mail, Eye, CreditCard, Home, Car, 
-  UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby, Star, Scale
+  UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby, Star, Scale, Trophy
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO, differenceInYears } from 'date-fns';
 import type { Employee } from '@/types/hr';
 
-type TabType = 'overview' | 'attendance' | 'leave' | 'contract' | 'letters' | 'personal' | 'records';
+type TabType = 'overview' | 'attendance' | 'leave' | 'contract' | 'letters' | 'personal' | 'records' | 'gamification';
 
 export function EmployeePortalPreview() {
   const { data: employees = [] } = useEmployees();
@@ -62,6 +63,7 @@ export function EmployeePortalPreview() {
     { id: 'contract' as TabType, label: 'Contract', icon: FileText },
     { id: 'letters' as TabType, label: 'HR Letters', icon: Mail },
     { id: 'records' as TabType, label: 'Records', icon: Scale },
+    { id: 'gamification' as TabType, label: 'Points & Badges', icon: Trophy },
   ];
 
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -417,6 +419,13 @@ export function EmployeePortalPreview() {
                     )}
                   </CardContent>
                 </Card>
+              </div>
+            )}
+
+            {/* Gamification Tab */}
+            {activeTab === 'gamification' && selectedEmployee && (
+              <div className="animate-fade-in">
+                <EmployeeGamificationCard employeeId={selectedEmployeeId} />
               </div>
             )}
           </main>

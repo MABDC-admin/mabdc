@@ -21,7 +21,9 @@ import {
   UserCheck,
   AlertCircle,
   Timer,
-  Eye
+  Eye,
+  Gamepad2,
+  Trophy
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHRStore } from '@/store/hrStore';
@@ -43,7 +45,15 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+  { 
+    id: 'dashboard', 
+    label: 'Dashboard', 
+    icon: <LayoutDashboard className="w-5 h-5" />,
+    subItems: [
+      { id: 'dashboard', label: 'Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
+      { id: 'gamification', label: 'Gamification', icon: <Gamepad2 className="w-4 h-4" /> }
+    ]
+  },
   { 
     id: 'employees', 
     label: 'Employees', 
@@ -78,7 +88,7 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const { currentView, setCurrentView } = useHRStore();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['attendance', 'employees']);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['attendance', 'employees', 'dashboard']);
   const { signOut, user } = useAuth();
   const { data: appeals = [] } = useAttendanceAppeals();
   const navigate = useNavigate();
