@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useEmployees, useDeleteEmployee } from '@/hooks/useEmployees';
-import { useLeave, useAllLeaveBalances } from '@/hooks/useLeave';
+import { useLeave, useAllLeaveBalances, useLeaveTypes } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { useHRStore } from '@/store/hrStore';
 import { Button } from '@/components/ui/button';
@@ -34,16 +34,26 @@ export function EmployeesView() {
   const { data: leaveRecords = [] } = useLeave();
   const { data: contracts = [] } = useContracts();
   const { data: allLeaveBalances = [] } = useAllLeaveBalances();
+  const { data: leaveTypes = [] } = useLeaveTypes();
 
-  // Calculate total allocated leave balance per employee from leave_balances table
+  // Find Annual Leave type ID
+  const annualLeaveType = useMemo(() => {
+    return leaveTypes.find(lt => lt.code === 'AL' || lt.name.toLowerCase().includes('annual'));
+  }, [leaveTypes]);
+
+  // Calculate Annual Leave balance only per employee from leave_balances table
   const employeeLeaveBalances = useMemo(() => {
     const balanceMap: Record<string, number> = {};
-    allLeaveBalances.forEach((balance) => {
-      const available = (balance.entitled_days || 0) + (balance.carried_forward_days || 0) - (balance.used_days || 0) - (balance.pending_days || 0);
-      balanceMap[balance.employee_id] = (balanceMap[balance.employee_id] || 0) + Math.max(0, available);
-    });
+    if (!annualLeaveType) return balanceMap;
+    
+    allLeaveBalances
+      .filter(balance => balance.leave_type_id === annualLeaveType.id)
+      .forEach((balance) => {
+        const available = (balance.entitled_days || 0) + (balance.carried_forward_days || 0) - (balance.used_days || 0) - (balance.pending_days || 0);
+        balanceMap[balance.employee_id] = Math.max(0, available);
+      });
     return balanceMap;
-  }, [allLeaveBalances]);
+  }, [allLeaveBalances, annualLeaveType]);
 
   const getEmployeeLeaveBalance = (employeeId: string) => {
     return employeeLeaveBalances[employeeId] ?? 0;
