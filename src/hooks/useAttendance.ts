@@ -231,10 +231,10 @@ export function useCheckOutByHRMS() {
       if (!attendance) throw new Error(`${employee.full_name} hasn't checked in today`);
       if (attendance.check_out) throw new Error(`${employee.full_name} already checked out`);
       
-      // Check if undertime (before 5:00 PM / 17:00)
+      // Check if undertime (before 7:00 PM / 19:00)
       const hour = now.getHours();
-      const isUndertime = hour < 17;
-      const wasLate = attendance.status === 'Late';
+      const isUndertime = hour < 19;
+      const wasLate = String(attendance.status).includes('Late');
       
       // Determine combined status
       let newStatus = attendance.status;
