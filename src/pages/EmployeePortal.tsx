@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { 
   User, Calendar, FileText, Clock, CheckCircle, XCircle, 
   AlertTriangle, Download, Plus, ArrowLeft, Briefcase, Mail,
-  Eye, CreditCard, Home, Car, UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby
+  Eye, CreditCard, Home, Car, UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby, Pencil, Save, X
 } from 'lucide-react';
 import { ImagePreviewModal } from '@/components/modals/ImagePreviewModal';
 import { useEmployeeDocuments } from '@/hooks/useDocuments';
@@ -32,6 +32,20 @@ export default function EmployeePortal() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+  const [isEditingPersonal, setIsEditingPersonal] = useState(false);
+  const [personalInfo, setPersonalInfo] = useState({
+    gender: '',
+    birthday: '',
+    personal_email: '',
+    personal_phone: '',
+    home_address: '',
+    place_of_birth: '',
+    country_of_birth: '',
+    family_status: '',
+    number_of_children: 0,
+    nationality: '',
+  });
+  const [savingPersonal, setSavingPersonal] = useState(false);
 
   // Fetch employee data
   useEffect(() => {
@@ -690,102 +704,240 @@ export default function EmployeePortal() {
         {activeTab === 'personal' && (
           <div className="animate-fade-in space-y-6">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <UserCircle className="w-5 h-5" />
                   Personal Information
                 </CardTitle>
+                {!isEditingPersonal ? (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setPersonalInfo({
+                        gender: employee.gender || '',
+                        birthday: employee.birthday || '',
+                        personal_email: employee.personal_email || '',
+                        personal_phone: employee.personal_phone || '',
+                        home_address: employee.home_address || '',
+                        place_of_birth: employee.place_of_birth || '',
+                        country_of_birth: employee.country_of_birth || '',
+                        family_status: employee.family_status || '',
+                        number_of_children: employee.number_of_children || 0,
+                        nationality: employee.nationality || '',
+                      });
+                      setIsEditingPersonal(true);
+                    }}
+                  >
+                    <Pencil className="w-4 h-4 mr-1" />
+                    Edit
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setIsEditingPersonal(false)}
+                      disabled={savingPersonal}
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Cancel
+                    </Button>
+                    <Button 
+                      size="sm"
+                      onClick={async () => {
+                        if (!employeeId) return;
+                        setSavingPersonal(true);
+                        try {
+                          const { error } = await supabase
+                            .from('employees')
+                            .update({
+                              gender: personalInfo.gender || null,
+                              birthday: personalInfo.birthday || null,
+                              personal_email: personalInfo.personal_email || null,
+                              personal_phone: personalInfo.personal_phone || null,
+                              home_address: personalInfo.home_address || null,
+                              place_of_birth: personalInfo.place_of_birth || null,
+                              country_of_birth: personalInfo.country_of_birth || null,
+                              family_status: personalInfo.family_status || null,
+                              number_of_children: personalInfo.number_of_children,
+                              nationality: personalInfo.nationality || null,
+                            })
+                            .eq('id', employeeId);
+                          
+                          if (error) throw error;
+                          
+                          setEmployee(prev => prev ? { ...prev, ...personalInfo } : null);
+                          setIsEditingPersonal(false);
+                          toast.success('Personal information updated');
+                        } catch (err) {
+                          console.error('Error updating personal info:', err);
+                          toast.error('Failed to update personal information');
+                        } finally {
+                          setSavingPersonal(false);
+                        }
+                      }}
+                      disabled={savingPersonal}
+                    >
+                      <Save className="w-4 h-4 mr-1" />
+                      {savingPersonal ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Left Column */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                      <User className="w-5 h-5 text-muted-foreground" />
+                {isEditingPersonal ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-4">
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase">Gender</p>
-                        <p className="font-medium">{employee.gender || 'Not specified'}</p>
+                        <label className="text-xs text-muted-foreground uppercase">Gender</label>
+                        <Select value={personalInfo.gender} onValueChange={(v) => setPersonalInfo({ ...personalInfo, gender: v })}>
+                          <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Male">Male</SelectItem>
+                            <SelectItem value="Female">Female</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground uppercase">Birthday</label>
+                        <Input type="date" value={personalInfo.birthday} onChange={(e) => setPersonalInfo({ ...personalInfo, birthday: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground uppercase">Personal Email</label>
+                        <Input type="email" value={personalInfo.personal_email} onChange={(e) => setPersonalInfo({ ...personalInfo, personal_email: e.target.value })} placeholder="personal@email.com" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground uppercase">Personal Phone</label>
+                        <Input type="tel" value={personalInfo.personal_phone} onChange={(e) => setPersonalInfo({ ...personalInfo, personal_phone: e.target.value })} placeholder="+971 XX XXX XXXX" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground uppercase">Home Address</label>
+                        <Textarea value={personalInfo.home_address} onChange={(e) => setPersonalInfo({ ...personalInfo, home_address: e.target.value })} placeholder="Enter home address" rows={2} />
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                      <Cake className="w-5 h-5 text-muted-foreground" />
+                    <div className="space-y-4">
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase">Birthday</p>
-                        <p className="font-medium">
-                          {employee.birthday ? format(parseISO(employee.birthday), 'dd MMMM yyyy') : 'Not specified'}
-                        </p>
+                        <label className="text-xs text-muted-foreground uppercase">Place of Birth</label>
+                        <Input value={personalInfo.place_of_birth} onChange={(e) => setPersonalInfo({ ...personalInfo, place_of_birth: e.target.value })} placeholder="City" />
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                      <Mail className="w-5 h-5 text-muted-foreground" />
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase">Personal Email</p>
-                        <p className="font-medium">{employee.personal_email || 'Not specified'}</p>
+                        <label className="text-xs text-muted-foreground uppercase">Country of Birth</label>
+                        <Input value={personalInfo.country_of_birth} onChange={(e) => setPersonalInfo({ ...personalInfo, country_of_birth: e.target.value })} placeholder="Country" />
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                      <Phone className="w-5 h-5 text-muted-foreground" />
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase">Personal Phone</p>
-                        <p className="font-medium">{employee.personal_phone || 'Not specified'}</p>
+                        <label className="text-xs text-muted-foreground uppercase">Family Status</label>
+                        <Select value={personalInfo.family_status} onValueChange={(v) => setPersonalInfo({ ...personalInfo, family_status: v })}>
+                          <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Single">Single</SelectItem>
+                            <SelectItem value="Married">Married</SelectItem>
+                            <SelectItem value="Divorced">Divorced</SelectItem>
+                            <SelectItem value="Widowed">Widowed</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                      <MapPin className="w-5 h-5 text-muted-foreground" />
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase">Home Address</p>
-                        <p className="font-medium">{employee.home_address || 'Not specified'}</p>
+                        <label className="text-xs text-muted-foreground uppercase">Number of Children</label>
+                        <Input type="number" min="0" value={personalInfo.number_of_children} onChange={(e) => setPersonalInfo({ ...personalInfo, number_of_children: parseInt(e.target.value) || 0 })} />
                       </div>
-                    </div>
-                  </div>
-                  
-                  {/* Right Column */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                      <Globe className="w-5 h-5 text-muted-foreground" />
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase">Place of Birth</p>
-                        <p className="font-medium">{employee.place_of_birth || 'Not specified'}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                      <Globe className="w-5 h-5 text-muted-foreground" />
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">Country of Birth</p>
-                        <p className="font-medium">{employee.country_of_birth || 'Not specified'}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                      <Heart className="w-5 h-5 text-muted-foreground" />
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">Family Status</p>
-                        <p className="font-medium">{employee.family_status || 'Not specified'}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                      <Baby className="w-5 h-5 text-muted-foreground" />
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">Number of Children</p>
-                        <p className="font-medium">{employee.number_of_children ?? 0}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                      <Globe className="w-5 h-5 text-muted-foreground" />
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">Nationality</p>
-                        <p className="font-medium">{employee.nationality || 'Not specified'}</p>
+                        <label className="text-xs text-muted-foreground uppercase">Nationality</label>
+                        <Input value={personalInfo.nationality} onChange={(e) => setPersonalInfo({ ...personalInfo, nationality: e.target.value })} placeholder="Nationality" />
                       </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Left Column */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                        <User className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">Gender</p>
+                          <p className="font-medium">{employee.gender || 'Not specified'}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                        <Cake className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">Birthday</p>
+                          <p className="font-medium">
+                            {employee.birthday ? format(parseISO(employee.birthday), 'dd MMMM yyyy') : 'Not specified'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                        <Mail className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">Personal Email</p>
+                          <p className="font-medium">{employee.personal_email || 'Not specified'}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                        <Phone className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">Personal Phone</p>
+                          <p className="font-medium">{employee.personal_phone || 'Not specified'}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                        <MapPin className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">Home Address</p>
+                          <p className="font-medium">{employee.home_address || 'Not specified'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Right Column */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                        <Globe className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">Place of Birth</p>
+                          <p className="font-medium">{employee.place_of_birth || 'Not specified'}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                        <Globe className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">Country of Birth</p>
+                          <p className="font-medium">{employee.country_of_birth || 'Not specified'}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                        <Heart className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">Family Status</p>
+                          <p className="font-medium">{employee.family_status || 'Not specified'}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                        <Baby className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">Number of Children</p>
+                          <p className="font-medium">{employee.number_of_children ?? 0}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                        <Globe className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase">Nationality</p>
+                          <p className="font-medium">{employee.nationality || 'Not specified'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
