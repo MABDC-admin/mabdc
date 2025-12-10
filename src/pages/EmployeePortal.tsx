@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAttendance } from '@/hooks/useAttendance';
-import { useLeave, useAddLeave, useLeaveTypes } from '@/hooks/useLeave';
+import { useLeave, useAddLeave, useLeaveTypes, useLeaveBalances } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { useEmployeeHRLetters } from '@/hooks/useHRLetters';
 import { useEmployeePerformance, useEmployeeCorrectiveActions } from '@/hooks/usePerformance';
@@ -79,6 +79,7 @@ export default function EmployeePortal() {
   const { data: contracts = [] } = useContracts();
   const { data: letters = [] } = useEmployeeHRLetters(employeeId || '');
   const { data: leaveTypes = [] } = useLeaveTypes();
+  const { data: leaveBalances = [] } = useLeaveBalances(employeeId || '');
   const addLeave = useAddLeave();
   const { data: documents = [] } = useEmployeeDocuments(employeeId || '');
   const { data: performanceRecords = [] } = useEmployeePerformance(employeeId || '');
@@ -90,6 +91,14 @@ export default function EmployeePortal() {
   const leaveRecords = allLeave.filter(l => l.employee_id === employeeId);
   const employeeContract = contracts.find(c => c.employee_id === employeeId && c.status === 'Active');
 
+  // Calculate total available leave from leave_balances table
+  const totalLeaveBalance = useMemo(() => {
+    return leaveBalances.reduce((acc, balance) => {
+      const available = (balance.entitled_days + balance.carried_forward_days) - balance.used_days - balance.pending_days;
+      return acc + Math.max(0, available);
+    }, 0);
+  }, [leaveBalances]);
+
   // Leave request form
   const [leaveForm, setLeaveForm] = useState({
     leave_type: 'Annual',
@@ -98,11 +107,41 @@ export default function EmployeePortal() {
     reason: '',
   });
 
+  // Calculate available balance for selected leave type
+  const selectedLeaveType = useMemo(() => {
+    return leaveTypes.find(lt => lt.name === leaveForm.leave_type);
+  }, [leaveTypes, leaveForm.leave_type]);
+
+  const selectedBalance = useMemo(() => {
+    if (!selectedLeaveType) return null;
+    return leaveBalances.find(lb => lb.leave_type_id === selectedLeaveType.id);
+  }, [leaveBalances, selectedLeaveType]);
+
+  const availableDays = useMemo(() => {
+    if (!selectedBalance) return 0;
+    return (selectedBalance.entitled_days + selectedBalance.carried_forward_days) - 
+           selectedBalance.used_days - selectedBalance.pending_days;
+  }, [selectedBalance]);
+
+  const requestedDays = useMemo(() => {
+    if (!leaveForm.start_date || !leaveForm.end_date) return 0;
+    const days = differenceInDays(parseISO(leaveForm.end_date), parseISO(leaveForm.start_date)) + 1;
+    return days > 0 ? days : 0;
+  }, [leaveForm.start_date, leaveForm.end_date]);
+
+  const hasInsufficientBalance = requestedDays > 0 && availableDays < requestedDays;
+
   const handleLeaveSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!employeeId) return;
     
     const daysCount = differenceInDays(parseISO(leaveForm.end_date), parseISO(leaveForm.start_date)) + 1;
+    
+    // Check balance
+    if (hasInsufficientBalance) {
+      toast.error('Insufficient leave balance. Please contact HR for assistance.');
+      return;
+    }
     
     addLeave.mutate({
       employee_id: employeeId,
@@ -235,7 +274,25 @@ export default function EmployeePortal() {
                 <CardTitle className="text-sm text-muted-foreground">Leave Balance</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold text-primary">{employee.leave_balance || 0} days</p>
+                <p className="text-2xl font-bold text-primary">
+                  {leaveBalances.length > 0 ? `${totalLeaveBalance} days` : 'Not allocated'}
+                </p>
+                {leaveBalances.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {leaveBalances.slice(0, 3).map((balance) => {
+                      const available = (balance.entitled_days + balance.carried_forward_days) - balance.used_days - balance.pending_days;
+                      const leaveTypeName = (balance as any).leave_types?.name || 'Leave';
+                      return (
+                        <div key={balance.id} className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">{leaveTypeName}</span>
+                          <span className={cn("font-medium", available <= 0 ? "text-destructive" : "text-foreground")}>
+                            {Math.max(0, available)}/{balance.entitled_days}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
             
@@ -280,16 +337,30 @@ export default function EmployeePortal() {
                     <form onSubmit={handleLeaveSubmit} className="space-y-4 mt-4">
                       <div>
                         <label className="text-xs text-muted-foreground">Leave Type</label>
-                      <Select value={leaveForm.leave_type} onValueChange={(v) => setLeaveForm({ ...leaveForm, leave_type: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Annual">Annual Leave</SelectItem>
-                          <SelectItem value="Sick">Sick Leave</SelectItem>
-                          <SelectItem value="Maternity">Maternity Leave</SelectItem>
-                          <SelectItem value="Emergency">Emergency Leave</SelectItem>
-                          <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <Select value={leaveForm.leave_type} onValueChange={(v) => setLeaveForm({ ...leaveForm, leave_type: v })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {leaveTypes.length > 0 ? leaveTypes.map((type) => (
+                              <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
+                            )) : (
+                              <>
+                                <SelectItem value="Annual">Annual Leave</SelectItem>
+                                <SelectItem value="Sick">Sick Leave</SelectItem>
+                                <SelectItem value="Maternity">Maternity Leave</SelectItem>
+                                <SelectItem value="Emergency">Emergency Leave</SelectItem>
+                                <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        {selectedBalance && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Available: <span className={cn("font-medium", availableDays <= 0 ? "text-destructive" : "text-primary")}>{Math.max(0, availableDays)} days</span>
+                          </p>
+                        )}
+                        {!selectedBalance && selectedLeaveType && (
+                          <p className="text-xs text-amber-500 mt-1">No allocation found for this leave type</p>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -301,11 +372,30 @@ export default function EmployeePortal() {
                           <Input type="date" value={leaveForm.end_date} onChange={(e) => setLeaveForm({ ...leaveForm, end_date: e.target.value })} required />
                         </div>
                       </div>
+                      {requestedDays > 0 && (
+                        <div className={cn(
+                          "p-3 rounded-lg border",
+                          hasInsufficientBalance ? "bg-destructive/10 border-destructive/30" : "bg-primary/10 border-primary/30"
+                        )}>
+                          <p className={cn("text-sm font-medium", hasInsufficientBalance ? "text-destructive" : "text-primary")}>
+                            Duration: {requestedDays} day(s)
+                          </p>
+                        </div>
+                      )}
+                      {hasInsufficientBalance && (
+                        <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+                          <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                          <div className="text-sm text-destructive">
+                            <p className="font-medium">Insufficient leave balance</p>
+                            <p className="text-xs mt-0.5">Please contact HR for assistance.</p>
+                          </div>
+                        </div>
+                      )}
                       <div>
                         <label className="text-xs text-muted-foreground">Reason</label>
                         <Textarea value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} placeholder="Enter reason..." />
                       </div>
-                      <Button type="submit" className="w-full" disabled={addLeave.isPending}>
+                      <Button type="submit" className="w-full" disabled={addLeave.isPending || hasInsufficientBalance}>
                         {addLeave.isPending ? 'Submitting...' : 'Submit Request'}
                       </Button>
                     </form>
@@ -408,13 +498,27 @@ export default function EmployeePortal() {
                       <Select value={leaveForm.leave_type} onValueChange={(v) => setLeaveForm({ ...leaveForm, leave_type: v })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Annual">Annual Leave</SelectItem>
-                          <SelectItem value="Sick">Sick Leave</SelectItem>
-                          <SelectItem value="Maternity">Maternity Leave</SelectItem>
-                          <SelectItem value="Emergency">Emergency Leave</SelectItem>
-                          <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
+                          {leaveTypes.length > 0 ? leaveTypes.map((type) => (
+                            <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
+                          )) : (
+                            <>
+                              <SelectItem value="Annual">Annual Leave</SelectItem>
+                              <SelectItem value="Sick">Sick Leave</SelectItem>
+                              <SelectItem value="Maternity">Maternity Leave</SelectItem>
+                              <SelectItem value="Emergency">Emergency Leave</SelectItem>
+                              <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
+                            </>
+                          )}
                         </SelectContent>
                       </Select>
+                      {selectedBalance && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Available: <span className={cn("font-medium", availableDays <= 0 ? "text-destructive" : "text-primary")}>{Math.max(0, availableDays)} days</span>
+                        </p>
+                      )}
+                      {!selectedBalance && selectedLeaveType && (
+                        <p className="text-xs text-amber-500 mt-1">No allocation found for this leave type</p>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -426,11 +530,30 @@ export default function EmployeePortal() {
                         <Input type="date" value={leaveForm.end_date} onChange={(e) => setLeaveForm({ ...leaveForm, end_date: e.target.value })} required />
                       </div>
                     </div>
+                    {requestedDays > 0 && (
+                      <div className={cn(
+                        "p-3 rounded-lg border",
+                        hasInsufficientBalance ? "bg-destructive/10 border-destructive/30" : "bg-primary/10 border-primary/30"
+                      )}>
+                        <p className={cn("text-sm font-medium", hasInsufficientBalance ? "text-destructive" : "text-primary")}>
+                          Duration: {requestedDays} day(s)
+                        </p>
+                      </div>
+                    )}
+                    {hasInsufficientBalance && (
+                      <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+                        <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                        <div className="text-sm text-destructive">
+                          <p className="font-medium">Insufficient leave balance</p>
+                          <p className="text-xs mt-0.5">Please contact HR for assistance.</p>
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <label className="text-xs text-muted-foreground">Reason</label>
                       <Textarea value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} placeholder="Enter reason..." />
                     </div>
-                    <Button type="submit" className="w-full" disabled={addLeave.isPending}>
+                    <Button type="submit" className="w-full" disabled={addLeave.isPending || hasInsufficientBalance}>
                       {addLeave.isPending ? 'Submitting...' : 'Submit Request'}
                     </Button>
                   </form>
