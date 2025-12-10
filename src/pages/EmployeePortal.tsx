@@ -29,7 +29,7 @@ export default function EmployeePortal() {
   const { employeeId } = useParams<{ employeeId: string }>();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [activeTab, setActiveTab] = useState<TabType>('personal');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
   const [isEditingPersonal, setIsEditingPersonal] = useState(false);
@@ -146,12 +146,12 @@ export default function EmployeePortal() {
   }
 
   const tabs = [
+    { id: 'personal' as TabType, label: 'Personal Info', icon: UserCircle },
     { id: 'overview' as TabType, label: 'Overview', icon: User },
     { id: 'attendance' as TabType, label: 'Attendance', icon: Clock },
     { id: 'leave' as TabType, label: 'Leave', icon: Calendar },
     { id: 'contract' as TabType, label: 'Contract', icon: FileText },
     { id: 'letters' as TabType, label: 'HR Letters', icon: Mail },
-    { id: 'personal' as TabType, label: 'Personal Info', icon: UserCircle },
   ];
 
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
