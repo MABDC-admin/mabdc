@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useEmployees, useDeleteEmployee } from '@/hooks/useEmployees';
-import { useLeave } from '@/hooks/useLeave';
+import { useLeave, useAllLeaveBalances } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { useHRStore } from '@/store/hrStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
 import { AddEmployeeModal } from '@/components/modals/AddEmployeeModal';
-import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning, FilePlus } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning, FilePlus, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/hr';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -33,6 +33,28 @@ export function EmployeesView() {
   const { data: employees = [], isLoading, refetch } = useEmployees();
   const { data: leaveRecords = [] } = useLeave();
   const { data: contracts = [] } = useContracts();
+  const { data: allLeaveBalances = [] } = useAllLeaveBalances();
+
+  // Calculate total allocated leave balance per employee from leave_balances table
+  const employeeLeaveBalances = useMemo(() => {
+    const balanceMap: Record<string, number> = {};
+    allLeaveBalances.forEach((balance) => {
+      const available = (balance.entitled_days || 0) + (balance.carried_forward_days || 0) - (balance.used_days || 0) - (balance.pending_days || 0);
+      balanceMap[balance.employee_id] = (balanceMap[balance.employee_id] || 0) + Math.max(0, available);
+    });
+    return balanceMap;
+  }, [allLeaveBalances]);
+
+  const getEmployeeLeaveBalance = (employeeId: string) => {
+    return employeeLeaveBalances[employeeId] ?? 0;
+  };
+
+  const openWhatsApp = (phone: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Clean phone number and format for WhatsApp
+    const cleanPhone = phone.replace(/\D/g, '');
+    window.open(`https://wa.me/${cleanPhone}`, '_blank');
+  };
   const deleteEmployee = useDeleteEmployee();
   const { setCurrentEmployee, setCurrentView } = useHRStore();
   const [searchQuery, setSearchQuery] = useState('');
@@ -331,7 +353,7 @@ export function EmployeesView() {
                     </div>
                     <div className="text-center">
                       <p className="text-[10px] uppercase text-muted-foreground">Leave</p>
-                      <p className="text-xs text-foreground font-medium">{emp.leave_balance || 0}d</p>
+                      <p className="text-xs text-foreground font-medium">{getEmployeeLeaveBalance(emp.id)}d</p>
                     </div>
                   </div>
                 </div>
@@ -467,7 +489,18 @@ export function EmployeesView() {
                     </div>
                     <div>
                       <p className="text-[10px] uppercase text-muted-foreground">Phone</p>
-                      <p className="text-xs text-foreground">{emp.work_phone}</p>
+                      <p className="text-xs text-foreground flex items-center gap-1">
+                        {emp.work_phone}
+                        {emp.work_phone && (
+                          <button 
+                            onClick={(e) => openWhatsApp(emp.work_phone, e)}
+                            className="text-emerald-500 hover:text-emerald-600 transition-colors"
+                            title="Send WhatsApp message"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </p>
                     </div>
                     <div>
                       <p className="text-[10px] uppercase text-muted-foreground">Nationality</p>
@@ -475,7 +508,7 @@ export function EmployeesView() {
                     </div>
                     <div>
                       <p className="text-[10px] uppercase text-muted-foreground">Leave Balance</p>
-                      <p className="text-xs text-foreground">{emp.leave_balance || 0} days</p>
+                      <p className="text-xs text-foreground">{getEmployeeLeaveBalance(emp.id)} days</p>
                     </div>
                   </div>
                 </div>
