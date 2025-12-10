@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileSpreadsheet, FileText, Download, Calendar, Users, AlertTriangle } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO, isWithinInterval, differenceInDays, eachDayOfInterval } from 'date-fns';
+import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -79,7 +80,8 @@ export function AttendanceReportModal({
 
   const reportStats = useMemo(() => {
     const presentCount = filteredRecords.filter(r => r.status === 'Present').length;
-    const lateCount = filteredRecords.filter(r => r.status === 'Late').length;
+    const lateCount = filteredRecords.filter(r => String(r.status).includes('Late')).length;
+    const undertimeCount = filteredRecords.filter(r => String(r.status).includes('Undertime')).length;
     const absentCount = filteredRecords.filter(r => r.status === 'Absent').length;
     const halfDayCount = filteredRecords.filter(r => r.status === 'Half Day').length;
     const totalDays = differenceInDays(getDateRange.end, getDateRange.start) + 1;
@@ -91,12 +93,45 @@ export function AttendanceReportModal({
       const monthEnd = endOfMonth(parseISO(selectedDate));
       const matchesEmployee = selectedEmployee === 'all' || r.employee_id === selectedEmployee;
       return isWithinInterval(recordDate, { start: monthStart, end: monthEnd }) && 
-             r.status === 'Late' && 
+             String(r.status).includes('Late') && 
              matchesEmployee;
     }).length;
 
-    return { presentCount, lateCount, absentCount, halfDayCount, totalDays, monthlyLateCount };
+    const monthlyUndertimeCount = attendance.filter(r => {
+      const recordDate = parseISO(r.date);
+      const monthStart = startOfMonth(parseISO(selectedDate));
+      const monthEnd = endOfMonth(parseISO(selectedDate));
+      const matchesEmployee = selectedEmployee === 'all' || r.employee_id === selectedEmployee;
+      return isWithinInterval(recordDate, { start: monthStart, end: monthEnd }) && 
+             String(r.status).includes('Undertime') && 
+             matchesEmployee;
+    }).length;
+
+    return { presentCount, lateCount, undertimeCount, absentCount, halfDayCount, totalDays, monthlyLateCount, monthlyUndertimeCount };
   }, [filteredRecords, getDateRange, attendance, selectedDate, selectedEmployee]);
+
+  // Helper to generate undertime remark
+  const getUndertimeRemark = (record: AttendanceRecord) => {
+    if (record.check_out && record.check_out < '17:00') {
+      const [hours, mins] = record.check_out.split(':').map(Number);
+      const earlyMins = (17 * 60) - (hours * 60 + mins);
+      const earlyHours = Math.floor(earlyMins / 60);
+      const earlyMinutes = earlyMins % 60;
+      return `Undertime: Left ${earlyHours}h ${earlyMinutes}m early`;
+    }
+    return null;
+  };
+
+  // Combine remarks with undertime info
+  const getRemarks = (record: AttendanceRecord) => {
+    const undertimeRemark = getUndertimeRemark(record);
+    const existingRemarks = record.admin_remarks || record.employee_remarks || '';
+    
+    if (undertimeRemark && existingRemarks) {
+      return `${undertimeRemark} | ${existingRemarks}`;
+    }
+    return undertimeRemark || existingRemarks || '';
+  };
 
   const exportToExcel = () => {
     const workbook = XLSX.utils.book_new();
@@ -110,8 +145,7 @@ export function AttendanceReportModal({
       'Check In': record.check_in || '-',
       'Check Out': record.check_out || '-',
       'Status': record.status,
-      'Employee Remarks': record.employee_remarks || '',
-      'Admin Remarks': record.admin_remarks || '',
+      'Remarks': getRemarks(record),
     }));
 
     // Add summary row
@@ -123,9 +157,8 @@ export function AttendanceReportModal({
       'HRMS No': '',
       'Check In': `Present: ${reportStats.presentCount}`,
       'Check Out': `Late: ${reportStats.lateCount}`,
-      'Status': `Absent: ${reportStats.absentCount}`,
-      'Employee Remarks': '',
-      'Admin Remarks': `Monthly Lates: ${reportStats.monthlyLateCount}`,
+      'Status': `Undertime: ${reportStats.undertimeCount}`,
+      'Remarks': `Monthly Lates: ${reportStats.monthlyLateCount} | Monthly Undertime: ${reportStats.monthlyUndertimeCount}`,
     } as any);
 
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -160,7 +193,8 @@ export function AttendanceReportModal({
     doc.text('Summary', 14, 52);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Present: ${reportStats.presentCount} | Late: ${reportStats.lateCount} | Absent: ${reportStats.absentCount} | Monthly Lates: ${reportStats.monthlyLateCount}`, 14, 58);
+    doc.text(`Present: ${reportStats.presentCount} | Late: ${reportStats.lateCount} | Undertime: ${reportStats.undertimeCount} | Absent: ${reportStats.absentCount}`, 14, 58);
+    doc.text(`Monthly Lates: ${reportStats.monthlyLateCount} | Monthly Undertime: ${reportStats.monthlyUndertimeCount}`, 14, 64);
 
     // Table
     const tableData = filteredRecords.map(record => [
@@ -170,20 +204,29 @@ export function AttendanceReportModal({
       record.check_in || '-',
       record.check_out || '-',
       record.status,
-      record.admin_remarks || record.employee_remarks || '',
+      getRemarks(record),
     ]);
 
     autoTable(doc, {
-      startY: 65,
+      startY: 70,
       head: [['Date', 'Employee', 'HRMS', 'In', 'Out', 'Status', 'Remarks']],
       body: tableData,
       styles: { fontSize: 8 },
       headStyles: { fillColor: [74, 222, 128] },
       didParseCell: (data) => {
         // Red color for Late status
-        if (data.column.index === 5 && data.cell.text[0] === 'Late') {
+        if (data.column.index === 5 && String(data.cell.text[0]).includes('Late')) {
           data.cell.styles.textColor = [220, 38, 38];
           data.cell.styles.fontStyle = 'bold';
+        }
+        // Cyan color for Undertime
+        if (data.column.index === 5 && String(data.cell.text[0]).includes('Undertime')) {
+          data.cell.styles.textColor = [6, 182, 212];
+          data.cell.styles.fontStyle = 'bold';
+        }
+        // Undertime remarks in cyan
+        if (data.column.index === 6 && String(data.cell.text[0]).includes('Undertime')) {
+          data.cell.styles.textColor = [6, 182, 212];
         }
       },
     });
@@ -237,7 +280,7 @@ export function AttendanceReportModal({
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4">
             <div className="p-3 rounded-xl bg-primary/10 border border-primary/30">
               <p className="text-xs text-muted-foreground">Present</p>
               <p className="text-2xl font-bold text-primary">{reportStats.presentCount}</p>
@@ -245,6 +288,10 @@ export function AttendanceReportModal({
             <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
               <p className="text-xs text-muted-foreground">Late</p>
               <p className="text-2xl font-bold text-amber-400">{reportStats.lateCount}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30">
+              <p className="text-xs text-muted-foreground">Undertime</p>
+              <p className="text-2xl font-bold text-cyan-400">{reportStats.undertimeCount}</p>
             </div>
             <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30">
               <p className="text-xs text-muted-foreground">Absent</p>
@@ -280,20 +327,34 @@ export function AttendanceReportModal({
                       </td>
                     </tr>
                   ) : (
-                    filteredRecords.map((record) => (
-                      <tr key={record.id} className="border-t border-border">
-                        <td className="p-2">{format(parseISO(record.date), 'dd/MM')}</td>
-                        <td className="p-2">{record.employees?.full_name}</td>
-                        <td className="p-2">{record.check_in || '-'}</td>
-                        <td className="p-2">{record.check_out || '-'}</td>
-                        <td className={`p-2 font-medium ${record.status === 'Late' ? 'text-destructive' : ''}`}>
-                          {record.status}
-                        </td>
-                        <td className="p-2 text-xs text-muted-foreground truncate max-w-[150px]">
-                          {record.admin_remarks || record.employee_remarks || '-'}
-                        </td>
-                      </tr>
-                    ))
+                    filteredRecords.map((record) => {
+                      const remarks = getRemarks(record);
+                      const isUndertime = String(record.status).includes('Undertime') || (record.check_out && record.check_out < '17:00');
+                      const isLate = String(record.status).includes('Late');
+                      
+                      return (
+                        <tr key={record.id} className="border-t border-border">
+                          <td className="p-2">{format(parseISO(record.date), 'dd/MM')}</td>
+                          <td className="p-2">{record.employees?.full_name}</td>
+                          <td className="p-2">{record.check_in || '-'}</td>
+                          <td className="p-2">{record.check_out || '-'}</td>
+                          <td className={cn(
+                            "p-2 font-medium",
+                            isLate && isUndertime && "text-amber-500",
+                            isLate && !isUndertime && "text-destructive",
+                            isUndertime && !isLate && "text-cyan-500"
+                          )}>
+                            {record.status}
+                          </td>
+                          <td className={cn(
+                            "p-2 text-xs truncate max-w-[150px]",
+                            isUndertime ? "text-cyan-500" : "text-muted-foreground"
+                          )}>
+                            {remarks || '-'}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
