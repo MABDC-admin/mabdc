@@ -237,12 +237,16 @@ export function DashboardView() {
                       onClick={() => setCurrentView('employees')}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold",
-                          days <= 30 ? "bg-destructive/20 text-destructive" : "bg-amber-500/20 text-amber-500"
-                        )}>
-                          {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                        </div>
+                        {emp.photo_url ? (
+                          <img src={emp.photo_url} alt={emp.full_name} className="w-8 h-8 rounded-lg object-cover" />
+                        ) : (
+                          <div className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold",
+                            days <= 30 ? "bg-destructive/20 text-destructive" : "bg-amber-500/20 text-amber-500"
+                          )}>
+                            {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                          </div>
+                        )}
                         <div>
                           <p className="text-sm font-medium text-foreground">{emp.full_name}</p>
                           <p className="text-[10px] text-muted-foreground">{emp.hrms_no} • Visa: {emp.visa_no}</p>
@@ -286,9 +290,13 @@ export function DashboardView() {
                 {todayAttendance.filter(a => a.status === 'Late').map((record) => (
                   <div key={record.id} className="flex items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-xs font-bold text-amber-500">
-                        {record.employees?.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '??'}
-                      </div>
+                      {record.employees?.photo_url ? (
+                        <img src={record.employees.photo_url} alt={record.employees.full_name} className="w-8 h-8 rounded-lg object-cover" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-xs font-bold text-amber-500">
+                          {record.employees?.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '??'}
+                        </div>
+                      )}
                       <div>
                         <p className="text-sm font-medium text-foreground">{record.employees?.full_name}</p>
                         <p className="text-[10px] text-muted-foreground">Check-in: {record.check_in || '--:--'}</p>
@@ -342,9 +350,13 @@ export function DashboardView() {
             todayAttendance.slice(0, 6).map((record) => (
               <div key={record.id} className="flex items-center justify-between p-2 rounded-lg bg-secondary/30 border border-border animate-fade-in">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg avatar-gradient flex items-center justify-center text-xs font-bold text-primary-foreground">
-                    {record.employees?.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '??'}
-                  </div>
+                  {record.employees?.photo_url ? (
+                    <img src={record.employees.photo_url} alt={record.employees.full_name} className="w-8 h-8 rounded-lg object-cover" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-lg avatar-gradient flex items-center justify-center text-xs font-bold text-primary-foreground">
+                      {record.employees?.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '??'}
+                    </div>
+                  )}
                   <div>
                     <p className="text-xs font-medium text-foreground">{record.employees?.full_name}</p>
                     <p className="text-[10px] text-muted-foreground flex items-center gap-2">
@@ -410,9 +422,13 @@ export function DashboardView() {
               recentEmployees.map((emp) => (
                 <div key={emp.id} className="p-3 rounded-xl bg-secondary/30 border border-border hover:border-primary/30 transition-colors cursor-pointer group">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg avatar-gradient flex items-center justify-center text-sm font-bold text-primary-foreground">
-                      {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                    </div>
+                    {emp.photo_url ? (
+                      <img src={emp.photo_url} alt={emp.full_name} className="w-10 h-10 rounded-lg object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg avatar-gradient flex items-center justify-center text-sm font-bold text-primary-foreground">
+                        {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">{emp.full_name}</p>
                       <p className="text-xs text-muted-foreground truncate">
