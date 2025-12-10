@@ -15,7 +15,10 @@ import {
   Scale,
   Network,
   LogOut,
-  FolderOpen
+  FolderOpen,
+  ChevronDown,
+  ChevronRight,
+  UserCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHRStore } from '@/store/hrStore';
@@ -27,11 +30,25 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
-const navItems: { id: ViewType; label: string; icon: React.ReactNode }[] = [
+interface NavItem {
+  id: ViewType;
+  label: string;
+  icon: React.ReactNode;
+  subItems?: { id: ViewType; label: string; icon: React.ReactNode }[];
+}
+
+const navItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
   { id: 'employees', label: 'Employees', icon: <Users className="w-5 h-5" /> },
   { id: 'contracts', label: 'Contracts', icon: <FileText className="w-5 h-5" /> },
-  { id: 'attendance', label: 'Attendance', icon: <Clock className="w-5 h-5" /> },
+  { 
+    id: 'attendance', 
+    label: 'Attendance', 
+    icon: <Clock className="w-5 h-5" />,
+    subItems: [
+      { id: 'employee-attendance', label: 'Employee Attendance', icon: <UserCheck className="w-4 h-4" /> }
+    ]
+  },
   { id: 'leave', label: 'Leave', icon: <CalendarDays className="w-5 h-5" /> },
   { id: 'payroll', label: 'Payroll & WPS', icon: <DollarSign className="w-5 h-5" /> },
   { id: 'eos', label: 'EOS Calculator', icon: <Calculator className="w-5 h-5" /> },
@@ -46,6 +63,7 @@ const navItems: { id: ViewType; label: string; icon: React.ReactNode }[] = [
 export function Sidebar() {
   const { currentView, setCurrentView } = useHRStore();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['attendance']);
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
   
@@ -60,6 +78,16 @@ export function Sidebar() {
       toast.success('Signed out successfully');
       navigate('/auth?portal=hr');
     }
+  };
+
+  const toggleExpanded = (id: string) => {
+    setExpandedMenus(prev => 
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
+  };
+
+  const isSubItemActive = (item: NavItem) => {
+    return item.subItems?.some(sub => sub.id === currentView);
   };
 
   return (
@@ -100,20 +128,70 @@ export function Sidebar() {
 
         <nav className="space-y-1">
           {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => {
-                setCurrentView(item.id);
-                setIsMobileOpen(false);
-              }}
-              className={cn(
-                "nav-item w-full text-left text-muted-foreground",
-                currentView === item.id && "active text-primary"
+            <div key={item.id}>
+              {item.subItems ? (
+                <>
+                  {/* Parent menu with submenu */}
+                  <button
+                    onClick={() => {
+                      setCurrentView(item.id);
+                      toggleExpanded(item.id);
+                      setIsMobileOpen(false);
+                    }}
+                    className={cn(
+                      "nav-item w-full text-left text-muted-foreground flex items-center justify-between",
+                      (currentView === item.id || isSubItemActive(item)) && "active text-primary"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </div>
+                    {expandedMenus.includes(item.id) ? (
+                      <ChevronDown className="w-4 h-4" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4" />
+                    )}
+                  </button>
+                  
+                  {/* Submenu items */}
+                  {expandedMenus.includes(item.id) && (
+                    <div className="ml-4 pl-4 border-l border-border space-y-1 mt-1">
+                      {item.subItems.map((subItem) => (
+                        <button
+                          key={subItem.id}
+                          onClick={() => {
+                            setCurrentView(subItem.id);
+                            setIsMobileOpen(false);
+                          }}
+                          className={cn(
+                            "nav-item w-full text-left text-muted-foreground text-sm py-2",
+                            currentView === subItem.id && "active text-primary"
+                          )}
+                        >
+                          {subItem.icon}
+                          <span>{subItem.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    setCurrentView(item.id);
+                    setIsMobileOpen(false);
+                  }}
+                  className={cn(
+                    "nav-item w-full text-left text-muted-foreground",
+                    currentView === item.id && "active text-primary"
+                  )}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </button>
               )}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </button>
+            </div>
           ))}
           
           {/* Attendance Scanner Link */}
