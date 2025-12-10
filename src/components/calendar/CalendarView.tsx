@@ -1,15 +1,17 @@
 import { useState, useMemo } from 'react';
 import { useLeave, usePublicHolidays } from '@/hooks/useLeave';
 import { useEvents, useAddEvent, useDeleteEvent } from '@/hooks/useSettings';
+import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ChevronLeft, ChevronRight, Plus, Trash2, CalendarDays, Users, Flag } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ChevronLeft, ChevronRight, Plus, LayoutGrid, Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, addWeeks, getWeeksInMonth } from 'date-fns';
 
 interface CalendarViewProps {
   className?: string;
@@ -19,11 +21,12 @@ export function CalendarView({ className }: CalendarViewProps) {
   const { data: leave = [] } = useLeave();
   const { data: holidays = [] } = usePublicHolidays();
   const { data: events = [] } = useEvents();
+  const { data: employees = [] } = useEmployees();
   const addEvent = useAddEvent();
   const deleteEvent = useDeleteEvent();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [viewMode, setViewMode] = useState<'matrix' | 'calendar'>('calendar');
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [eventForm, setEventForm] = useState({
     title: '',
@@ -37,11 +40,19 @@ export function CalendarView({ className }: CalendarViewProps) {
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
-  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-
-  // Get day of week for first day (0 = Sunday)
-  const startDayOfWeek = monthStart.getDay();
-  const paddingDays = Array(startDayOfWeek).fill(null);
+  
+  // Get all weeks in the month
+  const weeks = useMemo(() => {
+    const firstWeekStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const lastWeekEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    const allDays = eachDayOfInterval({ start: firstWeekStart, end: lastWeekEnd });
+    
+    const weeksArray: Date[][] = [];
+    for (let i = 0; i < allDays.length; i += 7) {
+      weeksArray.push(allDays.slice(i, i + 7));
+    }
+    return weeksArray;
+  }, [currentMonth]);
 
   const approvedLeave = leave.filter(l => l.status === 'Approved');
 
@@ -67,15 +78,7 @@ export function CalendarView({ className }: CalendarViewProps) {
 
   const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
   const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
-
-  const handleDateClick = (date: Date) => {
-    setSelectedDate(date);
-    setEventForm(prev => ({
-      ...prev,
-      start_date: format(date, 'yyyy-MM-dd'),
-      end_date: format(date, 'yyyy-MM-dd'),
-    }));
-  };
+  const handleToday = () => setCurrentMonth(new Date());
 
   const handleSubmitEvent = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,175 +106,212 @@ export function CalendarView({ className }: CalendarViewProps) {
     });
   };
 
-  const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : null;
+  const getEmployeeById = (id: string) => employees.find(e => e.id === id);
 
-  const eventColors: Record<string, string> = {
-    General: 'bg-primary',
-    Meeting: 'bg-uae-blue',
-    Training: 'bg-uae-green',
-    Holiday: 'bg-destructive',
-    Company: 'bg-accent',
+  const leaveTypeColors: Record<string, string> = {
+    'Annual': 'text-blue-600',
+    'Sick': 'text-orange-600',
+    'Emergency': 'text-red-600',
+    'Maternity': 'text-pink-600',
+    'Paternity': 'text-indigo-600',
+    'Bereavement': 'text-gray-600',
+    'Unpaid': 'text-slate-600',
+    'WFH': 'text-green-600',
   };
+
+  const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
   return (
     <div className={cn("space-y-4", className)}>
       {/* Calendar Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handlePrevMonth} className="h-8 w-8 border-border">
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <h2 className="text-lg font-semibold text-foreground min-w-[160px] text-center">
-            {format(currentMonth, 'MMMM yyyy')}
-          </h2>
-          <Button variant="outline" size="icon" onClick={handleNextMonth} className="h-8 w-8 border-border">
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-        <Button size="sm" onClick={() => setIsEventModalOpen(true)} className="bg-primary hover:bg-primary/90">
-          <Plus className="w-4 h-4 mr-1" /> Add Event
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Calendar Grid */}
-        <div className="lg:col-span-3 glass-card rounded-2xl border border-border p-4">
-          {/* Day Headers */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
-                {day}
-              </div>
-            ))}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <h2 className="text-xl font-bold text-foreground">Calendar</h2>
+        
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* View Toggle */}
+          <div className="inline-flex rounded-lg border border-border bg-secondary/30 p-1">
+            <button
+              onClick={() => setViewMode('matrix')}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                viewMode === 'matrix' 
+                  ? "bg-background text-foreground shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Matrix view
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                viewMode === 'calendar' 
+                  ? "bg-primary text-primary-foreground shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Calendar view
+            </button>
           </div>
 
-          {/* Calendar Days */}
-          <div className="grid grid-cols-7 gap-1">
-            {paddingDays.map((_, i) => (
-              <div key={`padding-${i}`} className="aspect-square" />
-            ))}
-            {daysInMonth.map(day => {
+          {/* Month Navigation */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-foreground min-w-[120px]">
+              {format(currentMonth, 'MMMM yyyy')}
+            </span>
+            <Button variant="ghost" size="icon" onClick={handlePrevMonth} className="h-7 w-7">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleNextMonth} className="h-7 w-7">
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <Button variant="outline" size="sm" onClick={handleToday} className="text-xs border-border">
+            Today
+          </Button>
+
+          <Button size="sm" onClick={() => setIsEventModalOpen(true)} className="bg-primary hover:bg-primary/90 text-xs">
+            <Plus className="w-3 h-3 mr-1" /> Add Event
+          </Button>
+        </div>
+      </div>
+
+      {/* Calendar Grid */}
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        {/* Day Headers */}
+        <div className="grid grid-cols-7 border-b border-border">
+          {dayNames.map((day, idx) => (
+            <div 
+              key={day} 
+              className={cn(
+                "py-3 text-center text-xs font-medium text-muted-foreground border-r border-border last:border-r-0",
+                idx === 0 && "text-destructive/70"
+              )}
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar Weeks */}
+        {weeks.map((week, weekIndex) => (
+          <div key={weekIndex} className="grid grid-cols-7 border-b border-border last:border-b-0">
+            {week.map((day, dayIndex) => {
               const { leaveItems, holidayItems, eventItems } = getEventsForDate(day);
-              const hasEvents = leaveItems.length > 0 || holidayItems.length > 0 || eventItems.length > 0;
-              const isSelected = selectedDate && isSameDay(day, selectedDate);
+              const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
+              const isTodayDate = isToday(day);
+
+              // Group leave by type for display
+              const leaveByType: Record<string, typeof leaveItems> = {};
+              leaveItems.forEach(l => {
+                const type = l.leave_type;
+                if (!leaveByType[type]) leaveByType[type] = [];
+                leaveByType[type].push(l);
+              });
 
               return (
-                <button
+                <div
                   key={day.toISOString()}
-                  onClick={() => handleDateClick(day)}
                   className={cn(
-                    "aspect-square p-1 rounded-lg transition-all relative group",
-                    "hover:bg-secondary/50",
-                    isToday(day) && "ring-2 ring-primary",
-                    isSelected && "bg-primary/10",
-                    !isSameMonth(day, currentMonth) && "opacity-50"
+                    "min-h-[120px] p-2 border-r border-border last:border-r-0 transition-colors",
+                    !isCurrentMonth && "bg-muted/30",
+                    isTodayDate && "bg-primary/5"
                   )}
                 >
-                  <span className={cn(
-                    "text-sm font-medium",
-                    isToday(day) && "text-primary font-bold",
-                    isSelected && "text-primary"
-                  )}>
-                    {format(day, 'd')}
-                  </span>
-                  
-                  {hasEvents && (
-                    <div className="absolute bottom-1 left-1 right-1 flex gap-0.5 justify-center">
-                      {holidayItems.length > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-                      )}
-                      {leaveItems.length > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                      )}
-                      {eventItems.length > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                      )}
-                    </div>
-                  )}
-                </button>
+                  {/* Day Number */}
+                  <div className="flex items-start justify-between mb-1">
+                    <span className={cn(
+                      "text-xs font-medium uppercase text-muted-foreground",
+                      dayIndex === 0 && "text-destructive/70"
+                    )}>
+                      {dayNames[dayIndex]}
+                    </span>
+                    <span className={cn(
+                      "text-lg font-semibold",
+                      !isCurrentMonth && "text-muted-foreground/50",
+                      isCurrentMonth && "text-foreground",
+                      isTodayDate && "bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center text-sm"
+                    )}>
+                      {format(day, 'd')}
+                    </span>
+                  </div>
+
+                  {/* Events Container */}
+                  <div className="space-y-1 mt-1">
+                    {/* Holidays */}
+                    {holidayItems.map(holiday => (
+                      <div key={holiday.id} className="text-xs">
+                        <span className="text-destructive font-medium">{holiday.name}</span>
+                        <p className="text-[10px] text-muted-foreground">All employees</p>
+                      </div>
+                    ))}
+
+                    {/* Leave by type with avatars */}
+                    {Object.entries(leaveByType).map(([type, items]) => (
+                      <div key={type} className="space-y-0.5">
+                        <span className={cn(
+                          "text-[11px] font-medium",
+                          leaveTypeColors[type] || "text-foreground"
+                        )}>
+                          {type} Leave
+                        </span>
+                        <div className="flex -space-x-1.5">
+                          {items.slice(0, 4).map(l => {
+                            const employee = getEmployeeById(l.employee_id);
+                            return (
+                              <Avatar key={l.id} className="w-5 h-5 border border-background">
+                                <AvatarImage src={employee?.photo_url || ''} />
+                                <AvatarFallback className="text-[8px] bg-secondary">
+                                  {employee?.full_name?.charAt(0) || '?'}
+                                </AvatarFallback>
+                              </Avatar>
+                            );
+                          })}
+                          {items.length > 4 && (
+                            <div className="w-5 h-5 rounded-full bg-muted border border-background flex items-center justify-center">
+                              <span className="text-[8px] text-muted-foreground">+{items.length - 4}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Custom Events */}
+                    {eventItems.map(event => (
+                      <div key={event.id} className="text-[10px] text-primary font-medium truncate">
+                        {event.title}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               );
             })}
           </div>
+        ))}
+      </div>
 
-          {/* Legend */}
-          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="w-2.5 h-2.5 rounded-full bg-destructive" />
-              <span>Holiday</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-              <span>Leave</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="w-2.5 h-2.5 rounded-full bg-primary" />
-              <span>Event</span>
-            </div>
-          </div>
+      {/* Legend */}
+      <div className="flex items-center gap-6 pt-2">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="w-2.5 h-2.5 rounded-full bg-destructive" />
+          <span>Holiday</span>
         </div>
-
-        {/* Selected Date Events */}
-        <div className="glass-card rounded-2xl border border-border p-4">
-          <h3 className="text-sm font-semibold text-foreground mb-3">
-            {selectedDate ? format(selectedDate, 'EEEE, MMMM d') : 'Select a date'}
-          </h3>
-          
-          {selectedDate && selectedDateEvents ? (
-            <div className="space-y-2 max-h-80 overflow-y-auto soft-scroll">
-              {selectedDateEvents.holidayItems.length === 0 && 
-               selectedDateEvents.leaveItems.length === 0 && 
-               selectedDateEvents.eventItems.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-4 text-center">No events on this day</p>
-              ) : (
-                <>
-                  {selectedDateEvents.holidayItems.map(holiday => (
-                    <div key={holiday.id} className="p-2 rounded-lg bg-destructive/10 border border-destructive/20">
-                      <div className="flex items-center gap-2">
-                        <Flag className="w-3 h-3 text-destructive" />
-                        <span className="text-xs font-medium text-foreground">{holiday.name}</span>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Public Holiday</p>
-                    </div>
-                  ))}
-                  
-                  {selectedDateEvents.leaveItems.map(leaveItem => (
-                    <div key={leaveItem.id} className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-3 h-3 text-amber-500" />
-                        <span className="text-xs font-medium text-foreground">{leaveItem.employees?.full_name}</span>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{leaveItem.leave_type} Leave</p>
-                    </div>
-                  ))}
-                  
-                  {selectedDateEvents.eventItems.map(event => (
-                    <div 
-                      key={event.id} 
-                      className="p-2 rounded-lg bg-primary/10 border border-primary/20 group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <CalendarDays className="w-3 h-3 text-primary" />
-                          <span className="text-xs font-medium text-foreground">{event.title}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => deleteEvent.mutate(event.id)}
-                        >
-                          <Trash2 className="w-3 h-3 text-destructive" />
-                        </Button>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{event.event_type}</p>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground py-4 text-center">Click a date to see events</p>
-          )}
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+          <span>Sick Leave</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+          <span>Annual Leave</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="w-2.5 h-2.5 rounded-full bg-gray-500" />
+          <span>Bereavement</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+          <span>WFH</span>
         </div>
       </div>
 
