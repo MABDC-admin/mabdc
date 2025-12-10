@@ -475,3 +475,65 @@ export function useAllLeaveBalances() {
     },
   });
 }
+
+export function useUpdateLeaveBalance() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, entitled_days, carried_forward_days }: { 
+      id: string; 
+      entitled_days: number;
+      carried_forward_days?: number;
+    }) => {
+      const { data, error } = await supabase
+        .from('leave_balances')
+        .update({
+          entitled_days,
+          carried_forward_days: carried_forward_days || 0,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
+      queryClient.invalidateQueries({ queryKey: ['all_leave_balances'] });
+      toast.success('Leave allocation updated');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update allocation: ${error.message}`);
+    },
+  });
+}
+
+// Check for overlapping leaves
+export function useCheckOverlappingLeave() {
+  return useMutation({
+    mutationFn: async ({ employee_id, start_date, end_date, exclude_id }: {
+      employee_id: string;
+      start_date: string;
+      end_date: string;
+      exclude_id?: string;
+    }) => {
+      let query = supabase
+        .from('leave_records')
+        .select('id, start_date, end_date, leave_type, status')
+        .eq('employee_id', employee_id)
+        .in('status', ['Pending', 'Approved'])
+        .or(`and(start_date.lte.${end_date},end_date.gte.${start_date})`);
+      
+      if (exclude_id) {
+        query = query.neq('id', exclude_id);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+}
