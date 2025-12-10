@@ -153,14 +153,16 @@ export function useUpdateLeaveStatus() {
         updateData.rejection_reason = rejection_reason;
       }
       
-      // First, get the leave record details
+      // First, get the leave record details including current status
       const { data: leaveRecord, error: fetchError } = await supabase
         .from('leave_records')
-        .select('employee_id, leave_type, days_count')
+        .select('employee_id, leave_type, days_count, status')
         .eq('id', id)
         .single();
       
       if (fetchError) throw fetchError;
+      
+      const previousStatus = leaveRecord?.status;
       
       // Update the leave record status
       const { data, error } = await supabase
@@ -172,9 +174,8 @@ export function useUpdateLeaveStatus() {
       
       if (error) throw error;
       
-      // If approved, deduct from leave balance
-      if (status === 'Approved' && leaveRecord) {
-        // Find the leave type ID
+      // Handle leave balance updates
+      if (leaveRecord) {
         const { data: leaveType } = await supabase
           .from('leave_types')
           .select('id')
@@ -184,7 +185,6 @@ export function useUpdateLeaveStatus() {
         if (leaveType) {
           const currentYear = new Date().getFullYear();
           
-          // Get current balance
           const { data: currentBalance } = await supabase
             .from('leave_balances')
             .select('id, used_days, pending_days')
@@ -194,14 +194,27 @@ export function useUpdateLeaveStatus() {
             .single();
           
           if (currentBalance) {
-            // Update balance: increment used_days by days_count
-            await supabase
-              .from('leave_balances')
-              .update({
-                used_days: (currentBalance.used_days || 0) + leaveRecord.days_count,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', currentBalance.id);
+            // If approving (and wasn't previously approved), deduct from balance
+            if (status === 'Approved' && previousStatus !== 'Approved') {
+              await supabase
+                .from('leave_balances')
+                .update({
+                  used_days: (currentBalance.used_days || 0) + leaveRecord.days_count,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', currentBalance.id);
+            }
+            // If rejecting a previously approved leave, restore the balance
+            else if (status === 'Rejected' && previousStatus === 'Approved') {
+              const newUsedDays = Math.max(0, (currentBalance.used_days || 0) - leaveRecord.days_count);
+              await supabase
+                .from('leave_balances')
+                .update({
+                  used_days: newUsedDays,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', currentBalance.id);
+            }
           }
         }
       }
@@ -251,6 +264,49 @@ export function useDeleteLeave() {
   
   return useMutation({
     mutationFn: async (id: string) => {
+      // First, get the leave record to check if it was approved
+      const { data: leaveRecord, error: fetchError } = await supabase
+        .from('leave_records')
+        .select('employee_id, leave_type, days_count, status')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      // If the leave was approved, restore the balance
+      if (leaveRecord && leaveRecord.status === 'Approved') {
+        const { data: leaveType } = await supabase
+          .from('leave_types')
+          .select('id')
+          .eq('name', leaveRecord.leave_type)
+          .single();
+        
+        if (leaveType) {
+          const currentYear = new Date().getFullYear();
+          
+          const { data: currentBalance } = await supabase
+            .from('leave_balances')
+            .select('id, used_days')
+            .eq('employee_id', leaveRecord.employee_id)
+            .eq('leave_type_id', leaveType.id)
+            .eq('year', currentYear)
+            .single();
+          
+          if (currentBalance) {
+            // Restore balance: decrement used_days
+            const newUsedDays = Math.max(0, (currentBalance.used_days || 0) - leaveRecord.days_count);
+            await supabase
+              .from('leave_balances')
+              .update({
+                used_days: newUsedDays,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', currentBalance.id);
+          }
+        }
+      }
+      
+      // Delete the leave record
       const { error } = await supabase
         .from('leave_records')
         .delete()
@@ -261,6 +317,7 @@ export function useDeleteLeave() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave'] });
       queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
+      queryClient.invalidateQueries({ queryKey: ['all_leave_balances'] });
       toast.success('Leave request deleted');
     },
     onError: (error: Error) => {
