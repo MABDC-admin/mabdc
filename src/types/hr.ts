@@ -26,6 +26,16 @@ export interface Employee {
   iban?: string;
   bank_account_no?: string;
   created_at?: string;
+  // Private information fields
+  gender?: string;
+  birthday?: string;
+  personal_email?: string;
+  personal_phone?: string;
+  home_address?: string;
+  place_of_birth?: string;
+  country_of_birth?: string;
+  family_status?: string;
+  number_of_children?: number;
 }
 
 export interface EmployeeDocument {
