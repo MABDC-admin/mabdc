@@ -257,6 +257,11 @@ export default function AttendanceScanner() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/5">
+      {/* Face Enrollment Modal */}
+      <FaceEnrollmentModal 
+        isOpen={enrollModalOpen} 
+        onClose={() => setEnrollModalOpen(false)} 
+      />
       {/* Header */}
       <header className="bg-card border-b border-border">
         <div className="max-w-4xl mx-auto px-4 py-4">
