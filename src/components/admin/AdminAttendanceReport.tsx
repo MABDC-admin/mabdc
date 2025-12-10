@@ -1,13 +1,14 @@
 import { useState, useMemo } from 'react';
-import { useAttendance, useDeleteAttendance } from '@/hooks/useAttendance';
+import { useAttendance, useDeleteAttendance, useUpdateAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, FileText, Calendar, Clock, Users, Trash2, Search, LogIn, LogOut, AlertTriangle } from 'lucide-react';
+import { Download, FileText, Calendar, Clock, Users, Trash2, Search, LogIn, LogOut, AlertTriangle, Pencil } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Label } from '@/components/ui/label';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,16 +19,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+
+interface EditRecord {
+  id: string;
+  employee_name: string;
+  date: string;
+  check_in: string;
+  check_out: string;
+}
 
 export function AdminAttendanceReport() {
   const { data: attendance = [] } = useAttendance();
   const { data: employees = [] } = useEmployees();
   const deleteAttendance = useDeleteAttendance();
+  const updateAttendance = useUpdateAttendance();
   
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(currentDate, 'yyyy-MM'));
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [editRecord, setEditRecord] = useState<EditRecord | null>(null);
 
   const months = useMemo(() => {
     const result = [];
@@ -284,14 +303,30 @@ export function AdminAttendanceReport() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeleteConfirm(record.id)}
-                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditRecord({
+                              id: record.id,
+                              employee_name: emp?.full_name || 'Unknown',
+                              date: record.date,
+                              check_in: record.check_in || '',
+                              check_out: record.check_out || '',
+                            })}
+                            className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteConfirm(record.id)}
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -312,6 +347,70 @@ export function AdminAttendanceReport() {
           </p>
         )}
       </div>
+
+      {/* Edit Attendance Dialog */}
+      <Dialog open={!!editRecord} onOpenChange={() => setEditRecord(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-primary" />
+              Edit Attendance Record
+            </DialogTitle>
+            <DialogDescription>
+              Modify check-in and check-out times for {editRecord?.employee_name} on {editRecord?.date ? format(parseISO(editRecord.date), 'dd MMM yyyy') : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="check_in" className="flex items-center gap-2">
+                <LogIn className="w-4 h-4 text-primary" />
+                Check In Time
+              </Label>
+              <Input
+                id="check_in"
+                type="time"
+                value={editRecord?.check_in || ''}
+                onChange={(e) => setEditRecord(prev => prev ? { ...prev, check_in: e.target.value } : null)}
+                className="bg-secondary/50"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="check_out" className="flex items-center gap-2">
+                <LogOut className="w-4 h-4 text-accent" />
+                Check Out Time
+              </Label>
+              <Input
+                id="check_out"
+                type="time"
+                value={editRecord?.check_out || ''}
+                onChange={(e) => setEditRecord(prev => prev ? { ...prev, check_out: e.target.value } : null)}
+                className="bg-secondary/50"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditRecord(null)}>Cancel</Button>
+            <Button 
+              onClick={() => {
+                if (editRecord) {
+                  const checkInTime = editRecord.check_in || undefined;
+                  const isLate = checkInTime && checkInTime > '08:00';
+                  updateAttendance.mutate({
+                    id: editRecord.id,
+                    check_in: checkInTime,
+                    check_out: editRecord.check_out || undefined,
+                    status: checkInTime ? (isLate ? 'Late' : 'Present') : 'Absent',
+                  });
+                  setEditRecord(null);
+                }
+              }}
+              className="bg-primary text-primary-foreground"
+            >
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
