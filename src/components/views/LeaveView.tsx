@@ -298,7 +298,7 @@ export function LeaveView() {
     }
     acc[empId].balances.push(balance);
     return acc;
-  }, {} as Record<string, { employee: { id: string; full_name: string; hrms_no: string; department: string }; balances: typeof allBalances }>);
+  }, {} as Record<string, { employee: { id: string; full_name: string; hrms_no: string; department: string; photo_url?: string }; balances: typeof allBalances }>);
 
   return (
     <div className="space-y-6 animate-slide-up">
@@ -449,9 +449,13 @@ export function LeaveView() {
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <div className="w-8 h-8 rounded-lg avatar-gradient flex items-center justify-center text-xs font-bold text-primary-foreground">
-                            {record.employees?.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '??'}
-                          </div>
+                          {record.employees?.photo_url ? (
+                            <img src={record.employees.photo_url} alt={record.employees.full_name} className="w-8 h-8 rounded-lg object-cover" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg avatar-gradient flex items-center justify-center text-xs font-bold text-primary-foreground">
+                              {record.employees?.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '??'}
+                            </div>
+                          )}
                           <div>
                             <h3 className="text-sm font-semibold text-foreground">{record.employees?.full_name || 'Unknown'}</h3>
                             <p className="text-[10px] text-muted-foreground">{record.employees?.hrms_no} • {record.employees?.department}</p>
@@ -546,9 +550,13 @@ export function LeaveView() {
                 {Object.values(balancesByEmployee).map(({ employee, balances }) => (
                   <div key={employee.id} className="glass-card rounded-xl border border-border p-4">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-lg avatar-gradient flex items-center justify-center text-sm font-bold text-primary-foreground">
-                        {employee.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                      </div>
+                      {employee.photo_url ? (
+                        <img src={employee.photo_url} alt={employee.full_name} className="w-10 h-10 rounded-lg object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg avatar-gradient flex items-center justify-center text-sm font-bold text-primary-foreground">
+                          {employee.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                        </div>
+                      )}
                       <div>
                         <h3 className="text-sm font-semibold text-foreground">{employee.full_name}</h3>
                         <p className="text-[10px] text-muted-foreground">{employee.hrms_no} • {employee.department}</p>

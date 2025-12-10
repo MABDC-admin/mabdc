@@ -20,6 +20,7 @@ interface Payroll {
     bank_account_no: string | null;
     department: string;
     job_position: string;
+    photo_url?: string;
   };
 }
 
@@ -31,7 +32,7 @@ export function usePayroll() {
         .from('payroll')
         .select(`
           *,
-          employees (full_name, hrms_no, bank_name, iban, bank_account_no, department, job_position)
+          employees (full_name, hrms_no, bank_name, iban, bank_account_no, department, job_position, photo_url)
         `)
         .order('created_at', { ascending: false });
       
