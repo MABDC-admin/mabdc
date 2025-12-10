@@ -279,6 +279,160 @@ export function useCheckOutByHRMS() {
   });
 }
 
+export function useCheckInById() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (employeeId: string) => {
+      // Get employee details
+      const { data: employee, error: empError } = await supabase
+        .from('employees')
+        .select('id, full_name, photo_url, department, job_position, hrms_no')
+        .eq('id', employeeId)
+        .single();
+      
+      if (empError) throw empError;
+      if (!employee) throw new Error('Employee not found');
+      
+      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const checkInTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      
+      // Check if already checked in today
+      const { data: existing } = await supabase
+        .from('attendance')
+        .select('id, check_out')
+        .eq('employee_id', employee.id)
+        .eq('date', today)
+        .maybeSingle();
+      
+      if (existing) {
+        if (!existing.check_out) {
+          throw new Error(`${employee.full_name} already checked in today`);
+        } else {
+          throw new Error(`${employee.full_name} already checked out today`);
+        }
+      }
+      
+      // Late if check-in after 8:00 AM
+      const hour = now.getHours();
+      const minutes = now.getMinutes();
+      const isLate = hour > 8 || (hour === 8 && minutes > 0);
+      const status = isLate ? 'Late' : 'Present';
+      
+      const { data, error } = await supabase
+        .from('attendance')
+        .insert([{
+          employee_id: employee.id,
+          date: today,
+          check_in: checkInTime,
+          status
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return { 
+        ...data, 
+        employeeId: employee.id,
+        employeeName: employee.full_name, 
+        employeePhoto: employee.photo_url,
+        department: employee.department,
+        jobPosition: employee.job_position,
+        hrmsNo: employee.hrms_no,
+        status,
+        checkInTime
+      };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      const statusText = data.status === 'Late' ? '(Late)' : '';
+      toast.success(`${data.employeeName} checked in successfully ${statusText}`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+export function useCheckOutById() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (employeeId: string) => {
+      // Get employee details
+      const { data: employee, error: empError } = await supabase
+        .from('employees')
+        .select('id, full_name, photo_url, department, job_position')
+        .eq('id', employeeId)
+        .single();
+      
+      if (empError) throw empError;
+      if (!employee) throw new Error('Employee not found');
+      
+      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const checkOutTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      
+      // Find today's attendance record
+      const { data: attendance, error: attError } = await supabase
+        .from('attendance')
+        .select('id, check_out, check_in, status')
+        .eq('employee_id', employee.id)
+        .eq('date', today)
+        .maybeSingle();
+      
+      if (attError) throw attError;
+      if (!attendance) throw new Error(`${employee.full_name} hasn't checked in today`);
+      if (attendance.check_out) throw new Error(`${employee.full_name} already checked out`);
+      
+      // Check if undertime (before 7:00 PM / 19:00)
+      const hour = now.getHours();
+      const isUndertime = hour < 19;
+      const wasLate = String(attendance.status).includes('Late');
+      
+      // Determine combined status
+      let newStatus = attendance.status;
+      if (isUndertime && wasLate) {
+        newStatus = 'Late | Undertime';
+      } else if (isUndertime) {
+        newStatus = 'Undertime';
+      }
+      
+      const { data, error } = await supabase
+        .from('attendance')
+        .update({ 
+          check_out: checkOutTime,
+          status: newStatus
+        })
+        .eq('id', attendance.id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return { 
+        ...data, 
+        employeeName: employee.full_name,
+        employeePhoto: employee.photo_url,
+        department: employee.department,
+        jobPosition: employee.job_position,
+        checkInTime: attendance.check_in,
+        checkOutTime,
+        status: newStatus,
+        isUndertime
+      };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      const undertimeText = data.isUndertime ? ' (Undertime)' : '';
+      toast.success(`${data.employeeName} checked out successfully${undertimeText}`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
 export function useDeleteAttendance() {
   const queryClient = useQueryClient();
   

@@ -483,6 +483,38 @@ export type Database = {
           },
         ]
       }
+      employee_face_data: {
+        Row: {
+          created_at: string
+          employee_id: string
+          face_descriptor: Json
+          id: string
+          photo_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          face_descriptor: Json
+          id?: string
+          photo_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          face_descriptor?: Json
+          id?: string
+          photo_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_face_data_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_performance: {
         Row: {
           comments: string | null
