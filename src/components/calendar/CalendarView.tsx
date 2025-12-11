@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { ChevronLeft, ChevronRight, Plus, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Search, X, Cake } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, isWeekend } from 'date-fns';
 
@@ -27,7 +27,7 @@ export function CalendarView({ className }: CalendarViewProps) {
   const deleteEvent = useDeleteEvent();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'matrix' | 'calendar'>('calendar');
+  const [viewMode, setViewMode] = useState<'matrix' | 'calendar' | 'birthdays'>('calendar');
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
@@ -192,7 +192,7 @@ export function CalendarView({ className }: CalendarViewProps) {
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              Matrix view
+              Matrix
             </button>
             <button
               onClick={() => setViewMode('calendar')}
@@ -203,7 +203,19 @@ export function CalendarView({ className }: CalendarViewProps) {
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              Calendar view
+              Calendar
+            </button>
+            <button
+              onClick={() => setViewMode('birthdays')}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
+                viewMode === 'birthdays' 
+                  ? "bg-pink-500 text-white shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Cake className="w-3 h-3" />
+              Birthdays
             </button>
           </div>
 
@@ -579,6 +591,169 @@ export function CalendarView({ className }: CalendarViewProps) {
               <span>{type}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Birthdays View */}
+      {viewMode === 'birthdays' && (
+        <div className="space-y-4">
+          {/* Birthday Calendar Grid */}
+          <div className="bg-card rounded-xl border border-border overflow-hidden">
+            {/* Header */}
+            <div className="grid grid-cols-7 border-b border-border">
+              {dayNames.map(day => (
+                <div key={day} className="p-3 text-center">
+                  <span className="text-xs font-semibold text-muted-foreground">{day}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar Grid */}
+            {weeks.map((week, weekIdx) => (
+              <div key={weekIdx} className="grid grid-cols-7 border-b border-border last:border-b-0">
+                {week.map(day => {
+                  const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
+                  const isTodayDate = isToday(day);
+                  const dayOfMonth = day.getDate();
+                  const monthOfDay = day.getMonth();
+                  
+                  // Find employees with birthdays on this day (any year)
+                  const birthdayEmployees = employees.filter(emp => {
+                    if (!emp.birthday) return false;
+                    const birthday = parseISO(emp.birthday);
+                    return birthday.getDate() === dayOfMonth && birthday.getMonth() === monthOfDay;
+                  });
+
+                  return (
+                    <div 
+                      key={day.toISOString()} 
+                      className={cn(
+                        "min-h-[100px] p-2 border-r border-border last:border-r-0 transition-colors",
+                        !isCurrentMonth && "bg-muted/30",
+                        isCurrentMonth && "bg-card",
+                        isTodayDate && "bg-primary/5",
+                        birthdayEmployees.length > 0 && isCurrentMonth && "bg-pink-500/5"
+                      )}
+                    >
+                      {/* Day Number */}
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={cn(
+                          "text-sm font-medium",
+                          !isCurrentMonth && "text-muted-foreground/50",
+                          isCurrentMonth && "text-foreground",
+                          isTodayDate && "bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs"
+                        )}>
+                          {format(day, 'd')}
+                        </span>
+                        {birthdayEmployees.length > 0 && isCurrentMonth && (
+                          <Cake className="w-3 h-3 text-pink-500" />
+                        )}
+                      </div>
+
+                      {/* Birthday Employees */}
+                      {isCurrentMonth && birthdayEmployees.length > 0 && (
+                        <div className="space-y-1">
+                          {birthdayEmployees.slice(0, 3).map(emp => (
+                            <div 
+                              key={emp.id} 
+                              className="flex items-center gap-1 p-1 rounded bg-pink-500/10 border border-pink-500/20"
+                              title={`${emp.full_name}'s Birthday`}
+                            >
+                              {emp.photo_url ? (
+                                <img src={emp.photo_url} alt={emp.full_name} className="w-4 h-4 rounded-full object-cover" />
+                              ) : (
+                                <div className="w-4 h-4 rounded-full bg-pink-500/30 flex items-center justify-center text-[8px] font-bold text-pink-600">
+                                  {emp.full_name.charAt(0)}
+                                </div>
+                              )}
+                              <span className="text-[9px] font-medium text-pink-600 dark:text-pink-400 truncate flex-1">
+                                {emp.full_name.split(' ')[0]}
+                              </span>
+                            </div>
+                          ))}
+                          {birthdayEmployees.length > 3 && (
+                            <span className="text-[9px] text-pink-500 font-medium">
+                              +{birthdayEmployees.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          {/* Birthday List for Current Month */}
+          <div className="bg-card rounded-xl border border-border p-4">
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Cake className="w-4 h-4 text-pink-500" />
+              Birthdays in {format(currentMonth, 'MMMM')}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {employees
+                .filter(emp => {
+                  if (!emp.birthday) return false;
+                  const birthday = parseISO(emp.birthday);
+                  return birthday.getMonth() === currentMonth.getMonth();
+                })
+                .sort((a, b) => {
+                  const dayA = parseISO(a.birthday!).getDate();
+                  const dayB = parseISO(b.birthday!).getDate();
+                  return dayA - dayB;
+                })
+                .map(emp => {
+                  const birthday = parseISO(emp.birthday!);
+                  const isTodayBirthday = isToday(new Date(currentMonth.getFullYear(), birthday.getMonth(), birthday.getDate()));
+                  
+                  return (
+                    <div 
+                      key={emp.id} 
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border transition-colors",
+                        isTodayBirthday 
+                          ? "bg-pink-500/20 border-pink-500/40" 
+                          : "bg-secondary/30 border-border hover:bg-secondary/50"
+                      )}
+                    >
+                      {emp.photo_url ? (
+                        <img src={emp.photo_url} alt={emp.full_name} className="w-10 h-10 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-pink-500/20 flex items-center justify-center text-sm font-bold text-pink-500">
+                          {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{emp.full_name}</p>
+                        <p className="text-xs text-muted-foreground">{emp.department}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className={cn(
+                          "text-sm font-bold",
+                          isTodayBirthday ? "text-pink-500" : "text-foreground"
+                        )}>
+                          {format(birthday, 'MMM d')}
+                        </p>
+                        {isTodayBirthday && (
+                          <span className="text-[10px] text-pink-500 font-medium">🎂 Today!</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              {employees.filter(emp => {
+                if (!emp.birthday) return false;
+                const birthday = parseISO(emp.birthday);
+                return birthday.getMonth() === currentMonth.getMonth();
+              }).length === 0 && (
+                <div className="col-span-full text-center py-8 text-muted-foreground">
+                  <Cake className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No birthdays in {format(currentMonth, 'MMMM')}</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
