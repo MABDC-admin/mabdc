@@ -243,10 +243,18 @@ export default function TimeClockView() {
       return;
     }
 
-    const status = editStatus === 'late_entry' ? 'Late' : 
-                   editStatus === 'miss_punch_in' || editStatus === 'miss_punch_out' ? 'Missed Punch' : 
-                   editStatus === 'early_out' || editStatus === 'early_in' ? 'Present' :
-                   'Present';
+    // Map TimeClockStatus to database status
+    const statusMap: Record<TimeClockStatus, string> = {
+      on_time: 'Present',
+      early_in: 'Present',
+      late_entry: 'Late',
+      early_out: 'Undertime',
+      late_exit: 'Present',
+      miss_punch_in: 'Missed Punch',
+      miss_punch_out: 'Missed Punch'
+    };
+    
+    const dbStatus = statusMap[editStatus] || 'Present';
 
     try {
       if (editDialog.record.attendanceId) {
@@ -255,9 +263,8 @@ export default function TimeClockView() {
           id: editDialog.record.attendanceId,
           check_in: editCheckIn || null,
           check_out: editCheckOut || null,
-          status
+          status: dbStatus
         });
-        toast.success('Time record updated');
       } else {
         // Create new attendance record
         await createAttendance.mutateAsync({
@@ -265,9 +272,8 @@ export default function TimeClockView() {
           date: dateString,
           check_in: editCheckIn || null,
           check_out: editCheckOut || null,
-          status
+          status: dbStatus
         });
-        toast.success('Time record created');
       }
       setEditDialog({ open: false, record: null });
       refetchAttendance();
@@ -375,8 +381,7 @@ export default function TimeClockView() {
                     <Badge 
                       key={r.employeeId} 
                       variant="outline" 
-                      className="bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200 cursor-pointer hover:bg-red-200"
-                      onClick={() => r.attendanceId && handleEdit(r)}
+                      className="bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200"
                     >
                       {r.employeeName} ({r.hrmsNo})
                     </Badge>
@@ -390,8 +395,7 @@ export default function TimeClockView() {
                     <Badge 
                       key={r.employeeId} 
                       variant="outline" 
-                      className="bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200 cursor-pointer hover:bg-orange-200"
-                      onClick={() => r.attendanceId && handleEdit(r)}
+                      className="bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200"
                     >
                       {r.employeeName} ({r.hrmsNo})
                     </Badge>
@@ -560,17 +564,15 @@ export default function TimeClockView() {
                       )}
                     </div>
 
-                    {/* Status - Clickable to edit */}
+                    {/* Status */}
                     <div className="col-span-2 flex flex-wrap justify-center gap-1">
                       {record.status.map((s, idx) => (
                         <Badge 
                           key={idx} 
                           variant="outline" 
-                          className={`text-xs ${STATUS_COLORS[s]} cursor-pointer hover:opacity-80`}
-                          onClick={() => handleEdit(record)}
+                          className={`text-xs ${STATUS_COLORS[s]}`}
                         >
                           {STATUS_LABELS[s]}
-                          <Edit2 className="h-3 w-3 ml-1" />
                         </Badge>
                       ))}
                     </div>
