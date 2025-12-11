@@ -236,9 +236,12 @@ export function EmployeesView() {
                 <div 
                   key={emp.id} 
                   className={cn(
-                    "glass-card rounded-2xl border border-border p-4 hover:border-muted-foreground/30 transition-all hover:shadow-lg relative group cursor-pointer",
-                    hasPendingLeave && !isContractExpired && "animate-pulse border-amber-500/50 bg-amber-500/5",
-                    isContractExpired && "bg-muted/50 border-muted grayscale-[50%] opacity-80"
+                    "rounded-2xl border p-4 transition-all hover:shadow-lg relative group cursor-pointer overflow-hidden",
+                    isContractExpired 
+                      ? "bg-muted/50 border-muted grayscale-[50%] opacity-80"
+                      : hasPendingLeave 
+                        ? "animate-pulse border-amber-500/50 bg-gradient-to-br from-amber-500/10 via-background to-orange-500/10"
+                        : "bg-gradient-to-br from-primary/5 via-background to-accent/10 border-border hover:border-primary/30"
                   )}
                   onClick={() => openProfile(emp)}
                 >
@@ -381,9 +384,12 @@ export function EmployeesView() {
                 <div 
                   key={emp.id} 
                   className={cn(
-                    "glass-card rounded-2xl border border-border p-4 hover:border-muted-foreground/30 transition-colors",
-                    hasPendingLeave && !isContractExpired && "animate-pulse border-amber-500/50 bg-amber-500/5",
-                    isContractExpired && "bg-muted/50 border-muted grayscale-[50%] opacity-80"
+                    "rounded-2xl border p-4 transition-colors overflow-hidden",
+                    isContractExpired 
+                      ? "bg-muted/50 border-muted grayscale-[50%] opacity-80"
+                      : hasPendingLeave 
+                        ? "animate-pulse border-amber-500/50 bg-gradient-to-r from-amber-500/10 via-background to-orange-500/10"
+                        : "bg-gradient-to-r from-primary/5 via-background to-accent/10 border-border hover:border-primary/30"
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">

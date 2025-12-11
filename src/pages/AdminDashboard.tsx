@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   Shield, Users, Calendar, FileText, DollarSign, ClipboardList, 
   Trash2, Edit, Plus, Download, RefreshCw, Database, BarChart3,
-  ChevronDown, AlertTriangle, Star, Scale, LogOut
+  ChevronDown, AlertTriangle, Star, Scale, LogOut, MessageSquare
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,6 +11,7 @@ import { useLeave, useDeleteLeave, useAddLeave, useUpdateLeave } from '@/hooks/u
 import { useAttendance } from '@/hooks/useAttendance';
 import { usePayroll, useGeneratePayroll } from '@/hooks/usePayroll';
 import { useContracts } from '@/hooks/useContracts';
+import { useAttendanceAppeals } from '@/hooks/useAttendanceAppeals';
 import { AdminEmployeeSection } from '@/components/admin/AdminEmployeeSection';
 import { AdminLeaveSection } from '@/components/admin/AdminLeaveSection';
 import { AdminAttendanceReport } from '@/components/admin/AdminAttendanceReport';
@@ -18,6 +19,7 @@ import { AdminPayrollReport } from '@/components/admin/AdminPayrollReport';
 import { AdminDataReset } from '@/components/admin/AdminDataReset';
 import { AdminPerformanceSection } from '@/components/admin/AdminPerformanceSection';
 import { AdminDisciplineSection } from '@/components/admin/AdminDisciplineSection';
+import { AdminAppealsSection } from '@/components/admin/AdminAppealsSection';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -29,6 +31,7 @@ export default function AdminDashboard() {
   const { data: attendance = [] } = useAttendance();
   const { data: payroll = [] } = usePayroll();
   const { data: contracts = [] } = useContracts();
+  const { data: appeals = [] } = useAttendanceAppeals();
   const { user, signOut } = useAuth();
 
   const handleLogout = async () => {
@@ -37,12 +40,14 @@ export default function AdminDashboard() {
     window.location.href = '/auth?portal=admin';
   };
 
+  const pendingAppeals = appeals.filter(a => a.status === 'Pending').length;
+
   const stats = [
     { label: 'Employees', value: employees.length, icon: Users, color: 'text-primary' },
     { label: 'Leave Records', value: leaveRecords.length, icon: Calendar, color: 'text-emerald-500' },
     { label: 'Attendance Records', value: attendance.length, icon: ClipboardList, color: 'text-blue-500' },
     { label: 'Payroll Records', value: payroll.length, icon: DollarSign, color: 'text-amber-500' },
-    { label: 'Contracts', value: contracts.length, icon: FileText, color: 'text-purple-500' },
+    { label: 'Appeals', value: appeals.length, icon: MessageSquare, color: 'text-purple-500', pending: pendingAppeals },
   ];
 
   return (
@@ -77,12 +82,17 @@ export default function AdminDashboard() {
         {/* Stats Overview */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           {stats.map((stat) => (
-            <div key={stat.label} className="glass-card rounded-2xl border border-border p-4">
+            <div key={stat.label} className="glass-card rounded-2xl border border-border p-4 relative">
               <div className="flex items-center gap-2 mb-2">
                 <stat.icon className={cn("w-4 h-4", stat.color)} />
                 <span className="text-xs text-muted-foreground">{stat.label}</span>
               </div>
               <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+              {(stat as any).pending > 0 && (
+                <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-medium animate-pulse">
+                  {(stat as any).pending} pending
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -110,6 +120,14 @@ export default function AdminDashboard() {
             </TabsTrigger>
             <TabsTrigger value="discipline" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Scale className="w-4 h-4 mr-2" />Discipline
+            </TabsTrigger>
+            <TabsTrigger value="appeals" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground relative">
+              <MessageSquare className="w-4 h-4 mr-2" />Appeals
+              {pendingAppeals > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center animate-pulse">
+                  {pendingAppeals}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="data-reset" className="rounded-lg data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
               <Database className="w-4 h-4 mr-2" />Data Management
@@ -181,6 +199,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="discipline">
             <AdminDisciplineSection />
+          </TabsContent>
+
+          <TabsContent value="appeals">
+            <AdminAppealsSection />
           </TabsContent>
 
           <TabsContent value="data-reset">

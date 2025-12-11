@@ -85,10 +85,30 @@ export function useUpdateAttendanceAppeal() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendance_appeals'] });
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
-      toast.success('Appeal updated successfully');
     },
     onError: (error: Error) => {
       toast.error(`Failed to update appeal: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteAttendanceAppeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('attendance_appeals')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance_appeals'] });
+      toast.success('Appeal deleted successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete appeal: ${error.message}`);
     },
   });
 }
