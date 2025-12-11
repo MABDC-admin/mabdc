@@ -12,6 +12,7 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import jsPDF from 'jspdf';
+import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { EmployeeAttendanceCalendar } from './EmployeeAttendanceCalendar';
 
@@ -490,6 +491,126 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     toast.success('Monthly Matrix PDF generated');
   };
 
+  // Excel Generation with color coding
+  const generateMatrixExcel = () => {
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new();
+    
+    // Build header row with day numbers and names
+    const headerRow1 = ['#', 'Employee Name'];
+    const headerRow2 = ['', ''];
+    
+    daysInMonth.forEach(day => {
+      headerRow1.push(format(day, 'd'));
+      headerRow2.push(DAY_NAMES[getDay(day)]);
+    });
+    
+    // Add summary headers
+    const summaryHeaders = ['P', 'SB', 'WB', 'H', 'A', 'HDA', 'VL', 'HDSL', 'SL', 'DO'];
+    summaryHeaders.forEach(h => {
+      headerRow1.push(h);
+      headerRow2.push('');
+    });
+    
+    // Build data rows
+    const dataRows: string[][] = [];
+    employeeSummaries.forEach((emp, idx) => {
+      const row: string[] = [
+        String(idx + 1).padStart(2, '0'),
+        emp.full_name
+      ];
+      
+      daysInMonth.forEach(day => {
+        const status = getDayStatus(emp.id, day);
+        const config = STATUS_CONFIG[status];
+        row.push(config.label);
+      });
+      
+      // Add summary counts
+      summaryHeaders.forEach(h => {
+        const count = emp[h as keyof typeof emp] as number || 0;
+        row.push(count.toString());
+      });
+      
+      dataRows.push(row);
+    });
+    
+    // Combine all rows
+    const wsData = [headerRow1, headerRow2, ...dataRows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    // Set column widths
+    const colWidths = [
+      { wch: 4 },  // #
+      { wch: 25 }, // Employee Name
+      ...daysInMonth.map(() => ({ wch: 4 })), // Day columns
+      ...summaryHeaders.map(() => ({ wch: 5 })) // Summary columns
+    ];
+    ws['!cols'] = colWidths;
+    
+    // Apply cell styles (colors) - xlsx-style would be needed for full color support
+    // Using cell comments/notes as a workaround for color indication
+    const statusColorMap: Record<string, { rgb: string }> = {
+      'P': { rgb: '22C55E' },   // Green
+      'SB': { rgb: 'A78BFA' },  // Violet
+      'WB': { rgb: 'A78BFA' },  // Violet
+      'SL': { rgb: 'A3E635' },  // Lime
+      'VL': { rgb: 'FDE047' },  // Yellow
+      'H': { rgb: '67E8F9' },   // Cyan
+      'HDA': { rgb: 'F472B6' }, // Pink
+      'HDSL': { rgb: 'A3E635' }, // Lime
+      'A': { rgb: 'EF4444' },   // Red
+      'DO': { rgb: '93C5FD' },  // Blue
+      '-': { rgb: 'E5E7EB' },   // Gray
+      'W': { rgb: '9CA3AF' },   // Dark Gray
+    };
+    
+    // Apply background colors to cells
+    for (let rowIdx = 2; rowIdx < wsData.length; rowIdx++) {
+      for (let colIdx = 2; colIdx < 2 + daysInMonth.length + summaryHeaders.length; colIdx++) {
+        const cellRef = XLSX.utils.encode_cell({ r: rowIdx, c: colIdx });
+        if (ws[cellRef]) {
+          const cellValue = ws[cellRef].v;
+          const colorInfo = statusColorMap[cellValue as string];
+          if (colorInfo) {
+            if (!ws[cellRef].s) ws[cellRef].s = {};
+            ws[cellRef].s = {
+              fill: { fgColor: { rgb: colorInfo.rgb } },
+              alignment: { horizontal: 'center' }
+            };
+          }
+        }
+      }
+    }
+    
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Attendance Matrix');
+    
+    // Create legend sheet
+    const legendData = [
+      ['Status Code', 'Description', 'Color'],
+      ['P', 'Present', 'Green'],
+      ['SB', 'Spring Break', 'Violet'],
+      ['WB', 'Winter Break', 'Violet'],
+      ['SL', 'Sick Leave', 'Yellow-Green'],
+      ['VL', 'Vacation Leave', 'Yellow'],
+      ['H', 'Public Holiday', 'Cyan'],
+      ['HDA', 'Half Day Absent', 'Pink'],
+      ['HDSL', 'Half Day Sick Leave', 'Yellow-Green'],
+      ['A', 'Absent', 'Red'],
+      ['DO', 'Day Off', 'Blue'],
+      ['-', 'No Record', 'Gray'],
+      ['W', 'Weekend', 'Dark Gray'],
+    ];
+    const legendWs = XLSX.utils.aoa_to_sheet(legendData);
+    legendWs['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 15 }];
+    XLSX.utils.book_append_sheet(wb, legendWs, 'Legend');
+    
+    // Save file
+    XLSX.writeFile(wb, `Monthly_Matrix_${months[selectedMonth]}_${selectedYear}.xlsx`);
+    toast.success('Monthly Matrix Excel generated');
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -522,6 +643,10 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
           <Button variant="outline" onClick={generateMatrixPDF}>
             <Download className="w-4 h-4 mr-2" />
             Export PDF
+          </Button>
+          <Button variant="outline" onClick={generateMatrixExcel}>
+            <Download className="w-4 h-4 mr-2" />
+            Export Excel
           </Button>
           <Button variant="outline" onClick={onBack}>
             <ArrowLeft className="w-4 h-4 mr-2" />
