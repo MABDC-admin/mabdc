@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { useEmployees } from '@/hooks/useEmployees';
-import { useAttendanceByDate, useUpdateAttendance } from '@/hooks/useAttendance';
+import { useAttendanceByDate, useUpdateAttendance, useCreateAttendance } from '@/hooks/useAttendance';
 import { useTimeShifts } from '@/hooks/useTimeShifts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -84,6 +84,7 @@ export default function TimeClockView() {
   const { data: attendance = [], isLoading: loadingAttendance, refetch: refetchAttendance } = useAttendanceByDate(dateString);
   const { data: shifts = [] } = useTimeShifts();
   const updateAttendance = useUpdateAttendance();
+  const createAttendance = useCreateAttendance();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -237,25 +238,41 @@ export default function TimeClockView() {
   };
 
   const handleSaveEdit = async () => {
-    if (!editDialog.record?.attendanceId) {
-      toast.error('No attendance record to update');
+    if (!editDialog.record) {
+      toast.error('No record selected');
       return;
     }
 
+    const status = editStatus === 'late_entry' ? 'Late' : 
+                   editStatus === 'miss_punch_in' || editStatus === 'miss_punch_out' ? 'Missed Punch' : 
+                   editStatus === 'early_out' || editStatus === 'early_in' ? 'Present' :
+                   'Present';
+
     try {
-      await updateAttendance.mutateAsync({
-        id: editDialog.record.attendanceId,
-        check_in: editCheckIn || null,
-        check_out: editCheckOut || null,
-        status: editStatus === 'late_entry' ? 'Late' : 
-                editStatus === 'miss_punch_in' || editStatus === 'miss_punch_out' ? 'Missed Punch' : 
-                'Present'
-      });
-      toast.success('Time record updated');
+      if (editDialog.record.attendanceId) {
+        // Update existing record
+        await updateAttendance.mutateAsync({
+          id: editDialog.record.attendanceId,
+          check_in: editCheckIn || null,
+          check_out: editCheckOut || null,
+          status
+        });
+        toast.success('Time record updated');
+      } else {
+        // Create new attendance record
+        await createAttendance.mutateAsync({
+          employee_id: editDialog.record.employeeId,
+          date: dateString,
+          check_in: editCheckIn || null,
+          check_out: editCheckOut || null,
+          status
+        });
+        toast.success('Time record created');
+      }
       setEditDialog({ open: false, record: null });
       refetchAttendance();
     } catch (error) {
-      toast.error('Failed to update record');
+      toast.error('Failed to save record');
     }
   };
 
@@ -549,22 +566,20 @@ export default function TimeClockView() {
                         <Badge 
                           key={idx} 
                           variant="outline" 
-                          className={`text-xs ${STATUS_COLORS[s]} ${record.attendanceId ? 'cursor-pointer hover:opacity-80' : ''}`}
-                          onClick={() => record.attendanceId && handleEdit(record)}
+                          className={`text-xs ${STATUS_COLORS[s]} cursor-pointer hover:opacity-80`}
+                          onClick={() => handleEdit(record)}
                         >
                           {STATUS_LABELS[s]}
-                          {record.attendanceId && <Edit2 className="h-3 w-3 ml-1" />}
+                          <Edit2 className="h-3 w-3 ml-1" />
                         </Badge>
                       ))}
                     </div>
 
                     {/* Action */}
                     <div className="col-span-1 text-center">
-                      {record.attendanceId && (
-                        <Button size="sm" variant="ghost" onClick={() => handleEdit(record)}>
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button size="sm" variant="ghost" onClick={() => handleEdit(record)}>
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -578,7 +593,9 @@ export default function TimeClockView() {
       <Dialog open={editDialog.open} onOpenChange={(open) => setEditDialog({ open, record: open ? editDialog.record : null })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Time Record</DialogTitle>
+            <DialogTitle>
+              {editDialog.record?.attendanceId ? 'Edit Time Record' : 'Create Time Record'}
+            </DialogTitle>
           </DialogHeader>
           {editDialog.record && (
             <div className="space-y-4">
@@ -635,8 +652,13 @@ export default function TimeClockView() {
             <Button variant="outline" onClick={() => setEditDialog({ open: false, record: null })}>
               Cancel
             </Button>
-            <Button onClick={handleSaveEdit} disabled={updateAttendance.isPending}>
-              {updateAttendance.isPending ? 'Saving...' : 'Save Changes'}
+            <Button 
+              onClick={handleSaveEdit} 
+              disabled={updateAttendance.isPending || createAttendance.isPending}
+            >
+              {(updateAttendance.isPending || createAttendance.isPending) 
+                ? 'Saving...' 
+                : editDialog.record?.attendanceId ? 'Save Changes' : 'Create Record'}
             </Button>
           </DialogFooter>
         </DialogContent>
