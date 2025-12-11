@@ -81,28 +81,6 @@ export function useAttendanceByDate(date: string) {
   });
 }
 
-export function useAttendanceByDateRange(startDate: string, endDate: string) {
-  return useQuery({
-    queryKey: ['attendance', 'date-range', startDate, endDate],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('attendance')
-        .select(`
-          *,
-          employees (full_name, hrms_no, photo_url)
-        `)
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data as Attendance[];
-    },
-    enabled: !!startDate && !!endDate,
-  });
-}
-
 export function useRealtimeAttendance() {
   const queryClient = useQueryClient();
 
