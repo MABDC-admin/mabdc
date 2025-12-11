@@ -9,11 +9,26 @@ import { cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay, isWithinInterval } from 'date-fns';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
 import { EmployeeAttendanceCalendar } from './EmployeeAttendanceCalendar';
+
+// Map matrix status codes to database status values
+const STATUS_TO_DB: Record<string, string> = {
+  'P': 'Present',
+  'A': 'Absent',
+  'SL': 'Sick Leave',
+  'VL': 'Vacation Leave',
+  'H': 'Holiday',
+  'SB': 'Spring Break',
+  'WB': 'Winter Break',
+  'HDA': 'Half Day Absent',
+  'HDSL': 'Half Day Sick Leave',
+  'DO': 'Day Off',
+  '-': 'No Record',
+};
 
 interface MonthlyMatrixViewProps {
   onBack: () => void;
@@ -152,21 +167,88 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     }
 
     // Map attendance status - Late is now treated as Present in matrix
-    if (attendance.status === 'Present' || attendance.status === 'Late' || attendance.status === 'Late | Undertime') return 'P';
-    if (attendance.status === 'Absent') return 'A';
-    if (attendance.status === 'Day Off') return 'DO';
+    const status = attendance.status?.toLowerCase() || '';
+    if (status === 'present' || status === 'late' || status.includes('undertime')) return 'P';
+    if (status === 'absent') return 'A';
+    if (status === 'day off') return 'DO';
+    if (status === 'sick leave') return 'SL';
+    if (status === 'vacation leave') return 'VL';
+    if (status === 'holiday') return 'H';
+    if (status === 'spring break') return 'SB';
+    if (status === 'winter break') return 'WB';
+    if (status === 'half day absent') return 'HDA';
+    if (status === 'half day sick leave') return 'HDSL';
+    if (status === 'no record') return '-';
     
     return 'P';
   };
 
-  const handleEditStatus = (newStatus: string) => {
+  // Mutation to save status to database
+  const saveStatusMutation = useMutation({
+    mutationFn: async ({ employeeId, date, status }: { employeeId: string; date: Date; status: string }) => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const dbStatus = STATUS_TO_DB[status] || status;
+      
+      // Check if attendance record exists
+      const { data: existing } = await supabase
+        .from('attendance')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .eq('date', dateStr)
+        .maybeSingle();
+      
+      if (existing) {
+        // Update existing record
+        const { error } = await supabase
+          .from('attendance')
+          .update({ 
+            status: dbStatus,
+            modified_at: new Date().toISOString(),
+            modified_by: 'HR Admin (Matrix)'
+          })
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        // Insert new record
+        const { error } = await supabase
+          .from('attendance')
+          .insert({
+            employee_id: employeeId,
+            date: dateStr,
+            status: dbStatus,
+            modified_at: new Date().toISOString(),
+            modified_by: 'HR Admin (Matrix)'
+          });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    },
+  });
+
+  const handleEditStatus = async (newStatus: string) => {
     if (editCell) {
       const key = getOverrideKey(editCell.employeeId, editCell.date);
-      setManualOverrides(prev => ({
-        ...prev,
-        [key]: newStatus
-      }));
-      toast.success(`Status updated to ${STATUS_CONFIG[newStatus as keyof typeof STATUS_CONFIG]?.name || newStatus}`);
+      
+      // Save to database
+      try {
+        await saveStatusMutation.mutateAsync({
+          employeeId: editCell.employeeId,
+          date: editCell.date,
+          status: newStatus,
+        });
+        
+        setManualOverrides(prev => ({
+          ...prev,
+          [key]: newStatus
+        }));
+        toast.success(`Status updated to ${STATUS_CONFIG[newStatus as keyof typeof STATUS_CONFIG]?.name || newStatus}`);
+      } catch (error) {
+        toast.error('Failed to save status');
+        console.error(error);
+      }
+      
       setEditCell(null);
     }
   };
@@ -480,6 +562,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
                 <Select 
                   value={editCell.currentStatus} 
                   onValueChange={handleEditStatus}
+                  disabled={saveStatusMutation.isPending}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
