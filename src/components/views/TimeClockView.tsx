@@ -263,6 +263,18 @@ export default function TimeClockView() {
       return;
     }
 
+    // Validation warnings
+    if (editStatus === 'miss_punch_in' && editCheckIn) {
+      toast.warning('Miss Punch In status selected but check-in time is provided. Check-in will be cleared.');
+    }
+    if (editStatus === 'miss_punch_out' && editCheckOut) {
+      toast.warning('Miss Punch Out status selected but check-out time is provided. Check-out will be cleared.');
+    }
+    if ((editStatus === 'on_time' || editStatus === 'early_in' || editStatus === 'late_entry') && !editCheckIn) {
+      toast.warning('Status requires check-in time. Please provide check-in time or select Miss Punch In.');
+      return;
+    }
+
     // Map TimeClockStatus to database status
     const statusMap: Record<TimeClockStatus, string> = {
       on_time: 'Present',
@@ -276,13 +288,17 @@ export default function TimeClockView() {
     
     const dbStatus = statusMap[editStatus] || 'Present';
 
+    // Clear times based on missed punch status
+    const finalCheckIn = editStatus === 'miss_punch_in' ? null : (editCheckIn || null);
+    const finalCheckOut = editStatus === 'miss_punch_out' ? null : (editCheckOut || null);
+
     try {
       if (editDialog.record.attendanceId) {
         // Update existing record
         await updateAttendance.mutateAsync({
           id: editDialog.record.attendanceId,
-          check_in: editCheckIn || null,
-          check_out: editCheckOut || null,
+          check_in: finalCheckIn,
+          check_out: finalCheckOut,
           status: dbStatus
         });
       } else {
@@ -290,13 +306,14 @@ export default function TimeClockView() {
         await createAttendance.mutateAsync({
           employee_id: editDialog.record.employeeId,
           date: dateString,
-          check_in: editCheckIn || null,
-          check_out: editCheckOut || null,
+          check_in: finalCheckIn,
+          check_out: finalCheckOut,
           status: dbStatus
         });
       }
       setEditDialog({ open: false, record: null });
       refetchAttendance();
+      toast.success('Time record saved successfully');
     } catch (error) {
       toast.error('Failed to save record');
     }
