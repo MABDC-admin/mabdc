@@ -40,12 +40,21 @@ export function AttendanceAppealsView() {
     return emp?.photo_url;
   };
 
+  const [confirmReject, setConfirmReject] = useState(false);
+
   const handleReview = async (action: 'approve' | 'reject') => {
     if (!selectedAppeal) return;
     
-    if (action === 'reject' && !reviewForm.reason.trim()) {
-      toast.error('Please provide a reason for rejection');
-      return;
+    if (action === 'reject') {
+      if (!reviewForm.reason.trim()) {
+        toast.error('Please provide a reason for rejection');
+        return;
+      }
+      // Show confirmation for rejection
+      if (!confirmReject) {
+        setConfirmReject(true);
+        return;
+      }
     }
 
     try {
@@ -58,18 +67,20 @@ export function AttendanceAppealsView() {
         rejection_reason: action === 'reject' ? reviewForm.reason : null,
       });
 
-      // If approved, update the attendance record
+      // If approved, update the attendance record with "Appealed" status
       if (action === 'approve' && selectedAppeal.attendance_id) {
         await updateAttendance.mutateAsync({
           id: selectedAppeal.attendance_id,
           check_in: selectedAppeal.requested_check_in,
           check_out: selectedAppeal.requested_check_out,
-          admin_remarks: `Time corrected via appeal: ${selectedAppeal.appeal_message}`,
+          status: 'Appealed',
+          admin_remarks: `[Appeal Approved] Time corrected: ${selectedAppeal.appeal_message}`,
         });
       }
 
       setSelectedAppeal(null);
       setReviewForm({ action: '', reason: '' });
+      setConfirmReject(false);
       toast.success(`Appeal ${action === 'approve' ? 'approved' : 'rejected'} successfully`);
     } catch (error) {
       toast.error('Failed to process appeal');
@@ -261,81 +272,130 @@ export function AttendanceAppealsView() {
       </Card>
 
       {/* Review Dialog */}
-      <Dialog open={!!selectedAppeal} onOpenChange={() => setSelectedAppeal(null)}>
+      <Dialog open={!!selectedAppeal} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedAppeal(null);
+          setConfirmReject(false);
+          setReviewForm({ action: '', reason: '' });
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Review Appeal</DialogTitle>
+            <DialogTitle>{confirmReject ? 'Confirm Rejection' : 'Review Appeal'}</DialogTitle>
           </DialogHeader>
           
           {selectedAppeal && (
             <div className="space-y-4 mt-4">
-              <div className="p-4 rounded-lg bg-secondary/50 border border-border">
-                <div className="flex items-center gap-3 mb-3">
-                  {getEmployeePhoto(selectedAppeal.employee_id) ? (
-                    <img 
-                      src={getEmployeePhoto(selectedAppeal.employee_id)} 
-                      alt={getEmployeeName(selectedAppeal.employee_id)} 
-                      className="w-12 h-12 rounded-full object-cover" 
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                      <User className="w-6 h-6 text-primary" />
-                    </div>
-                  )}
-                  <div>
-                    <p className="font-semibold">{getEmployeeName(selectedAppeal.employee_id)}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(parseISO(selectedAppeal.appeal_date), 'EEEE, dd MMM yyyy')}
+              {confirmReject ? (
+                // Rejection confirmation view
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
+                    <p className="text-sm text-center text-red-500 font-medium">
+                      Are you sure you want to reject this appeal?
+                    </p>
+                    <p className="text-xs text-center text-muted-foreground mt-2">
+                      Employee: {getEmployeeName(selectedAppeal.employee_id)}
+                    </p>
+                    <p className="text-xs text-center text-muted-foreground">
+                      Date: {format(parseISO(selectedAppeal.appeal_date), 'dd MMM yyyy')}
                     </p>
                   </div>
-                </div>
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Requested Check In:</span>
-                    <span className="font-medium">{selectedAppeal.requested_check_in || 'N/A'}</span>
+                  
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <p className="text-xs text-muted-foreground mb-1">Your Rejection Reason:</p>
+                    <p className="text-sm font-medium text-red-500">{reviewForm.reason}</p>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Requested Check Out:</span>
-                    <span className="font-medium">{selectedAppeal.requested_check_out || 'N/A'}</span>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfirmReject(false)}
+                      disabled={updateAppeal.isPending}
+                      className="flex-1"
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      onClick={() => handleReview('reject')}
+                      disabled={updateAppeal.isPending}
+                      className="flex-1 bg-red-500 hover:bg-red-600"
+                    >
+                      {updateAppeal.isPending ? 'Rejecting...' : 'Confirm Rejection'}
+                    </Button>
                   </div>
                 </div>
-              </div>
+              ) : (
+                // Normal review view
+                <>
+                  <div className="p-4 rounded-lg bg-secondary/50 border border-border">
+                    <div className="flex items-center gap-3 mb-3">
+                      {getEmployeePhoto(selectedAppeal.employee_id) ? (
+                        <img 
+                          src={getEmployeePhoto(selectedAppeal.employee_id)} 
+                          alt={getEmployeeName(selectedAppeal.employee_id)} 
+                          className="w-12 h-12 rounded-full object-cover" 
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                          <User className="w-6 h-6 text-primary" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-semibold">{getEmployeeName(selectedAppeal.employee_id)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(parseISO(selectedAppeal.appeal_date), 'EEEE, dd MMM yyyy')}
+                        </p>
+                      </div>
+                    </div>
 
-              <div className="p-3 rounded-lg bg-muted/50">
-                <p className="text-xs text-muted-foreground mb-1">Appeal Message:</p>
-                <p className="text-sm">{selectedAppeal.appeal_message}</p>
-              </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Requested Check In:</span>
+                        <span className="font-medium">{selectedAppeal.requested_check_in || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Requested Check Out:</span>
+                        <span className="font-medium">{selectedAppeal.requested_check_out || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
 
-              <div>
-                <label className="text-xs text-muted-foreground">Rejection Reason (required for rejection)</label>
-                <Textarea
-                  value={reviewForm.reason}
-                  onChange={(e) => setReviewForm({ ...reviewForm, reason: e.target.value })}
-                  placeholder="Enter reason if rejecting..."
-                  rows={3}
-                />
-              </div>
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <p className="text-xs text-muted-foreground mb-1">Appeal Message:</p>
+                    <p className="text-sm">{selectedAppeal.appeal_message}</p>
+                  </div>
 
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => handleReview('reject')}
-                  disabled={updateAppeal.isPending}
-                  className="flex-1 border-red-500/50 text-red-500 hover:bg-red-500/10"
-                >
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Reject
-                </Button>
-                <Button
-                  onClick={() => handleReview('approve')}
-                  disabled={updateAppeal.isPending}
-                  className="flex-1 bg-green-500 hover:bg-green-600"
-                >
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Approve
-                </Button>
-              </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Rejection Reason (required for rejection)</label>
+                    <Textarea
+                      value={reviewForm.reason}
+                      onChange={(e) => setReviewForm({ ...reviewForm, reason: e.target.value })}
+                      placeholder="Enter reason if rejecting..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => handleReview('reject')}
+                      disabled={updateAppeal.isPending}
+                      className="flex-1 border-red-500/50 text-red-500 hover:bg-red-500/10"
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Reject
+                    </Button>
+                    <Button
+                      onClick={() => handleReview('approve')}
+                      disabled={updateAppeal.isPending}
+                      className="flex-1 bg-green-500 hover:bg-green-600"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      {updateAppeal.isPending ? 'Approving...' : 'Approve'}
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </DialogContent>
