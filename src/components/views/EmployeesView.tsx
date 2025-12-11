@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/hr';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { differenceInDays, parseISO } from 'date-fns';
+import { differenceInDays, differenceInYears, parseISO } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,6 +101,11 @@ export function EmployeesView() {
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
+
+  const getAge = (birthday: string | null) => {
+    if (!birthday) return null;
+    return differenceInYears(new Date(), parseISO(birthday));
   };
 
   const getVisaDaysRemaining = (employee: Employee) => {
@@ -368,7 +373,7 @@ export function EmployeesView() {
                       <p className="text-[10px] uppercase text-muted-foreground">Birthday</p>
                       <p className="text-xs text-foreground font-medium">
                         {emp.birthday 
-                          ? new Date(emp.birthday).toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
+                          ? `${new Date(emp.birthday).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })} / ${getAge(emp.birthday)}`
                           : '—'}
                       </p>
                     </div>
@@ -515,7 +520,7 @@ export function EmployeesView() {
                       <p className="text-[10px] uppercase text-muted-foreground">Birthday</p>
                       <p className="text-xs text-foreground">
                         {emp.birthday 
-                          ? new Date(emp.birthday).toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
+                          ? `${new Date(emp.birthday).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })} / ${getAge(emp.birthday)}`
                           : '—'}
                       </p>
                     </div>
