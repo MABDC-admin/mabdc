@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { useEmployees } from '@/hooks/useEmployees';
-import { useTodayAttendance, useUpdateAttendance } from '@/hooks/useAttendance';
+import { useAttendanceByDate, useUpdateAttendance } from '@/hooks/useAttendance';
 import { useTimeShifts } from '@/hooks/useTimeShifts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,17 +12,20 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { 
   Clock, 
   Search, 
   RefreshCw, 
   Download, 
   Edit2,
-  AlertTriangle,
   CheckCircle,
   XCircle,
   ArrowDownLeft,
-  ArrowUpRight
+  ArrowUpRight,
+  CalendarIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -70,8 +73,12 @@ const SHIFT_TIMES = {
 };
 
 export default function TimeClockView() {
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const dateString = format(selectedDate, 'yyyy-MM-dd');
+  const isToday = dateString === format(new Date(), 'yyyy-MM-dd');
+  
   const { data: employees = [], isLoading: loadingEmployees, refetch } = useEmployees();
-  const { data: attendance = [], isLoading: loadingAttendance } = useTodayAttendance();
+  const { data: attendance = [], isLoading: loadingAttendance, refetch: refetchAttendance } = useAttendanceByDate(dateString);
   const { data: shifts = [] } = useTimeShifts();
   const updateAttendance = useUpdateAttendance();
 
@@ -104,12 +111,14 @@ export default function TimeClockView() {
     checkIn: string | undefined, 
     checkOut: string | undefined, 
     shiftStart: string, 
-    shiftEnd: string
+    shiftEnd: string,
+    forDate: Date
   ): TimeClockStatus[] => {
     const statuses: TimeClockStatus[] = [];
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const dateStr = format(forDate, 'yyyy-MM-dd');
     const now = new Date();
-    const currentTime = format(now, 'HH:mm');
+    const isViewingToday = dateStr === format(now, 'yyyy-MM-dd');
+    const isPastDate = forDate < new Date(format(now, 'yyyy-MM-dd'));
 
     // Parse shift times
     const shiftStartTime = shiftStart;
@@ -120,9 +129,8 @@ export default function TimeClockView() {
     const earlyThreshold = `${String(startHour - 1).padStart(2, '0')}:${String(startMin).padStart(2, '0')}`;
 
     if (!checkIn) {
-      // Only mark as miss punch if past shift start time
-      const shiftStartDate = new Date(`${today}T${shiftStartTime}:00`);
-      if (now > shiftStartDate) {
+      // Only mark as miss punch if past shift start time (for today) or if viewing past date
+      if (isPastDate || (isViewingToday && now > new Date(`${dateStr}T${shiftStartTime}:00`))) {
         statuses.push('miss_punch_in');
       }
     } else {
@@ -141,9 +149,8 @@ export default function TimeClockView() {
     }
 
     if (checkIn && !checkOut) {
-      // Only mark as miss punch out if past shift end time
-      const shiftEndDate = new Date(`${today}T${shiftEndTime}:00`);
-      if (now > shiftEndDate) {
+      // Only mark as miss punch out if past shift end time (for today) or if viewing past date
+      if (isPastDate || (isViewingToday && now > new Date(`${dateStr}T${shiftEndTime}:00`))) {
         statuses.push('miss_punch_out');
       }
     } else if (checkOut) {
@@ -166,7 +173,7 @@ export default function TimeClockView() {
       const shiftTimes = SHIFT_TIMES[shiftType] || SHIFT_TIMES.default;
       const att = attendanceMap.get(emp.id);
       
-      const statuses = calculateStatus(att?.checkIn, att?.checkOut, shiftTimes.start, shiftTimes.end);
+      const statuses = calculateStatus(att?.checkIn, att?.checkOut, shiftTimes.start, shiftTimes.end, selectedDate);
 
       return {
         employeeId: emp.id,
@@ -182,7 +189,7 @@ export default function TimeClockView() {
         attendanceId: att?.id
       };
     });
-  }, [employees, shiftMap, attendanceMap]);
+  }, [employees, shiftMap, attendanceMap, selectedDate]);
 
   const filteredRecords = useMemo(() => {
     return timeClockRecords.filter(record => {
@@ -243,9 +250,20 @@ export default function TimeClockView() {
       });
       toast.success('Time record updated');
       setEditDialog({ open: false, record: null });
-      refetch();
+      refetchAttendance();
     } catch (error) {
       toast.error('Failed to update record');
+    }
+  };
+
+  const handleRefresh = () => {
+    refetch();
+    refetchAttendance();
+  };
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(date);
     }
   };
 
@@ -254,6 +272,7 @@ export default function TimeClockView() {
       'HRMS No': record.hrmsNo,
       'Employee Name': record.employeeName,
       'Department': record.department,
+      'Date': format(selectedDate, 'yyyy-MM-dd'),
       'Shift Start': record.shiftStart,
       'Shift End': record.shiftEnd,
       'Check In': record.checkIn || '-',
@@ -267,12 +286,11 @@ export default function TimeClockView() {
     
     // Set column widths
     ws['!cols'] = [
-      { wch: 12 }, { wch: 25 }, { wch: 15 }, { wch: 12 }, 
-      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 30 }
+      { wch: 12 }, { wch: 25 }, { wch: 15 }, { wch: 12 },
+      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 30 }
     ];
 
-    const today = format(new Date(), 'yyyy-MM-dd');
-    XLSX.writeFile(wb, `time-clock-${today}.xlsx`);
+    XLSX.writeFile(wb, `time-clock-${dateString}.xlsx`);
     toast.success('Exported to Excel');
   };
 
@@ -284,10 +302,32 @@ export default function TimeClockView() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Time Clock</h1>
-          <p className="text-muted-foreground">Daily employee check-in/check-out tracking - {format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+          <p className="text-muted-foreground">
+            Daily employee check-in/check-out tracking
+            {isToday && <Badge variant="outline" className="ml-2 bg-green-100 text-green-800">Today</Badge>}
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
+        <div className="flex gap-2 flex-wrap">
+          {/* Date Picker */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(selectedDate, 'PPP')}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={handleDateSelect}
+                disabled={(date) => date > new Date()}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>

@@ -61,6 +61,26 @@ export function useTodayAttendance() {
   });
 }
 
+export function useAttendanceByDate(date: string) {
+  return useQuery({
+    queryKey: ['attendance', 'date', date],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('attendance')
+        .select(`
+          *,
+          employees (full_name, hrms_no, photo_url)
+        `)
+        .eq('date', date)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as Attendance[];
+    },
+    enabled: !!date,
+  });
+}
+
 export function useRealtimeAttendance() {
   const queryClient = useQueryClient();
 
