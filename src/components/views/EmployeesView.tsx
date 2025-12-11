@@ -361,7 +361,7 @@ export function EmployeesView() {
                     <div className="text-center">
                       <p className="text-[10px] uppercase text-muted-foreground">Joined</p>
                       <p className="text-xs text-foreground font-medium">
-                        {new Date(emp.joining_date).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })}
+                        {new Date(emp.joining_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}
                       </p>
                     </div>
                     <div className="text-center">
@@ -500,7 +500,7 @@ export function EmployeesView() {
                     <div>
                       <p className="text-[10px] uppercase text-muted-foreground">Joining Date</p>
                       <p className="text-xs text-foreground">
-                        {new Date(emp.joining_date).toLocaleDateString('en-GB')}
+                        {new Date(emp.joining_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}
                       </p>
                     </div>
                     <div>
