@@ -4,8 +4,8 @@ import { useContracts } from '@/hooks/useContracts';
 import { useTodayAttendance, useRealtimeAttendance } from '@/hooks/useAttendance';
 import { useHRStore } from '@/store/hrStore';
 import { cn } from '@/lib/utils';
-import { Users, FileText, Clock, AlertTriangle, TrendingUp, Calendar, ArrowRight, RefreshCw, LogIn, LogOut, CheckCircle, QrCode, Bell, Zap } from 'lucide-react';
-import { differenceInDays, parseISO } from 'date-fns';
+import { Users, FileText, Clock, AlertTriangle, TrendingUp, Calendar, ArrowRight, RefreshCw, LogIn, LogOut, CheckCircle, QrCode, Bell, Zap, Cake } from 'lucide-react';
+import { differenceInDays, parseISO, format, isAfter, isBefore, addDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
@@ -115,6 +115,37 @@ export function DashboardView() {
     { name: 'Contracts', count: activeContracts, fill: 'hsl(210, 100%, 35%)' },
   ];
 
+  // Upcoming birthdays (next 7 days)
+  const getUpcomingBirthdays = () => {
+    const today = new Date();
+    const next7Days = addDays(today, 7);
+    
+    return employees.filter(emp => {
+      if (!emp.birthday) return false;
+      
+      const birthday = parseISO(emp.birthday);
+      // Create this year's birthday
+      const thisYearBirthday = new Date(today.getFullYear(), birthday.getMonth(), birthday.getDate());
+      
+      // If this year's birthday has passed, check next year
+      if (isBefore(thisYearBirthday, today)) {
+        thisYearBirthday.setFullYear(today.getFullYear() + 1);
+      }
+      
+      return !isBefore(thisYearBirthday, today) && !isAfter(thisYearBirthday, next7Days);
+    }).map(emp => {
+      const birthday = parseISO(emp.birthday!);
+      const thisYearBirthday = new Date(today.getFullYear(), birthday.getMonth(), birthday.getDate());
+      if (isBefore(thisYearBirthday, today)) {
+        thisYearBirthday.setFullYear(today.getFullYear() + 1);
+      }
+      const daysUntil = differenceInDays(thisYearBirthday, today);
+      return { ...emp, daysUntil, birthdayDate: thisYearBirthday };
+    }).sort((a, b) => a.daysUntil - b.daysUntil);
+  };
+
+  const upcomingBirthdays = getUpcomingBirthdays();
+
   const isLoading = employeesLoading || leaveLoading || contractsLoading;
 
   return (
@@ -204,7 +235,7 @@ export function DashboardView() {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Visa Expiry Alerts */}
         <div className="glass-card rounded-2xl border border-border p-5">
           <div className="flex items-center justify-between mb-4">
@@ -305,6 +336,69 @@ export function DashboardView() {
                     <span className="text-[10px] px-2 py-1 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30">
                       Late
                     </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Upcoming Birthdays */}
+        <div className="glass-card rounded-2xl border border-border p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Cake className="w-4 h-4 text-pink-500" />
+              Upcoming Birthdays
+            </h2>
+            <span className="text-xs text-pink-500 font-medium">{upcomingBirthdays.length} this week</span>
+          </div>
+          <div className="h-[200px] overflow-y-auto soft-scroll">
+            {upcomingBirthdays.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                <Cake className="w-10 h-10 mb-2 text-pink-500 opacity-50" />
+                <p className="text-sm font-medium">No birthdays soon</p>
+                <p className="text-xs opacity-70">No birthdays in the next 7 days</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {upcomingBirthdays.map((emp) => (
+                  <div 
+                    key={emp.id} 
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors",
+                      emp.daysUntil === 0 
+                        ? "bg-pink-500/20 border-pink-500/40 hover:bg-pink-500/30" 
+                        : "bg-pink-500/10 border-pink-500/20 hover:bg-pink-500/20"
+                    )}
+                    onClick={() => setCurrentView('employees')}
+                  >
+                    <div className="flex items-center gap-3">
+                      {emp.photo_url ? (
+                        <img src={emp.photo_url} alt={emp.full_name} className="w-8 h-8 rounded-lg object-cover" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-pink-500/20 flex items-center justify-center text-xs font-bold text-pink-500">
+                          {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{emp.full_name}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {format(emp.birthdayDate, 'MMM dd')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {emp.daysUntil === 0 ? (
+                        <span className="text-xs px-2 py-1 rounded-full bg-pink-500 text-white font-medium">
+                          🎂 Today!
+                        </span>
+                      ) : (
+                        <>
+                          <p className="text-lg font-bold text-pink-500">{emp.daysUntil}</p>
+                          <p className="text-[10px] text-muted-foreground">days</p>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
