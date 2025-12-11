@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AttendanceDetailModal } from './AttendanceDetailModal';
 import { AttendanceAppealModal } from './AttendanceAppealModal';
 import { AttendanceMatrixView } from './AttendanceMatrixView';
+import { MonthlyMatrixView } from './MonthlyMatrixView';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
 
@@ -43,6 +44,7 @@ export function EmployeeAttendanceCalendar({
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAppealModal, setShowAppealModal] = useState(false);
   const [showMatrixView, setShowMatrixView] = useState(false);
+  const [showMonthlyMatrixView, setShowMonthlyMatrixView] = useState(false);
   
   const { data: allAttendance = [] } = useAttendance();
   const { data: employees = [] } = useEmployees();
@@ -354,6 +356,11 @@ export function EmployeeAttendanceCalendar({
     return <AttendanceMatrixView onBack={() => setShowMatrixView(false)} />;
   }
 
+  // Show Monthly Matrix View if toggled
+  if (showMonthlyMatrixView && !isEmployeePortal) {
+    return <MonthlyMatrixView onBack={() => setShowMonthlyMatrixView(false)} />;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -412,16 +419,26 @@ export function EmployeeAttendanceCalendar({
         </Card>
       </div>
 
-      {/* Matrix View Button - Only for HR */}
+      {/* Matrix View Buttons - Only for HR */}
       {showEmployeeSelector && !isEmployeePortal && (
-        <Button 
-          variant="default" 
-          onClick={() => setShowMatrixView(true)}
-          className="w-full md:w-auto"
-        >
-          <Grid3X3 className="w-4 h-4 mr-2" />
-          Matrix View - All Employees
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            variant="default" 
+            onClick={() => setShowMatrixView(true)}
+            className="w-full md:w-auto"
+          >
+            <Grid3X3 className="w-4 h-4 mr-2" />
+            Matrix View - All Employees
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setShowMonthlyMatrixView(true)}
+            className="w-full md:w-auto"
+          >
+            <Grid3X3 className="w-4 h-4 mr-2" />
+            Monthly Matrix View
+          </Button>
+        </div>
       )}
 
       {/* Filters */}
