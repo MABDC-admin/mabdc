@@ -15,7 +15,6 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Clock, 
   Search, 
@@ -26,8 +25,7 @@ import {
   XCircle,
   ArrowDownLeft,
   ArrowUpRight,
-  CalendarIcon,
-  Users
+  CalendarIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -90,14 +88,6 @@ export default function TimeClockView() {
   const [editCheckIn, setEditCheckIn] = useState('');
   const [editCheckOut, setEditCheckOut] = useState('');
   const [editStatus, setEditStatus] = useState<TimeClockStatus>('on_time');
-  
-  // Bulk edit state
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkEditDialog, setBulkEditDialog] = useState(false);
-  const [bulkCheckIn, setBulkCheckIn] = useState('');
-  const [bulkCheckOut, setBulkCheckOut] = useState('');
-  const [bulkStatus, setBulkStatus] = useState<TimeClockStatus | ''>('');
-  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
   const shiftMap = useMemo(() => {
     const map = new Map<string, 'morning' | 'afternoon'>();
@@ -269,76 +259,6 @@ export default function TimeClockView() {
   const handleRefresh = () => {
     refetch();
     refetchAttendance();
-    setSelectedIds(new Set());
-  };
-
-  // Bulk selection handlers
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      const selectableIds = filteredRecords
-        .filter(r => r.attendanceId)
-        .map(r => r.employeeId);
-      setSelectedIds(new Set(selectableIds));
-    } else {
-      setSelectedIds(new Set());
-    }
-  };
-
-  const handleSelectOne = (employeeId: string, checked: boolean) => {
-    const newSet = new Set(selectedIds);
-    if (checked) {
-      newSet.add(employeeId);
-    } else {
-      newSet.delete(employeeId);
-    }
-    setSelectedIds(newSet);
-  };
-
-  const selectableRecords = filteredRecords.filter(r => r.attendanceId);
-  const allSelected = selectableRecords.length > 0 && selectableRecords.every(r => selectedIds.has(r.employeeId));
-  const someSelected = selectedIds.size > 0;
-
-  const handleOpenBulkEdit = () => {
-    setBulkCheckIn('');
-    setBulkCheckOut('');
-    setBulkStatus('');
-    setBulkEditDialog(true);
-  };
-
-  const handleBulkSave = async () => {
-    const recordsToUpdate = filteredRecords.filter(r => selectedIds.has(r.employeeId) && r.attendanceId);
-    
-    if (recordsToUpdate.length === 0) {
-      toast.error('No valid records to update');
-      return;
-    }
-
-    setIsBulkUpdating(true);
-    try {
-      const updates = recordsToUpdate.map(record => {
-        const updateData: any = { id: record.attendanceId };
-        
-        if (bulkCheckIn) updateData.check_in = bulkCheckIn;
-        if (bulkCheckOut) updateData.check_out = bulkCheckOut;
-        if (bulkStatus) {
-          updateData.status = bulkStatus === 'late_entry' ? 'Late' : 
-                              bulkStatus === 'miss_punch_in' || bulkStatus === 'miss_punch_out' ? 'Missed Punch' : 
-                              'Present';
-        }
-        
-        return updateAttendance.mutateAsync(updateData);
-      });
-
-      await Promise.all(updates);
-      toast.success(`Updated ${recordsToUpdate.length} records`);
-      setBulkEditDialog(false);
-      setSelectedIds(new Set());
-      refetchAttendance();
-    } catch (error) {
-      toast.error('Failed to update some records');
-    } finally {
-      setIsBulkUpdating(false);
-    }
   };
 
   const handleDateSelect = (date: Date | undefined) => {
@@ -407,12 +327,6 @@ export default function TimeClockView() {
               />
             </PopoverContent>
           </Popover>
-          {someSelected && (
-            <Button variant="default" size="sm" onClick={handleOpenBulkEdit}>
-              <Users className="h-4 w-4 mr-2" />
-              Bulk Edit ({selectedIds.size})
-            </Button>
-          )}
           <Button variant="outline" size="sm" onClick={handleRefresh}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
@@ -532,14 +446,7 @@ export default function TimeClockView() {
             <ScrollArea className="h-[500px]">
               <div className="space-y-2">
                 {/* Header Row */}
-                <div className="grid grid-cols-13 gap-2 p-3 bg-muted/50 rounded-lg font-medium text-sm">
-                  <div className="col-span-1 flex items-center justify-center">
-                    <Checkbox
-                      checked={allSelected}
-                      onCheckedChange={handleSelectAll}
-                      aria-label="Select all"
-                    />
-                  </div>
+                <div className="grid grid-cols-12 gap-2 p-3 bg-muted/50 rounded-lg font-medium text-sm">
                   <div className="col-span-3">Employee</div>
                   <div className="col-span-2 text-center">Shift</div>
                   <div className="col-span-2 text-center">Check In</div>
@@ -551,24 +458,8 @@ export default function TimeClockView() {
                 {filteredRecords.map((record) => (
                   <div
                     key={record.employeeId}
-                    className={cn(
-                      "grid grid-cols-13 gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors items-center",
-                      selectedIds.has(record.employeeId) && "bg-primary/5 border-primary/30"
-                    )}
+                    className="grid grid-cols-12 gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors items-center"
                   >
-                    {/* Checkbox */}
-                    <div className="col-span-1 flex items-center justify-center">
-                      {record.attendanceId ? (
-                        <Checkbox
-                          checked={selectedIds.has(record.employeeId)}
-                          onCheckedChange={(checked) => handleSelectOne(record.employeeId, !!checked)}
-                          aria-label={`Select ${record.employeeName}`}
-                        />
-                      ) : (
-                        <span className="w-4 h-4" />
-                      )}
-                    </div>
-
                     {/* Employee Info */}
                     <div className="col-span-3 flex items-center gap-2">
                       <Avatar className="h-8 w-8">
@@ -692,74 +583,6 @@ export default function TimeClockView() {
             </Button>
             <Button onClick={handleSaveEdit} disabled={updateAttendance.isPending}>
               {updateAttendance.isPending ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Bulk Edit Dialog */}
-      <Dialog open={bulkEditDialog} onOpenChange={setBulkEditDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Bulk Edit Time Records</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="p-3 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                Editing <span className="font-semibold text-foreground">{selectedIds.size}</span> employee records.
-                Leave fields empty to keep existing values.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Check In (optional)</Label>
-                <Input
-                  type="time"
-                  value={bulkCheckIn}
-                  onChange={(e) => setBulkCheckIn(e.target.value)}
-                  placeholder="Leave empty to skip"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Check Out (optional)</Label>
-                <Input
-                  type="time"
-                  value={bulkCheckOut}
-                  onChange={(e) => setBulkCheckOut(e.target.value)}
-                  placeholder="Leave empty to skip"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Status Override (optional)</Label>
-              <Select value={bulkStatus} onValueChange={(v) => setBulkStatus(v as TimeClockStatus | '')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Leave unchanged" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Leave unchanged</SelectItem>
-                  <SelectItem value="on_time">On Time</SelectItem>
-                  <SelectItem value="early_in">Early In</SelectItem>
-                  <SelectItem value="late_entry">Late Entry</SelectItem>
-                  <SelectItem value="early_out">Early Out</SelectItem>
-                  <SelectItem value="late_exit">Late Exit</SelectItem>
-                  <SelectItem value="miss_punch_in">Miss Punch In</SelectItem>
-                  <SelectItem value="miss_punch_out">Miss Punch Out</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkEditDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleBulkSave} 
-              disabled={isBulkUpdating || (!bulkCheckIn && !bulkCheckOut && !bulkStatus)}
-            >
-              {isBulkUpdating ? 'Updating...' : `Update ${selectedIds.size} Records`}
             </Button>
           </DialogFooter>
         </DialogContent>
