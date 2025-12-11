@@ -486,6 +486,7 @@ export function useCreateAttendance() {
       check_in?: string | null;
       check_out?: string | null;
       status?: string;
+      admin_remarks?: string;
     }) => {
       const { data: result, error } = await supabase
         .from('attendance')
@@ -494,7 +495,8 @@ export function useCreateAttendance() {
           date: data.date,
           check_in: data.check_in || null,
           check_out: data.check_out || null,
-          status: data.status || 'Present'
+          status: data.status || 'Present',
+          admin_remarks: data.admin_remarks || null,
         }])
         .select(`*, employees (full_name, hrms_no, photo_url)`)
         .single();
@@ -504,7 +506,6 @@ export function useCreateAttendance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
-      toast.success('Attendance record created successfully');
     },
     onError: (error: Error) => {
       toast.error(`Failed to create attendance: ${error.message}`);

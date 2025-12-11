@@ -13,7 +13,7 @@ import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAttendanceAppeals, useUpdateAttendanceAppeal } from '@/hooks/useAttendanceAppeals';
 import { useEmployees } from '@/hooks/useEmployees';
-import { useUpdateAttendance } from '@/hooks/useAttendance';
+import { useUpdateAttendance, useCreateAttendance } from '@/hooks/useAttendance';
 import { toast } from 'sonner';
 
 export function AttendanceAppealsView() {
@@ -21,6 +21,7 @@ export function AttendanceAppealsView() {
   const { data: employees = [] } = useEmployees();
   const updateAppeal = useUpdateAttendanceAppeal();
   const updateAttendance = useUpdateAttendance();
+  const createAttendance = useCreateAttendance();
   
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedAppeal, setSelectedAppeal] = useState<any>(null);
@@ -67,15 +68,28 @@ export function AttendanceAppealsView() {
         rejection_reason: action === 'reject' ? reviewForm.reason : null,
       });
 
-      // If approved, update the attendance record with "Appealed" status
-      if (action === 'approve' && selectedAppeal.attendance_id) {
-        await updateAttendance.mutateAsync({
-          id: selectedAppeal.attendance_id,
-          check_in: selectedAppeal.requested_check_in,
-          check_out: selectedAppeal.requested_check_out,
-          status: 'Appealed',
-          admin_remarks: `[Appeal Approved] Time corrected: ${selectedAppeal.appeal_message}`,
-        });
+      // If approved, update or create the attendance record with "Appealed" status
+      if (action === 'approve') {
+        if (selectedAppeal.attendance_id) {
+          // Update existing attendance record
+          await updateAttendance.mutateAsync({
+            id: selectedAppeal.attendance_id,
+            check_in: selectedAppeal.requested_check_in,
+            check_out: selectedAppeal.requested_check_out,
+            status: 'Appealed',
+            admin_remarks: `[Appeal Approved] Time corrected: ${selectedAppeal.appeal_message}`,
+          });
+        } else {
+          // Create new attendance record if none exists
+          await createAttendance.mutateAsync({
+            employee_id: selectedAppeal.employee_id,
+            date: selectedAppeal.appeal_date,
+            check_in: selectedAppeal.requested_check_in,
+            check_out: selectedAppeal.requested_check_out,
+            status: 'Appealed',
+            admin_remarks: `[Appeal Approved] Time corrected: ${selectedAppeal.appeal_message}`,
+          });
+        }
       }
 
       setSelectedAppeal(null);
