@@ -3,43 +3,52 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Download } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ArrowLeft, Download, Calendar, Edit2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay, isWithinInterval } from 'date-fns';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
+import { EmployeeAttendanceCalendar } from './EmployeeAttendanceCalendar';
 
 interface MonthlyMatrixViewProps {
   onBack: () => void;
 }
 
-// Status type definitions with colors matching the reference image
+// Status type definitions - removed L (Late), added DO (Day Off), updated colors
 const STATUS_CONFIG = {
-  P: { label: 'P', name: 'Present', bg: 'bg-lime-300', text: 'text-lime-800', pdfBg: [190, 242, 100] },
+  P: { label: 'P', name: 'Present', bg: 'bg-green-500', text: 'text-white', pdfBg: [34, 197, 94] },
   SB: { label: 'SB', name: 'Spring Break', bg: 'bg-violet-400', text: 'text-violet-900', pdfBg: [167, 139, 250] },
   WB: { label: 'WB', name: 'Winter Break', bg: 'bg-violet-400', text: 'text-violet-900', pdfBg: [167, 139, 250] },
-  SL: { label: 'SL', name: 'Sick Leave', bg: 'bg-yellow-300', text: 'text-yellow-800', pdfBg: [253, 224, 71] },
+  SL: { label: 'SL', name: 'Sick Leave', bg: 'bg-lime-400', text: 'text-lime-900', pdfBg: [163, 230, 53] },
   VL: { label: 'VL', name: 'Vacation Leave', bg: 'bg-yellow-300', text: 'text-yellow-800', pdfBg: [253, 224, 71] },
   H: { label: 'H', name: 'Public Holiday', bg: 'bg-cyan-300', text: 'text-cyan-800', pdfBg: [103, 232, 249] },
   HDA: { label: 'HDA', name: 'Half Day Absent', bg: 'bg-pink-400', text: 'text-pink-900', pdfBg: [244, 114, 182] },
-  HDSL: { label: 'HDSL', name: 'Half Day Sick Leave', bg: 'bg-yellow-300', text: 'text-yellow-800', pdfBg: [253, 224, 71] },
-  A: { label: 'A', name: 'Absent', bg: 'bg-pink-400', text: 'text-pink-900', pdfBg: [244, 114, 182] },
-  L: { label: 'L', name: 'Late', bg: 'bg-orange-300', text: 'text-orange-800', pdfBg: [253, 186, 116] },
+  HDSL: { label: 'HDSL', name: 'Half Day Sick Leave', bg: 'bg-lime-400', text: 'text-lime-900', pdfBg: [163, 230, 53] },
+  A: { label: 'A', name: 'Absent', bg: 'bg-red-500', text: 'text-white', pdfBg: [239, 68, 68] },
+  DO: { label: 'DO', name: 'Day Off', bg: 'bg-blue-300', text: 'text-blue-800', pdfBg: [147, 197, 253] },
   '-': { label: '-', name: 'No Record', bg: 'bg-gray-200', text: 'text-gray-600', pdfBg: [229, 231, 235] },
   W: { label: '-', name: 'Weekend', bg: 'bg-gray-400', text: 'text-gray-700', pdfBg: [156, 163, 175] },
 } as const;
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// Editable statuses for the dropdown
+const EDITABLE_STATUSES = ['-', 'A', 'H', 'P', 'SL', 'HDSL', 'VL', 'SB', 'WB', 'HDA', 'DO'] as const;
+
 export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  const [editCell, setEditCell] = useState<{ employeeId: string; employeeName: string; date: Date; currentStatus: string } | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<{ id: string; name: string } | null>(null);
+  const [manualOverrides, setManualOverrides] = useState<Record<string, string>>({});
   
+  const queryClient = useQueryClient();
   const { data: allAttendance = [] } = useAttendance();
   const { data: employees = [] } = useEmployees();
 
@@ -96,7 +105,17 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     );
   };
 
+  const getOverrideKey = (employeeId: string, date: Date) => {
+    return `${employeeId}_${format(date, 'yyyy-MM-dd')}`;
+  };
+
   const getDayStatus = (employeeId: string, date: Date): keyof typeof STATUS_CONFIG => {
+    // Check for manual override first
+    const overrideKey = getOverrideKey(employeeId, date);
+    if (manualOverrides[overrideKey]) {
+      return manualOverrides[overrideKey] as keyof typeof STATUS_CONFIG;
+    }
+
     const dayOfWeek = getDay(date);
     const isSat = dayOfWeek === 6;
     const isSun = dayOfWeek === 0;
@@ -120,6 +139,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       if (leaveType.includes('vacation') || leaveType.includes('annual')) return 'VL';
       if (leaveType.includes('spring')) return 'SB';
       if (leaveType.includes('winter')) return 'WB';
+      if (leaveType.includes('day off')) return 'DO';
       return 'VL'; // Default to vacation leave for other approved leaves
     }
     
@@ -131,18 +151,31 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       return 'A'; // Absent if no record for past working day
     }
 
-    if (attendance.status === 'Present') return 'P';
-    if (attendance.status === 'Late' || attendance.status === 'Late | Undertime') return 'L';
+    // Map attendance status - Late is now treated as Present in matrix
+    if (attendance.status === 'Present' || attendance.status === 'Late' || attendance.status === 'Late | Undertime') return 'P';
     if (attendance.status === 'Absent') return 'A';
+    if (attendance.status === 'Day Off') return 'DO';
     
     return 'P';
+  };
+
+  const handleEditStatus = (newStatus: string) => {
+    if (editCell) {
+      const key = getOverrideKey(editCell.employeeId, editCell.date);
+      setManualOverrides(prev => ({
+        ...prev,
+        [key]: newStatus
+      }));
+      toast.success(`Status updated to ${STATUS_CONFIG[newStatus as keyof typeof STATUS_CONFIG]?.name || newStatus}`);
+      setEditCell(null);
+    }
   };
 
   // Calculate summary for each employee
   const employeeSummaries = useMemo(() => {
     return employees.map((emp, index) => {
       const counts = {
-        P: 0, SB: 0, WB: 0, H: 0, A: 0, HDA: 0, VL: 0, HDSL: 0, SL: 0, L: 0
+        P: 0, SB: 0, WB: 0, H: 0, A: 0, HDA: 0, VL: 0, HDSL: 0, SL: 0, DO: 0
       };
       
       daysInMonth.forEach(day => {
@@ -154,7 +187,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       
       return { ...emp, index: index + 1, ...counts };
     });
-  }, [employees, daysInMonth, allAttendance, leaveRecords, publicHolidays]);
+  }, [employees, daysInMonth, allAttendance, leaveRecords, publicHolidays, manualOverrides]);
 
   // PDF Generation
   const generateMatrixPDF = () => {
@@ -188,7 +221,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       { code: 'A', color: STATUS_CONFIG.A.pdfBg },
       { code: 'VL', color: STATUS_CONFIG.VL.pdfBg },
       { code: 'SL', color: STATUS_CONFIG.SL.pdfBg },
-      { code: 'L', color: STATUS_CONFIG.L.pdfBg },
+      { code: 'DO', color: STATUS_CONFIG.DO.pdfBg },
     ];
     legends.forEach((leg, idx) => {
       const x = margin + idx * 35;
@@ -201,7 +234,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     
     // Table header - Day numbers
     doc.setFillColor(200, 200, 200);
-    doc.rect(margin, startY, nameWidth + daysInMonth.length * cellWidth + 60, 8, 'F');
+    doc.rect(margin, startY, nameWidth + daysInMonth.length * cellWidth + 70, 8, 'F');
     doc.setFontSize(5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
@@ -216,9 +249,9 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       doc.setFontSize(5);
     });
 
-    // Summary headers (simplified - horizontal text)
+    // Summary headers
     const summaryStartX = margin + nameWidth + daysInMonth.length * cellWidth + 2;
-    const summaryHeaders = ['P', 'SB', 'WB', 'H', 'A', 'HDA', 'VL', 'HDSL', 'SL'];
+    const summaryHeaders = ['P', 'SB', 'WB', 'H', 'A', 'HDA', 'VL', 'HDSL', 'SL', 'DO'];
     doc.setFontSize(4);
     summaryHeaders.forEach((h, idx) => {
       doc.text(h, summaryStartX + idx * 6.5 + 3, startY + 5, { align: 'center' });
@@ -358,7 +391,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
                   </th>
                 ))}
                 {/* Summary headers */}
-                {['P', 'SB', 'WB', 'H', 'A', 'HDA', 'VL', 'HDSL', 'SL'].map((h) => (
+                {['P', 'SB', 'WB', 'H', 'A', 'HDA', 'VL', 'HDSL', 'SL', 'DO'].map((h) => (
                   <th 
                     key={h} 
                     className={cn(
@@ -375,9 +408,13 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
             <tbody>
               {employeeSummaries.map((emp) => (
                 <tr key={emp.id}>
-                  <td className="sticky left-0 bg-card p-1 border border-gray-300 text-[10px] font-medium whitespace-nowrap">
+                  <td 
+                    className="sticky left-0 bg-card p-1 border border-gray-300 text-[10px] font-medium whitespace-nowrap cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => setSelectedEmployee({ id: emp.id, name: emp.full_name })}
+                  >
                     <span className="text-muted-foreground mr-1">{String(emp.index).padStart(2, '0')}</span>
-                    {emp.full_name}
+                    <span className="text-primary hover:underline">{emp.full_name}</span>
+                    <Calendar className="inline-block w-3 h-3 ml-1 text-muted-foreground" />
                   </td>
                   {daysInMonth.map((day) => {
                     const status = getDayStatus(emp.id, day);
@@ -386,9 +423,15 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
                       <td 
                         key={day.toISOString()} 
                         className={cn(
-                          "text-center p-0 border border-gray-300",
+                          "text-center p-0 border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity",
                           config.bg
                         )}
+                        onClick={() => setEditCell({ 
+                          employeeId: emp.id, 
+                          employeeName: emp.full_name,
+                          date: day, 
+                          currentStatus: status 
+                        })}
                       >
                         <span className={cn("text-[9px] font-bold", config.text)}>
                           {config.label}
@@ -397,7 +440,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
                     );
                   })}
                   {/* Summary cells */}
-                  {['P', 'SB', 'WB', 'H', 'A', 'HDA', 'VL', 'HDSL', 'SL'].map((h) => {
+                  {['P', 'SB', 'WB', 'H', 'A', 'HDA', 'VL', 'HDSL', 'SL', 'DO'].map((h) => {
                     const count = emp[h as keyof typeof emp] as number || 0;
                     const config = STATUS_CONFIG[h as keyof typeof STATUS_CONFIG];
                     return (
@@ -415,6 +458,74 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
           </table>
         </CardContent>
       </Card>
+
+      {/* Edit Status Dialog */}
+      <Dialog open={!!editCell} onOpenChange={() => setEditCell(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="w-4 h-4" />
+              Edit Status
+            </DialogTitle>
+          </DialogHeader>
+          {editCell && (
+            <div className="space-y-4">
+              <div className="text-sm">
+                <p><strong>Employee:</strong> {editCell.employeeName}</p>
+                <p><strong>Date:</strong> {format(editCell.date, 'EEEE, MMMM d, yyyy')}</p>
+                <p><strong>Current Status:</strong> {STATUS_CONFIG[editCell.currentStatus as keyof typeof STATUS_CONFIG]?.name || editCell.currentStatus}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Select New Status</label>
+                <Select 
+                  value={editCell.currentStatus} 
+                  onValueChange={handleEditStatus}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EDITABLE_STATUSES.map((status) => {
+                      const config = STATUS_CONFIG[status];
+                      return (
+                        <SelectItem key={status} value={status}>
+                          <div className="flex items-center gap-2">
+                            <span className={cn("w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold", config.bg, config.text)}>
+                              {config.label}
+                            </span>
+                            <span>{config.name}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Employee Calendar Dialog */}
+      <Dialog open={!!selectedEmployee} onOpenChange={() => setSelectedEmployee(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              {selectedEmployee?.name} - Attendance Calendar
+            </DialogTitle>
+          </DialogHeader>
+          {selectedEmployee && (
+            <div className="mt-4">
+              <EmployeeAttendanceCalendar 
+                employeeId={selectedEmployee.id}
+                showBackButton={false}
+                showEmployeeSelector={false}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
