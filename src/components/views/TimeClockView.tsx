@@ -25,8 +25,11 @@ import {
   XCircle,
   ArrowDownLeft,
   ArrowUpRight,
-  CalendarIcon
+  CalendarIcon,
+  AlertTriangle,
+  Bell
 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -338,6 +341,51 @@ export default function TimeClockView() {
         </div>
       </div>
 
+      {/* Missed Punch Alerts */}
+      {(statusStats.miss_punch_in > 0 || statusStats.miss_punch_out > 0) && (
+        <Alert variant="destructive" className="border-red-300 bg-red-50 dark:bg-red-950/30">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle className="flex items-center gap-2">
+            <Bell className="h-4 w-4 animate-pulse" />
+            Missed Punch Alerts
+          </AlertTitle>
+          <AlertDescription>
+            <div className="mt-2 space-y-2">
+              {timeClockRecords.filter(r => r.status.includes('miss_punch_in')).length > 0 && (
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="font-medium text-red-700 dark:text-red-300">Miss Punch In:</span>
+                  {timeClockRecords.filter(r => r.status.includes('miss_punch_in')).map(r => (
+                    <Badge 
+                      key={r.employeeId} 
+                      variant="outline" 
+                      className="bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200 cursor-pointer hover:bg-red-200"
+                      onClick={() => r.attendanceId && handleEdit(r)}
+                    >
+                      {r.employeeName} ({r.hrmsNo})
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              {timeClockRecords.filter(r => r.status.includes('miss_punch_out')).length > 0 && (
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="font-medium text-red-700 dark:text-red-300">Miss Punch Out:</span>
+                  {timeClockRecords.filter(r => r.status.includes('miss_punch_out')).map(r => (
+                    <Badge 
+                      key={r.employeeId} 
+                      variant="outline" 
+                      className="bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200 cursor-pointer hover:bg-orange-200"
+                      onClick={() => r.attendanceId && handleEdit(r)}
+                    >
+                      {r.employeeName} ({r.hrmsNo})
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Status Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <Card className={`cursor-pointer hover:shadow-md transition-shadow ${statusFilter === 'on_time' ? 'ring-2 ring-green-500' : ''}`}
@@ -495,11 +543,17 @@ export default function TimeClockView() {
                       )}
                     </div>
 
-                    {/* Status */}
+                    {/* Status - Clickable to edit */}
                     <div className="col-span-2 flex flex-wrap justify-center gap-1">
                       {record.status.map((s, idx) => (
-                        <Badge key={idx} variant="outline" className={`text-xs ${STATUS_COLORS[s]}`}>
+                        <Badge 
+                          key={idx} 
+                          variant="outline" 
+                          className={`text-xs ${STATUS_COLORS[s]} ${record.attendanceId ? 'cursor-pointer hover:opacity-80' : ''}`}
+                          onClick={() => record.attendanceId && handleEdit(record)}
+                        >
                           {STATUS_LABELS[s]}
+                          {record.attendanceId && <Edit2 className="h-3 w-3 ml-1" />}
                         </Badge>
                       ))}
                     </div>
