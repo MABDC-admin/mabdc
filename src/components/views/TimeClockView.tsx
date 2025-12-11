@@ -100,16 +100,33 @@ export default function TimeClockView() {
   }, [shifts]);
 
   const attendanceMap = useMemo(() => {
-    const map = new Map<string, { id: string; checkIn?: string; checkOut?: string }>();
+    const map = new Map<string, { id: string; checkIn?: string; checkOut?: string; dbStatus?: string }>();
     attendance.forEach(a => {
       map.set(a.employee_id, { 
         id: a.id, 
         checkIn: a.check_in || undefined, 
-        checkOut: a.check_out || undefined 
+        checkOut: a.check_out || undefined,
+        dbStatus: a.status || undefined
       });
     });
     return map;
   }, [attendance]);
+
+  // Convert database status to TimeClockStatus
+  const dbStatusToTimeClock = (dbStatus: string | undefined): TimeClockStatus[] => {
+    if (!dbStatus) return [];
+    
+    const statusMap: Record<string, TimeClockStatus> = {
+      'Present': 'on_time',
+      'Late': 'late_entry',
+      'Undertime': 'early_out',
+      'Late | Undertime': 'late_entry',
+      'Missed Punch': 'miss_punch_in'
+    };
+    
+    const mapped = statusMap[dbStatus];
+    return mapped ? [mapped] : ['on_time'];
+  };
 
   const calculateStatus = (
     checkIn: string | undefined, 
@@ -177,7 +194,10 @@ export default function TimeClockView() {
       const shiftTimes = SHIFT_TIMES[shiftType] || SHIFT_TIMES.default;
       const att = attendanceMap.get(emp.id);
       
-      const statuses = calculateStatus(att?.checkIn, att?.checkOut, shiftTimes.start, shiftTimes.end, selectedDate);
+      // Use saved database status if available, otherwise calculate
+      const statuses = att?.dbStatus 
+        ? dbStatusToTimeClock(att.dbStatus)
+        : calculateStatus(att?.checkIn, att?.checkOut, shiftTimes.start, shiftTimes.end, selectedDate);
 
       return {
         employeeId: emp.id,
