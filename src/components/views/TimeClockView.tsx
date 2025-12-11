@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useAttendanceByDate, useUpdateAttendance, useCreateAttendance } from '@/hooks/useAttendance';
@@ -92,12 +92,48 @@ export default function TimeClockView() {
   const [editCheckIn, setEditCheckIn] = useState('');
   const [editCheckOut, setEditCheckOut] = useState('');
   const [editStatus, setEditStatus] = useState<TimeClockStatus>('on_time');
+  const [autoCalculateStatus, setAutoCalculateStatus] = useState(true);
 
   const shiftMap = useMemo(() => {
     const map = new Map<string, 'morning' | 'afternoon'>();
     shifts.forEach(s => map.set(s.employee_id, s.shift_type as 'morning' | 'afternoon'));
     return map;
   }, [shifts]);
+
+  // Auto-calculate status based on check-in/out times
+  useEffect(() => {
+    if (!editDialog.record || !autoCalculateStatus) return;
+    
+    const employeeId = editDialog.record.employeeId;
+    const shiftType = shiftMap.get(employeeId) || 'default';
+    const shiftTimes = SHIFT_TIMES[shiftType] || SHIFT_TIMES.default;
+    
+    let suggestedStatus: TimeClockStatus = 'on_time';
+    
+    if (!editCheckIn && !editCheckOut) {
+      suggestedStatus = 'miss_punch_in';
+    } else if (editCheckIn && !editCheckOut) {
+      if (editCheckIn > shiftTimes.start) {
+        suggestedStatus = 'late_entry';
+      } else {
+        suggestedStatus = 'on_time';
+      }
+    } else if (!editCheckIn && editCheckOut) {
+      suggestedStatus = 'miss_punch_in';
+    } else if (editCheckIn && editCheckOut) {
+      if (editCheckIn > shiftTimes.start && editCheckOut < shiftTimes.end) {
+        suggestedStatus = 'late_entry';
+      } else if (editCheckIn > shiftTimes.start) {
+        suggestedStatus = 'late_entry';
+      } else if (editCheckOut < shiftTimes.end) {
+        suggestedStatus = 'early_out';
+      } else {
+        suggestedStatus = 'on_time';
+      }
+    }
+    
+    setEditStatus(suggestedStatus);
+  }, [editCheckIn, editCheckOut, editDialog.record, shiftMap, autoCalculateStatus]);
 
   const attendanceMap = useMemo(() => {
     const map = new Map<string, { id: string; checkIn?: string; checkOut?: string; dbStatus?: string }>();
@@ -251,6 +287,7 @@ export default function TimeClockView() {
   };
 
   const handleEdit = (record: TimeClockRecord) => {
+    setAutoCalculateStatus(true); // Reset auto-calculate when opening dialog
     setEditDialog({ open: true, record });
     setEditCheckIn(record.checkIn || '');
     setEditCheckOut(record.checkOut || '');
@@ -669,8 +706,25 @@ export default function TimeClockView() {
               </div>
 
               <div className="space-y-2">
-                <Label>Status Override</Label>
-                <Select value={editStatus} onValueChange={(v) => setEditStatus(v as TimeClockStatus)}>
+                <div className="flex items-center justify-between">
+                  <Label>Status Override</Label>
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoCalculateStatus}
+                      onChange={(e) => setAutoCalculateStatus(e.target.checked)}
+                      className="rounded"
+                    />
+                    Auto-calculate
+                  </label>
+                </div>
+                <Select 
+                  value={editStatus} 
+                  onValueChange={(v) => {
+                    setAutoCalculateStatus(false); // Disable auto-calculate when manually selecting
+                    setEditStatus(v as TimeClockStatus);
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
