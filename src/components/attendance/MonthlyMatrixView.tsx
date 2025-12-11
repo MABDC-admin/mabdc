@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Download, Calendar, Edit2 } from 'lucide-react';
+import { ArrowLeft, Download, Calendar, Edit2, CheckSquare, Square, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay, isWithinInterval } from 'date-fns';
 import { useAttendance } from '@/hooks/useAttendance';
@@ -62,6 +62,11 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
   const [editCell, setEditCell] = useState<{ employeeId: string; employeeName: string; date: Date; currentStatus: string } | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<{ id: string; name: string } | null>(null);
   const [manualOverrides, setManualOverrides] = useState<Record<string, string>>({});
+  
+  // Bulk selection state
+  const [bulkSelectMode, setBulkSelectMode] = useState(false);
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
+  const [bulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
   
   const queryClient = useQueryClient();
   const { data: allAttendance = [] } = useAttendance();
@@ -253,6 +258,103 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     }
   };
 
+  // Bulk save mutation
+  const bulkSaveStatusMutation = useMutation({
+    mutationFn: async ({ cells, status }: { cells: string[]; status: string }) => {
+      const dbStatus = STATUS_TO_DB[status] || status;
+      
+      for (const cellKey of cells) {
+        const [employeeId, dateStr] = cellKey.split('_');
+        
+        const { data: existing } = await supabase
+          .from('attendance')
+          .select('id')
+          .eq('employee_id', employeeId)
+          .eq('date', dateStr)
+          .maybeSingle();
+        
+        if (existing) {
+          const { error } = await supabase
+            .from('attendance')
+            .update({ 
+              status: dbStatus,
+              modified_at: new Date().toISOString(),
+              modified_by: 'HR Admin (Bulk Matrix)'
+            })
+            .eq('id', existing.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('attendance')
+            .insert({
+              employee_id: employeeId,
+              date: dateStr,
+              status: dbStatus,
+              modified_at: new Date().toISOString(),
+              modified_by: 'HR Admin (Bulk Matrix)'
+            });
+          if (error) throw error;
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    },
+  });
+
+  const handleCellClick = (employeeId: string, employeeName: string, date: Date, currentStatus: string) => {
+    if (bulkSelectMode) {
+      const key = getOverrideKey(employeeId, date);
+      setSelectedCells(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(key)) {
+          newSet.delete(key);
+        } else {
+          newSet.add(key);
+        }
+        return newSet;
+      });
+    } else {
+      setEditCell({ employeeId, employeeName, date, currentStatus });
+    }
+  };
+
+  const handleBulkEditStatus = async (newStatus: string) => {
+    if (selectedCells.size === 0) return;
+    
+    try {
+      await bulkSaveStatusMutation.mutateAsync({
+        cells: Array.from(selectedCells),
+        status: newStatus,
+      });
+      
+      const newOverrides: Record<string, string> = {};
+      selectedCells.forEach(key => {
+        newOverrides[key] = newStatus;
+      });
+      setManualOverrides(prev => ({ ...prev, ...newOverrides }));
+      
+      toast.success(`Updated ${selectedCells.size} cells to ${STATUS_CONFIG[newStatus as keyof typeof STATUS_CONFIG]?.name || newStatus}`);
+      setSelectedCells(new Set());
+      setBulkEditDialogOpen(false);
+      setBulkSelectMode(false);
+    } catch (error) {
+      toast.error('Failed to save bulk status');
+      console.error(error);
+    }
+  };
+
+  const toggleBulkSelectMode = () => {
+    setBulkSelectMode(prev => !prev);
+    if (bulkSelectMode) {
+      setSelectedCells(new Set());
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedCells(new Set());
+  };
+
   // Calculate summary for each employee
   const employeeSummaries = useMemo(() => {
     return employees.map((emp, index) => {
@@ -399,6 +501,24 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant={bulkSelectMode ? "default" : "outline"} 
+            onClick={toggleBulkSelectMode}
+            className={bulkSelectMode ? "bg-primary" : ""}
+          >
+            {bulkSelectMode ? <CheckSquare className="w-4 h-4 mr-2" /> : <Square className="w-4 h-4 mr-2" />}
+            {bulkSelectMode ? "Selection Mode ON" : "Bulk Select"}
+          </Button>
+          {bulkSelectMode && selectedCells.size > 0 && (
+            <>
+              <Button variant="default" onClick={() => setBulkEditDialogOpen(true)}>
+                Apply to {selectedCells.size} cells
+              </Button>
+              <Button variant="ghost" size="icon" onClick={clearSelection}>
+                <X className="w-4 h-4" />
+              </Button>
+            </>
+          )}
           <Button variant="outline" onClick={generateMatrixPDF}>
             <Download className="w-4 h-4 mr-2" />
             Export PDF
@@ -437,6 +557,15 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
             max={2030}
           />
         </div>
+        
+        {bulkSelectMode && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-md text-sm">
+            <CheckSquare className="w-4 h-4 text-primary" />
+            <span className="text-primary font-medium">
+              Click cells to select. {selectedCells.size > 0 ? `${selectedCells.size} selected` : 'None selected'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Legend */}
@@ -501,23 +630,24 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
                   {daysInMonth.map((day) => {
                     const status = getDayStatus(emp.id, day);
                     const config = STATUS_CONFIG[status];
+                    const cellKey = getOverrideKey(emp.id, day);
+                    const isSelected = selectedCells.has(cellKey);
                     return (
                       <td 
                         key={day.toISOString()} 
                         className={cn(
-                          "text-center p-0 border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity",
-                          config.bg
+                          "text-center p-0 border-2 cursor-pointer hover:opacity-80 transition-all relative",
+                          config.bg,
+                          isSelected ? "border-primary ring-2 ring-primary ring-inset" : "border-gray-300"
                         )}
-                        onClick={() => setEditCell({ 
-                          employeeId: emp.id, 
-                          employeeName: emp.full_name,
-                          date: day, 
-                          currentStatus: status 
-                        })}
+                        onClick={() => handleCellClick(emp.id, emp.full_name, day, status)}
                       >
                         <span className={cn("text-[9px] font-bold", config.text)}>
                           {config.label}
                         </span>
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-primary/20 pointer-events-none" />
+                        )}
                       </td>
                     );
                   })}
@@ -586,6 +716,53 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Edit Status Dialog */}
+      <Dialog open={bulkEditDialogOpen} onOpenChange={setBulkEditDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckSquare className="w-4 h-4" />
+              Bulk Edit Status
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm">
+              <p><strong>Selected Cells:</strong> {selectedCells.size}</p>
+              <p className="text-muted-foreground">All selected cells will be updated to the chosen status.</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Select Status for All</label>
+              <Select 
+                onValueChange={handleBulkEditStatus}
+                disabled={bulkSaveStatusMutation.isPending}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status to apply" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EDITABLE_STATUSES.map((status) => {
+                    const config = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG];
+                    return (
+                      <SelectItem key={status} value={status}>
+                        <div className="flex items-center gap-2">
+                          <span className={cn("w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold", config.bg, config.text)}>
+                            {config.label}
+                          </span>
+                          <span>{config.name}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            {bulkSaveStatusMutation.isPending && (
+              <p className="text-sm text-muted-foreground">Saving {selectedCells.size} records...</p>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
