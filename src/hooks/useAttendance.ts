@@ -476,6 +476,42 @@ export function useDeleteAttendance() {
   });
 }
 
+export function useCreateAttendance() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: {
+      employee_id: string;
+      date: string;
+      check_in?: string | null;
+      check_out?: string | null;
+      status?: string;
+    }) => {
+      const { data: result, error } = await supabase
+        .from('attendance')
+        .insert([{
+          employee_id: data.employee_id,
+          date: data.date,
+          check_in: data.check_in || null,
+          check_out: data.check_out || null,
+          status: data.status || 'Present'
+        }])
+        .select(`*, employees (full_name, hrms_no, photo_url)`)
+        .single();
+      
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      toast.success('Attendance record created successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to create attendance: ${error.message}`);
+    },
+  });
+}
+
 export function useEmployeeMonthlyLates(employeeId: string) {
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
   
