@@ -78,6 +78,56 @@ export function ContractsView() {
     probation_period: '6',
   });
 
+  // Auto-compute total salary
+  const computeTotalSalary = (basic: string, housing: string, transport: string) => {
+    const basicNum = parseFloat(basic) || 0;
+    const housingNum = parseFloat(housing) || 0;
+    const transportNum = parseFloat(transport) || 0;
+    return (basicNum + housingNum + transportNum).toString();
+  };
+
+  const updateFormDataWithTotal = (field: string, value: string) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      if (['basic_salary', 'housing_allowance', 'transportation_allowance'].includes(field)) {
+        updated.total_salary = computeTotalSalary(
+          field === 'basic_salary' ? value : prev.basic_salary,
+          field === 'housing_allowance' ? value : prev.housing_allowance,
+          field === 'transportation_allowance' ? value : prev.transportation_allowance
+        );
+      }
+      return updated;
+    });
+  };
+
+  const updateRenewFormDataWithTotal = (field: string, value: string) => {
+    setRenewFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      if (['basic_salary', 'housing_allowance', 'transportation_allowance'].includes(field)) {
+        updated.total_salary = computeTotalSalary(
+          field === 'basic_salary' ? value : prev.basic_salary,
+          field === 'housing_allowance' ? value : prev.housing_allowance,
+          field === 'transportation_allowance' ? value : prev.transportation_allowance
+        );
+      }
+      return updated;
+    });
+  };
+
+  const updateEditFormDataWithTotal = (field: string, value: string) => {
+    setEditFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      if (['basic_salary', 'housing_allowance', 'transportation_allowance'].includes(field)) {
+        updated.total_salary = computeTotalSalary(
+          field === 'basic_salary' ? value : prev.basic_salary,
+          field === 'housing_allowance' ? value : prev.housing_allowance,
+          field === 'transportation_allowance' ? value : prev.transportation_allowance
+        );
+      }
+      return updated;
+    });
+  };
+
   const getContractExpiryStatus = (contract: typeof contracts[0]) => {
     if (contract.status === 'Expired') {
       return { status: 'expired', label: 'Expired', icon: XCircle, color: 'bg-destructive/10 text-destructive border-destructive/30', daysLeft: null };
@@ -259,14 +309,18 @@ export function ContractsView() {
     const newStartDate = contract.end_date ? format(parseISO(contract.end_date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
     const newEndDate = contract.end_date ? format(addYears(parseISO(contract.end_date), 2), 'yyyy-MM-dd') : format(addYears(new Date(), 2), 'yyyy-MM-dd');
     
+    const basic = contract.basic_salary?.toString() || '';
+    const housing = (contract as any).housing_allowance?.toString() || '';
+    const transport = (contract as any).transportation_allowance?.toString() || '';
+    
     setRenewFormData({
       mohre_contract_no: '',
       start_date: newStartDate,
       end_date: newEndDate,
-      basic_salary: contract.basic_salary?.toString() || '',
-      housing_allowance: (contract as any).housing_allowance?.toString() || '',
-      transportation_allowance: (contract as any).transportation_allowance?.toString() || '',
-      total_salary: contract.total_salary?.toString() || '',
+      basic_salary: basic,
+      housing_allowance: housing,
+      transportation_allowance: transport,
+      total_salary: computeTotalSalary(basic, housing, transport),
     });
     setIsRenewOpen(true);
   };
@@ -305,15 +359,18 @@ export function ContractsView() {
 
   const handleOpenEdit = (contract: typeof contracts[0]) => {
     setSelectedContract(contract);
+    const basic = contract.basic_salary?.toString() || '';
+    const housing = (contract as any).housing_allowance?.toString() || '';
+    const transport = (contract as any).transportation_allowance?.toString() || '';
     setEditFormData({
       mohre_contract_no: contract.mohre_contract_no || '',
       contract_type: contract.contract_type,
       start_date: contract.start_date || '',
       end_date: contract.end_date || '',
-      basic_salary: contract.basic_salary?.toString() || '',
-      housing_allowance: (contract as any).housing_allowance?.toString() || '',
-      transportation_allowance: (contract as any).transportation_allowance?.toString() || '',
-      total_salary: contract.total_salary?.toString() || '',
+      basic_salary: basic,
+      housing_allowance: housing,
+      transportation_allowance: transport,
+      total_salary: computeTotalSalary(basic, housing, transport),
       work_location: contract.work_location || 'Abu Dhabi',
       job_title_arabic: contract.job_title_arabic || '',
       working_hours: contract.working_hours?.toString() || '48',
@@ -454,19 +511,19 @@ export function ContractsView() {
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Basic Salary (AED)</label>
-                      <Input type="number" value={formData.basic_salary} onChange={(e) => setFormData({ ...formData, basic_salary: e.target.value })} placeholder="1800" required />
+                      <Input type="number" value={formData.basic_salary} onChange={(e) => updateFormDataWithTotal('basic_salary', e.target.value)} placeholder="1800" required />
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Housing Allowance (AED)</label>
-                      <Input type="number" value={formData.housing_allowance} onChange={(e) => setFormData({ ...formData, housing_allowance: e.target.value })} placeholder="500" />
+                      <Input type="number" value={formData.housing_allowance} onChange={(e) => updateFormDataWithTotal('housing_allowance', e.target.value)} placeholder="500" />
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Transportation Allowance (AED)</label>
-                      <Input type="number" value={formData.transportation_allowance} onChange={(e) => setFormData({ ...formData, transportation_allowance: e.target.value })} placeholder="300" />
+                      <Input type="number" value={formData.transportation_allowance} onChange={(e) => updateFormDataWithTotal('transportation_allowance', e.target.value)} placeholder="300" />
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Total Salary (AED)</label>
-                      <Input type="number" value={formData.total_salary} onChange={(e) => setFormData({ ...formData, total_salary: e.target.value })} placeholder="3500" />
+                      <Input type="number" value={formData.total_salary} readOnly className="bg-muted/50" placeholder="Auto-calculated" />
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Work Location</label>
@@ -881,19 +938,19 @@ export function ContractsView() {
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Basic Salary (AED)</label>
-                  <Input type="number" value={editFormData.basic_salary} onChange={(e) => setEditFormData({ ...editFormData, basic_salary: e.target.value })} placeholder="1800" required />
+                  <Input type="number" value={editFormData.basic_salary} onChange={(e) => updateEditFormDataWithTotal('basic_salary', e.target.value)} placeholder="1800" required />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Housing Allowance (AED)</label>
-                  <Input type="number" value={editFormData.housing_allowance} onChange={(e) => setEditFormData({ ...editFormData, housing_allowance: e.target.value })} placeholder="500" />
+                  <Input type="number" value={editFormData.housing_allowance} onChange={(e) => updateEditFormDataWithTotal('housing_allowance', e.target.value)} placeholder="500" />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Transportation Allowance (AED)</label>
-                  <Input type="number" value={editFormData.transportation_allowance} onChange={(e) => setEditFormData({ ...editFormData, transportation_allowance: e.target.value })} placeholder="300" />
+                  <Input type="number" value={editFormData.transportation_allowance} onChange={(e) => updateEditFormDataWithTotal('transportation_allowance', e.target.value)} placeholder="300" />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Total Salary (AED)</label>
-                  <Input type="number" value={editFormData.total_salary} onChange={(e) => setEditFormData({ ...editFormData, total_salary: e.target.value })} placeholder="3500" />
+                  <Input type="number" value={editFormData.total_salary} readOnly className="bg-muted/50" placeholder="Auto-calculated" />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Work Location</label>
@@ -993,8 +1050,24 @@ export function ContractsView() {
                   <Input 
                     type="number" 
                     value={renewFormData.basic_salary} 
-                    onChange={(e) => setRenewFormData({ ...renewFormData, basic_salary: e.target.value })} 
+                    onChange={(e) => updateRenewFormDataWithTotal('basic_salary', e.target.value)} 
                     required 
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Housing Allowance (AED)</label>
+                  <Input 
+                    type="number" 
+                    value={renewFormData.housing_allowance} 
+                    onChange={(e) => updateRenewFormDataWithTotal('housing_allowance', e.target.value)} 
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Transportation Allowance (AED)</label>
+                  <Input 
+                    type="number" 
+                    value={renewFormData.transportation_allowance} 
+                    onChange={(e) => updateRenewFormDataWithTotal('transportation_allowance', e.target.value)} 
                   />
                 </div>
                 <div>
@@ -1002,7 +1075,9 @@ export function ContractsView() {
                   <Input 
                     type="number" 
                     value={renewFormData.total_salary} 
-                    onChange={(e) => setRenewFormData({ ...renewFormData, total_salary: e.target.value })} 
+                    readOnly 
+                    className="bg-muted/50"
+                    placeholder="Auto-calculated"
                   />
                 </div>
               </div>
