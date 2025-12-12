@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { differenceInDays, parseISO, format, addYears } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { ImagePreviewModal } from '@/components/modals/ImagePreviewModal';
 
 export function ContractsView() {
   const { data: contracts = [], isLoading, refetch } = useContracts();
@@ -32,6 +33,7 @@ export function ContractsView() {
   const [isUploading, setIsUploading] = useState(false);
   const page1InputRef = useRef<HTMLInputElement>(null);
   const page2InputRef = useRef<HTMLInputElement>(null);
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
   const [formData, setFormData] = useState({
     employee_id: '',
@@ -826,11 +828,13 @@ export function ContractsView() {
                       {((contract as any).page1_url || (contract as any).page2_url) && (
                         <div className="flex gap-2 mt-3 pt-3 border-t border-border">
                           {(contract as any).page1_url && (
-                            <a 
-                              href={(contract as any).page1_url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="group relative w-16 h-16 rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-all hover:scale-105"
+                            <button 
+                              type="button"
+                              onClick={() => setPreviewImage({ 
+                                url: (contract as any).page1_url, 
+                                title: `${contract.employees?.full_name || 'Contract'} - Page 1` 
+                              })}
+                              className="group relative w-16 h-16 rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-all hover:scale-105 cursor-pointer"
                             >
                               <img 
                                 src={(contract as any).page1_url} 
@@ -839,14 +843,16 @@ export function ContractsView() {
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                               <span className="absolute bottom-1 left-1 text-[8px] text-white font-medium bg-primary/80 px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">1st</span>
-                            </a>
+                            </button>
                           )}
                           {(contract as any).page2_url && (
-                            <a 
-                              href={(contract as any).page2_url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="group relative w-16 h-16 rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-all hover:scale-105"
+                            <button 
+                              type="button"
+                              onClick={() => setPreviewImage({ 
+                                url: (contract as any).page2_url, 
+                                title: `${contract.employees?.full_name || 'Contract'} - Page 2` 
+                              })}
+                              className="group relative w-16 h-16 rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-all hover:scale-105 cursor-pointer"
                             >
                               <img 
                                 src={(contract as any).page2_url} 
@@ -855,7 +861,7 @@ export function ContractsView() {
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                               <span className="absolute bottom-1 left-1 text-[8px] text-white font-medium bg-primary/80 px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">2nd</span>
-                            </a>
+                            </button>
                           )}
                         </div>
                       )}
@@ -1107,6 +1113,16 @@ export function ContractsView() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <ImagePreviewModal
+          isOpen={!!previewImage}
+          onClose={() => setPreviewImage(null)}
+          imageUrl={previewImage.url}
+          title={previewImage.title}
+        />
+      )}
     </div>
   );
 }
