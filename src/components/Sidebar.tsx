@@ -83,6 +83,7 @@ const navItems: NavItem[] = [
   { id: 'discipline', label: 'Discipline', icon: <Scale className="w-5 h-5" /> },
   { id: 'orgchart', label: 'Hierarchy', icon: <Network className="w-5 h-5" /> },
   { id: 'company-docs', label: 'Company Docs', icon: <FolderOpen className="w-5 h-5" /> },
+  { id: 'reports', label: 'Reports', icon: <FileText className="w-5 h-5" /> },
   { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
 ];
 

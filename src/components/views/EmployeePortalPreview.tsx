@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useLeave, useLeaveTypes, useLeaveBalances } from '@/hooks/useLeave';
@@ -27,6 +27,16 @@ export function EmployeePortalPreview() {
   const { data: employees = [] } = useEmployees();
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<TabType>('personal');
+  
+  // Set default to Myranel when employees load
+  useEffect(() => {
+    if (employees.length > 0 && !selectedEmployeeId) {
+      const myranel = employees.find(e => e.full_name.toLowerCase().includes('myranel'));
+      if (myranel) {
+        setSelectedEmployeeId(myranel.id);
+      }
+    }
+  }, [employees, selectedEmployeeId]);
 
   const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
 
