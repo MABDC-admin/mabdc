@@ -12,9 +12,10 @@ import { useContracts } from '@/hooks/useContracts';
 import { usePayroll } from '@/hooks/usePayroll';
 import { useTimeShifts } from '@/hooks/useTimeShifts';
 import { useCompanySettings } from '@/hooks/useSettings';
+import { useDiscipline } from '@/hooks/useDiscipline';
 import { 
   FileText, Users, Calendar, Clock, DollarSign, FileCheck, Timer,
-  Download, Filter
+  Download, Filter, AlertTriangle, UserX
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, differenceInDays } from 'date-fns';
 import jsPDF from 'jspdf';
@@ -28,6 +29,7 @@ export function ReportsView() {
   const { data: payroll = [] } = usePayroll();
   const { data: shifts = [] } = useTimeShifts();
   const { data: settings } = useCompanySettings();
+  const { data: disciplineRecords = [] } = useDiscipline();
 
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(currentDate, 'yyyy-MM'));
@@ -213,6 +215,64 @@ export function ReportsView() {
       });
   }, [payroll, employees, selectedMonth, selectedDepartment]);
 
+  // EOS Report Data - Calculate gratuity for all employees
+  const eosReportData = useMemo(() => {
+    return filteredEmployees
+      .map((emp, idx) => {
+        const start = new Date(emp.joining_date);
+        const now = new Date();
+        const years = (now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365);
+        const basicSalary = emp.basic_salary || 0;
+        
+        let gratuity = 0;
+        if (years >= 1) {
+          if (years <= 5) {
+            gratuity = Math.round((21 / 30) * basicSalary * years);
+          } else {
+            const first5 = (21 / 30) * basicSalary * 5;
+            const remaining = (30 / 30) * basicSalary * (years - 5);
+            gratuity = Math.round(first5 + remaining);
+          }
+        }
+        
+        return {
+          no: idx + 1,
+          hrmsNo: emp.hrms_no,
+          name: emp.full_name,
+          department: emp.department,
+          joiningDate: emp.joining_date,
+          yearsOfService: Math.round(years * 10) / 10,
+          basicSalary,
+          gratuity,
+        };
+      })
+      .filter(e => e.yearsOfService >= 1);
+  }, [filteredEmployees]);
+
+  // Discipline Report Data
+  const disciplineReportData = useMemo(() => {
+    return disciplineRecords
+      .filter(d => {
+        if (selectedDepartment === 'all') return true;
+        const emp = employees.find(e => e.id === d.employee_id);
+        return emp?.department === selectedDepartment;
+      })
+      .map((d, idx) => {
+        const emp = employees.find(e => e.id === d.employee_id);
+        return {
+          no: idx + 1,
+          hrmsNo: emp?.hrms_no || d.employees?.hrms_no || '',
+          name: emp?.full_name || d.employees?.full_name || 'Unknown',
+          incidentType: d.incident_type,
+          incidentDate: d.incident_date,
+          description: d.description,
+          actionTaken: d.action_taken || '-',
+          status: d.status || 'Active',
+          issuedBy: d.issued_by || '-',
+        };
+      });
+  }, [disciplineRecords, employees, selectedDepartment]);
+
   const generatePDF = (reportType: string, data: any[], columns: { header: string; key: string }[]) => {
     const doc = new jsPDF('landscape');
     const companyName = settings?.company_name || 'MABDC';
@@ -257,6 +317,8 @@ export function ReportsView() {
     { id: 'contracts', label: 'Contracts', icon: FileCheck },
     { id: 'timeclock', label: 'Time Clock', icon: Timer },
     { id: 'payroll', label: 'Payroll', icon: DollarSign },
+    { id: 'eos', label: 'EOS', icon: UserX },
+    { id: 'discipline', label: 'Discipline', icon: AlertTriangle },
   ];
 
   return (
@@ -307,7 +369,7 @@ export function ReportsView() {
 
       {/* Report Tabs */}
       <Tabs defaultValue="employees" className="w-full">
-        <TabsList className="grid grid-cols-6 w-full">
+        <TabsList className="grid grid-cols-8 w-full">
           {reportTabs.map((tab) => (
             <TabsTrigger key={tab.id} value={tab.id} className="flex items-center gap-2">
               <tab.icon className="w-4 h-4" />
@@ -734,7 +796,172 @@ export function ReportsView() {
                     </p>
                   </div>
                 </div>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+        {/* EOS Report */}
+        <TabsContent value="eos">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <UserX className="w-5 h-5" />
+                End of Service (EOS) Report
+              </CardTitle>
+              <Button
+                onClick={() => generatePDF('EOS', eosReportData, [
+                  { header: '#', key: 'no' },
+                  { header: 'HRMS No.', key: 'hrmsNo' },
+                  { header: 'Name', key: 'name' },
+                  { header: 'Department', key: 'department' },
+                  { header: 'Joining Date', key: 'joiningDate' },
+                  { header: 'Years of Service', key: 'yearsOfService' },
+                  { header: 'Basic Salary', key: 'basicSalary' },
+                  { header: 'Gratuity (AED)', key: 'gratuity' },
+                ])}
+                className="gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Export PDF
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border overflow-auto max-h-[500px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>HRMS No.</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Joining Date</TableHead>
+                      <TableHead className="text-center">Years of Service</TableHead>
+                      <TableHead className="text-right">Basic Salary</TableHead>
+                      <TableHead className="text-right">Gratuity (AED)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {eosReportData.length > 0 ? eosReportData.map((row) => (
+                      <TableRow key={row.no}>
+                        <TableCell>{row.no}</TableCell>
+                        <TableCell className="font-mono">{row.hrmsNo}</TableCell>
+                        <TableCell className="font-medium">{row.name}</TableCell>
+                        <TableCell>{row.department}</TableCell>
+                        <TableCell>{row.joiningDate}</TableCell>
+                        <TableCell className="text-center font-medium">{row.yearsOfService}</TableCell>
+                        <TableCell className="text-right">AED {row.basicSalary.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-bold text-primary">AED {row.gratuity.toLocaleString()}</TableCell>
+                      </TableRow>
+                    )) : (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                          No employees with 1+ years of service
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {eosReportData.length > 0 && (
+                <div className="flex justify-end mt-4 p-4 bg-secondary/30 rounded-lg">
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Total EOS Liability</p>
+                    <p className="text-xl font-bold text-primary">
+                      AED {eosReportData.reduce((sum, r) => sum + r.gratuity, 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
               )}
+              <p className="text-xs text-muted-foreground mt-2">
+                * Calculated per UAE Labor Law: 21 days salary/year for first 5 years, 30 days/year thereafter.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Discipline Report */}
+        <TabsContent value="discipline">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                Discipline Report
+              </CardTitle>
+              <Button
+                onClick={() => generatePDF('Discipline', disciplineReportData, [
+                  { header: '#', key: 'no' },
+                  { header: 'HRMS No.', key: 'hrmsNo' },
+                  { header: 'Name', key: 'name' },
+                  { header: 'Incident Type', key: 'incidentType' },
+                  { header: 'Incident Date', key: 'incidentDate' },
+                  { header: 'Description', key: 'description' },
+                  { header: 'Action Taken', key: 'actionTaken' },
+                  { header: 'Status', key: 'status' },
+                ])}
+                className="gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Export PDF
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border overflow-auto max-h-[500px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>HRMS No.</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Incident Type</TableHead>
+                      <TableHead>Incident Date</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Action Taken</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {disciplineReportData.length > 0 ? disciplineReportData.map((row) => (
+                      <TableRow key={row.no}>
+                        <TableCell>{row.no}</TableCell>
+                        <TableCell className="font-mono">{row.hrmsNo}</TableCell>
+                        <TableCell className="font-medium">{row.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            row.incidentType === 'Termination' ? 'destructive' : 
+                            row.incidentType === 'Suspension' ? 'destructive' :
+                            row.incidentType === 'Final Warning' ? 'destructive' :
+                            'secondary'
+                          }>
+                            {row.incidentType}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{row.incidentDate}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{row.description}</TableCell>
+                        <TableCell>{row.actionTaken}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            row.status === 'Resolved' ? 'default' : 
+                            row.status === 'Active' ? 'secondary' : 
+                            'outline'
+                          }>
+                            {row.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    )) : (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                          No discipline records found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                Total: {disciplineReportData.length} discipline records
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
