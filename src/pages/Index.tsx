@@ -18,6 +18,7 @@ import { DisciplineView } from '@/components/views/DisciplineView';
 import { OrgChartView } from '@/components/views/OrgChartView';
 import { CompanyDocsView } from '@/components/views/CompanyDocsView';
 import { GamificationView } from '@/components/views/GamificationView';
+import { ReportsView } from '@/components/views/ReportsView';
 import { useHRStore } from '@/store/hrStore';
 
 const Index = () => {
@@ -61,6 +62,8 @@ const Index = () => {
         return <OrgChartView />;
       case 'company-docs':
         return <CompanyDocsView />;
+      case 'reports':
+        return <ReportsView />;
       case 'settings':
         return <SettingsView />;
       default:
