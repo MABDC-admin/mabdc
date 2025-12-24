@@ -358,6 +358,39 @@ export type Database = {
           },
         ]
       }
+      document_types: {
+        Row: {
+          created_at: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          is_system: boolean | null
+          name: string
+          name_arabic: string | null
+          requires_expiry: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name: string
+          name_arabic?: string | null
+          requires_expiry?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name?: string
+          name_arabic?: string | null
+          requires_expiry?: boolean | null
+        }
+        Relationships: []
+      }
       employee_badges: {
         Row: {
           badge_id: string
@@ -504,7 +537,9 @@ export type Database = {
         Row: {
           category: string | null
           created_at: string
+          document_type_id: string | null
           employee_id: string
+          expiry_date: string | null
           file_size: string | null
           file_type: string
           file_url: string
@@ -514,7 +549,9 @@ export type Database = {
         Insert: {
           category?: string | null
           created_at?: string
+          document_type_id?: string | null
           employee_id: string
+          expiry_date?: string | null
           file_size?: string | null
           file_type: string
           file_url: string
@@ -524,7 +561,9 @@ export type Database = {
         Update: {
           category?: string | null
           created_at?: string
+          document_type_id?: string | null
           employee_id?: string
+          expiry_date?: string | null
           file_size?: string | null
           file_type?: string
           file_url?: string
@@ -532,6 +571,13 @@ export type Database = {
           name?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "employee_documents_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "employee_documents_employee_id_fkey"
             columns: ["employee_id"]

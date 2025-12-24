@@ -10,6 +10,8 @@ export interface EmployeeDocument {
   file_url: string;
   file_size: string | null;
   category: string | null;
+  expiry_date: string | null;
+  document_type_id: string | null;
   created_at: string;
 }
 
@@ -37,11 +39,13 @@ export function useUploadDocument() {
     mutationFn: async ({ 
       file, 
       employeeId, 
-      category = 'Other' 
+      category = 'Other',
+      expiryDate,
     }: { 
       file: File; 
       employeeId: string; 
       category?: string;
+      expiryDate?: string;
     }) => {
       // Upload file to storage
       const fileExt = file.name.split('.').pop();
@@ -68,6 +72,7 @@ export function useUploadDocument() {
           file_url: publicUrl,
           file_size: formatFileSize(file.size),
           category,
+          expiry_date: expiryDate || null,
         }])
         .select()
         .single();

@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { FileText, RefreshCw, CheckCircle, Plus, AlertTriangle, Clock, XCircle, RotateCcw, Bell, Zap, Pencil, Upload, Image, X } from 'lucide-react';
+import { FileText, RefreshCw, CheckCircle, Plus, AlertTriangle, Clock, XCircle, RotateCcw, Bell, Zap, Pencil, Upload, Image, X, ClipboardList } from 'lucide-react';
+import { DocumentRenewalQueueModal } from '@/components/modals/DocumentRenewalQueueModal';
+import { useDocumentRenewalQueue } from '@/hooks/useDocumentRenewalQueue';
 import { cn } from '@/lib/utils';
 import { differenceInDays, parseISO, format, addYears } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,6 +36,9 @@ export function ContractsView() {
   const page1InputRef = useRef<HTMLInputElement>(null);
   const page2InputRef = useRef<HTMLInputElement>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+  const [isRenewalQueueOpen, setIsRenewalQueueOpen] = useState(false);
+  const { data: renewalQueueItems = [] } = useDocumentRenewalQueue(30);
+  const criticalRenewalCount = renewalQueueItems.filter(i => i.days_remaining <= 7).length;
 
   const [formData, setFormData] = useState({
     employee_id: '',
@@ -463,6 +468,23 @@ export function ContractsView() {
             </Button>
             <Button variant="outline" size="sm" onClick={() => refetch()} className="border-border">
               <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => setIsRenewalQueueOpen(true)}
+              className={cn(
+                "border-amber-500/50 text-amber-500 hover:bg-amber-500/10",
+                criticalRenewalCount > 0 && "animate-pulse"
+              )}
+            >
+              <ClipboardList className="w-4 h-4 mr-1" />
+              Visa & Document Renewal Queue
+              {renewalQueueItems.length > 0 && (
+                <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-500 text-white rounded-full">
+                  {renewalQueueItems.length}
+                </span>
+              )}
             </Button>
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
               <DialogTrigger asChild>
@@ -1123,6 +1145,12 @@ export function ContractsView() {
           title={previewImage.title}
         />
       )}
+
+      {/* Document Renewal Queue Modal */}
+      <DocumentRenewalQueueModal
+        open={isRenewalQueueOpen}
+        onOpenChange={setIsRenewalQueueOpen}
+      />
     </div>
   );
 }
