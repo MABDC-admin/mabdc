@@ -165,3 +165,60 @@ function formatFileSize(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
+
+export function useRenewDocument() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      oldDocumentId, 
+      newDocument 
+    }: { 
+      oldDocumentId: string; 
+      newDocument: {
+        employee_id: string;
+        name: string;
+        file_type: string;
+        file_url: string;
+        file_size?: string;
+        expiry_date?: string;
+        document_type_id?: string;
+        category?: string;
+      }
+    }) => {
+      // Create new document with reference to old one
+      const { data: newDoc, error: insertError } = await supabase
+        .from('employee_documents')
+        .insert([{
+          ...newDocument,
+          previous_document_id: oldDocumentId,
+        }])
+        .select()
+        .single();
+      
+      if (insertError) throw insertError;
+
+      // Mark old document as renewed
+      const { error: updateError } = await supabase
+        .from('employee_documents')
+        .update({ 
+          is_renewed: true, 
+          renewed_at: new Date().toISOString(),
+          renewed_document_id: newDoc.id,
+        })
+        .eq('id', oldDocumentId);
+      
+      if (updateError) throw updateError;
+      
+      return newDoc;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['employee-documents', variables.newDocument.employee_id] });
+      queryClient.invalidateQueries({ queryKey: ['document-renewal-queue'] });
+      toast.success('Document renewed successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to renew document: ${error.message}`);
+    },
+  });
+}

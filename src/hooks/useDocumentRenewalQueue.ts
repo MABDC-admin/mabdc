@@ -14,6 +14,8 @@ export interface RenewalQueueItem {
   days_remaining: number;
   source: 'employee' | 'document' | 'contract';
   source_id: string;
+  is_renewed?: boolean;
+  renewed_document_id?: string | null;
 }
 
 export function useDocumentRenewalQueue(daysThreshold = 30) {
@@ -40,9 +42,12 @@ export function useDocumentRenewalQueue(daysThreshold = 30) {
           name,
           category,
           expiry_date,
+          is_renewed,
+          renewed_document_id,
           employees!inner(full_name, photo_url, department, status)
         `)
-        .not('expiry_date', 'is', null);
+        .not('expiry_date', 'is', null)
+        .or('is_renewed.is.null,is_renewed.eq.false');
       
       if (documentsError) throw documentsError;
       
@@ -127,7 +132,7 @@ export function useDocumentRenewalQueue(daysThreshold = 30) {
         const daysRemaining = differenceInDays(parseISO(doc.expiry_date), today);
         if (daysRemaining <= daysThreshold && daysRemaining >= -30) {
           items.push({
-            id: `doc-${doc.id}`,
+            id: doc.id,
             employee_id: doc.employee_id,
             employee_name: doc.employees.full_name,
             employee_photo: doc.employees.photo_url,
@@ -138,6 +143,8 @@ export function useDocumentRenewalQueue(daysThreshold = 30) {
             days_remaining: daysRemaining,
             source: 'document',
             source_id: doc.id,
+            is_renewed: doc.is_renewed || false,
+            renewed_document_id: doc.renewed_document_id,
           });
         }
       });

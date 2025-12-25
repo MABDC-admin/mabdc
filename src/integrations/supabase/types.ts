@@ -544,7 +544,11 @@ export type Database = {
           file_type: string
           file_url: string
           id: string
+          is_renewed: boolean | null
           name: string
+          previous_document_id: string | null
+          renewed_at: string | null
+          renewed_document_id: string | null
         }
         Insert: {
           category?: string | null
@@ -556,7 +560,11 @@ export type Database = {
           file_type: string
           file_url: string
           id?: string
+          is_renewed?: boolean | null
           name: string
+          previous_document_id?: string | null
+          renewed_at?: string | null
+          renewed_document_id?: string | null
         }
         Update: {
           category?: string | null
@@ -568,7 +576,11 @@ export type Database = {
           file_type?: string
           file_url?: string
           id?: string
+          is_renewed?: boolean | null
           name?: string
+          previous_document_id?: string | null
+          renewed_at?: string | null
+          renewed_document_id?: string | null
         }
         Relationships: [
           {
@@ -583,6 +595,20 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_previous_document_id_fkey"
+            columns: ["previous_document_id"]
+            isOneToOne: false
+            referencedRelation: "employee_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_renewed_document_id_fkey"
+            columns: ["renewed_document_id"]
+            isOneToOne: false
+            referencedRelation: "employee_documents"
             referencedColumns: ["id"]
           },
         ]

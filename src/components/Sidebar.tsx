@@ -65,7 +65,15 @@ const navItems: NavItem[] = [
       { id: 'e-portal', label: 'E-Portal', icon: <Eye className="w-4 h-4" /> }
     ]
   },
-  { id: 'contracts', label: 'Contracts', icon: <FileText className="w-5 h-5" /> },
+  { 
+    id: 'contracts', 
+    label: 'Contracts', 
+    icon: <FileText className="w-5 h-5" />,
+    subItems: [
+      { id: 'contracts', label: 'All Contracts', icon: <FileText className="w-4 h-4" /> },
+      { id: 'renewal', label: 'Renewal', icon: <Clock className="w-4 h-4" /> }
+    ]
+  },
   { 
     id: 'attendance', 
     label: 'Attendance', 
@@ -90,7 +98,7 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const { currentView, setCurrentView } = useHRStore();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['attendance', 'employees', 'dashboard']);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['attendance', 'employees', 'dashboard', 'contracts']);
   const { signOut, user } = useAuth();
   const { data: appeals = [] } = useAttendanceAppeals();
   const navigate = useNavigate();
