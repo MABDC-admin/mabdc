@@ -469,23 +469,6 @@ export function ContractsView() {
             <Button variant="outline" size="sm" onClick={() => refetch()} className="border-border">
               <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
             </Button>
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => setIsRenewalQueueOpen(true)}
-              className={cn(
-                "border-amber-500/50 text-amber-500 hover:bg-amber-500/10",
-                criticalRenewalCount > 0 && "animate-pulse"
-              )}
-            >
-              <ClipboardList className="w-4 h-4 mr-1" />
-              Visa & Document Renewal Queue
-              {renewalQueueItems.length > 0 && (
-                <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-500 text-white rounded-full">
-                  {renewalQueueItems.length}
-                </span>
-              )}
-            </Button>
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
@@ -1107,6 +1090,63 @@ export function ContractsView() {
                     className="bg-muted/50"
                     placeholder="Auto-calculated"
                   />
+                </div>
+              </div>
+
+              {/* Contract Page Uploads */}
+              <div className="space-y-3">
+                <label className="text-xs text-muted-foreground font-medium">Upload New Contract Pages (Optional)</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Page 1</label>
+                    <div className="border-2 border-dashed border-border rounded-lg p-3 hover:border-primary/50 transition-colors">
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={(e) => handleFileChange(e.target.files?.[0] || null, 1)}
+                        className="w-full text-xs"
+                      />
+                      {page1Preview && (
+                        <div className="mt-2 relative">
+                          <img src={page1Preview} alt="Page 1" className="w-full h-20 object-cover rounded" />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="destructive"
+                            className="absolute -top-2 -right-2 w-5 h-5"
+                            onClick={() => { setPage1Preview(null); setPage1File(null); }}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Page 2</label>
+                    <div className="border-2 border-dashed border-border rounded-lg p-3 hover:border-primary/50 transition-colors">
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={(e) => handleFileChange(e.target.files?.[0] || null, 2)}
+                        className="w-full text-xs"
+                      />
+                      {page2Preview && (
+                        <div className="mt-2 relative">
+                          <img src={page2Preview} alt="Page 2" className="w-full h-20 object-cover rounded" />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="destructive"
+                            className="absolute -top-2 -right-2 w-5 h-5"
+                            onClick={() => { setPage2Preview(null); setPage2File(null); }}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 

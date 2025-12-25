@@ -5,6 +5,7 @@ import TimeShiftView from '@/components/views/TimeShiftView';
 import TimeClockView from '@/components/views/TimeClockView';
 import { EmployeePortalPreview } from '@/components/views/EmployeePortalPreview';
 import { ContractsView } from '@/components/views/ContractsView';
+import { RenewalView } from '@/components/views/RenewalView';
 import { AttendanceView } from '@/components/views/AttendanceView';
 import { EmployeeAttendanceView } from '@/components/views/EmployeeAttendanceView';
 import { AttendanceAppealsView } from '@/components/views/AttendanceAppealsView';
@@ -40,6 +41,8 @@ const Index = () => {
         return <EmployeePortalPreview />;
       case 'contracts':
         return <ContractsView />;
+      case 'renewal':
+        return <RenewalView />;
       case 'attendance':
         return <AttendanceView />;
       case 'employee-attendance':
