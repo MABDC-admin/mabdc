@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Download, Calendar, Edit2, CheckSquare, Square, X } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ArrowLeft, Download, Calendar, Edit2, CheckSquare, Square, X, ChevronLeft, ChevronRight, Search, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay, isWithinInterval } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay, isWithinInterval, addMonths, subMonths } from 'date-fns';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
@@ -28,6 +29,7 @@ const STATUS_TO_DB: Record<string, string> = {
   'HDA': 'Half Day Absent',
   'HDSL': 'Half Day Sick Leave',
   'DO': 'Day Off',
+  'L': 'Late',
   '-': 'No Record',
 };
 
@@ -35,26 +37,39 @@ interface MonthlyMatrixViewProps {
   onBack: () => void;
 }
 
-// Status type definitions - removed L (Late), added DO (Day Off), updated colors
+// Status type definitions with updated colors to match reference
 const STATUS_CONFIG = {
-  P: { label: 'P', name: 'Present', bg: 'bg-green-500', text: 'text-white', pdfBg: [34, 197, 94] },
+  P: { label: 'P', name: 'Present', bg: 'bg-emerald-500', text: 'text-white', pdfBg: [34, 197, 94] },
+  L: { label: 'L', name: 'Late', bg: 'bg-amber-400', text: 'text-amber-900', pdfBg: [251, 191, 36] },
+  A: { label: 'A', name: 'Absent', bg: 'bg-red-500', text: 'text-white', pdfBg: [239, 68, 68] },
+  VL: { label: 'VL', name: 'On Leave', bg: 'bg-blue-500', text: 'text-white', pdfBg: [59, 130, 246] },
+  W: { label: 'W', name: 'Weekend', bg: 'bg-slate-200', text: 'text-slate-600', pdfBg: [226, 232, 240] },
+  DO: { label: 'DO', name: 'Day Off', bg: 'bg-purple-400', text: 'text-purple-900', pdfBg: [192, 132, 252] },
+  H: { label: 'H', name: 'Half Day', bg: 'bg-orange-400', text: 'text-orange-900', pdfBg: [251, 146, 60] },
+  SL: { label: 'SL', name: 'Sick Leave', bg: 'bg-lime-400', text: 'text-lime-900', pdfBg: [163, 230, 53] },
   SB: { label: 'SB', name: 'Spring Break', bg: 'bg-violet-400', text: 'text-violet-900', pdfBg: [167, 139, 250] },
   WB: { label: 'WB', name: 'Winter Break', bg: 'bg-violet-400', text: 'text-violet-900', pdfBg: [167, 139, 250] },
-  SL: { label: 'SL', name: 'Sick Leave', bg: 'bg-lime-400', text: 'text-lime-900', pdfBg: [163, 230, 53] },
-  VL: { label: 'VL', name: 'Vacation Leave', bg: 'bg-yellow-300', text: 'text-yellow-800', pdfBg: [253, 224, 71] },
-  H: { label: 'H', name: 'Public Holiday', bg: 'bg-cyan-300', text: 'text-cyan-800', pdfBg: [103, 232, 249] },
   HDA: { label: 'HDA', name: 'Half Day Absent', bg: 'bg-pink-400', text: 'text-pink-900', pdfBg: [244, 114, 182] },
   HDSL: { label: 'HDSL', name: 'Half Day Sick Leave', bg: 'bg-lime-400', text: 'text-lime-900', pdfBg: [163, 230, 53] },
-  A: { label: 'A', name: 'Absent', bg: 'bg-red-500', text: 'text-white', pdfBg: [239, 68, 68] },
-  DO: { label: 'DO', name: 'Day Off', bg: 'bg-blue-300', text: 'text-blue-800', pdfBg: [147, 197, 253] },
+  PH: { label: 'PH', name: 'Public Holiday', bg: 'bg-cyan-300', text: 'text-cyan-800', pdfBg: [103, 232, 249] },
   '-': { label: '-', name: 'No Record', bg: 'bg-gray-200', text: 'text-gray-600', pdfBg: [229, 231, 235] },
-  W: { label: '-', name: 'Weekend', bg: 'bg-gray-400', text: 'text-gray-700', pdfBg: [156, 163, 175] },
 } as const;
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // Editable statuses for the dropdown
-const EDITABLE_STATUSES = ['-', 'A', 'H', 'P', 'SL', 'HDSL', 'VL', 'SB', 'WB', 'HDA', 'DO'] as const;
+const EDITABLE_STATUSES = ['-', 'A', 'PH', 'P', 'L', 'SL', 'HDSL', 'VL', 'SB', 'WB', 'HDA', 'DO'] as const;
+
+// Legend items for the header bar
+const LEGEND_ITEMS = [
+  { code: 'P', color: 'bg-emerald-500' },
+  { code: 'L', color: 'bg-amber-400' },
+  { code: 'A', color: 'bg-red-500' },
+  { code: 'VL', color: 'bg-blue-500', label: 'On Leave' },
+  { code: 'W', color: 'bg-slate-200' },
+  { code: 'DO', color: 'bg-purple-400', label: 'Day Off' },
+  { code: 'H', color: 'bg-orange-400', label: 'Half Day' },
+];
 
 export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
   const currentDate = new Date();
@@ -63,6 +78,8 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
   const [editCell, setEditCell] = useState<{ employeeId: string; employeeName: string; date: Date; currentStatus: string } | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<{ id: string; name: string } | null>(null);
   const [manualOverrides, setManualOverrides] = useState<Record<string, string>>({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('all');
   
   // Bulk selection state
   const [bulkSelectMode, setBulkSelectMode] = useState(false);
@@ -98,12 +115,36 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  // Get unique departments
+  const departments = useMemo(() => {
+    const depts = new Set(employees.map(e => e.department).filter(Boolean));
+    return Array.from(depts).sort();
+  }, [employees]);
+
+  // Filter employees by search and department
+  const filteredEmployees = useMemo(() => {
+    return employees.filter(emp => {
+      const matchesSearch = searchQuery === '' || 
+        emp.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        emp.hrms_no.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesDepartment = selectedDepartment === 'all' || emp.department === selectedDepartment;
+      return matchesSearch && matchesDepartment;
+    });
+  }, [employees, searchQuery, selectedDepartment]);
+
   // Generate days of the month
   const daysInMonth = useMemo(() => {
     const monthStart = startOfMonth(new Date(selectedYear, selectedMonth));
     const monthEnd = endOfMonth(monthStart);
     return eachDayOfInterval({ start: monthStart, end: monthEnd });
   }, [selectedMonth, selectedYear]);
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    const currentDateValue = new Date(selectedYear, selectedMonth);
+    const newDate = direction === 'prev' ? subMonths(currentDateValue, 1) : addMonths(currentDateValue, 1);
+    setSelectedMonth(newDate.getMonth());
+    setSelectedYear(newDate.getFullYear());
+  };
 
   const getHolidayForDay = (date: Date) => {
     return publicHolidays.find(h => isSameDay(parseISO(h.date), date));
@@ -138,18 +179,19 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     }
 
     const dayOfWeek = getDay(date);
+    const isFri = dayOfWeek === 5;
     const isSat = dayOfWeek === 6;
     const isSun = dayOfWeek === 0;
     
-    // Weekend
-    if (isSat || isSun) {
+    // Weekend (Friday, Saturday, Sunday based on reference)
+    if (isFri || isSat || isSun) {
       return 'W';
     }
     
     // Public Holiday
     const holiday = getHolidayForDay(date);
     if (holiday) {
-      return 'H';
+      return 'PH';
     }
 
     // Check for approved leave
@@ -172,14 +214,15 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       return 'A'; // Absent if no record for past working day
     }
 
-    // Map attendance status - Late is now treated as Present in matrix
+    // Map attendance status
     const status = attendance.status?.toLowerCase() || '';
-    if (status === 'present' || status === 'late' || status.includes('undertime')) return 'P';
+    if (status === 'present') return 'P';
+    if (status === 'late' || status.includes('undertime')) return 'L';
     if (status === 'absent') return 'A';
     if (status === 'day off') return 'DO';
     if (status === 'sick leave') return 'SL';
     if (status === 'vacation leave') return 'VL';
-    if (status === 'holiday') return 'H';
+    if (status === 'holiday') return 'PH';
     if (status === 'spring break') return 'SB';
     if (status === 'winter break') return 'WB';
     if (status === 'half day absent') return 'HDA';
@@ -195,7 +238,6 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       const dateStr = format(date, 'yyyy-MM-dd');
       const dbStatus = STATUS_TO_DB[status] || status;
       
-      // Check if attendance record exists
       const { data: existing } = await supabase
         .from('attendance')
         .select('id')
@@ -204,7 +246,6 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
         .maybeSingle();
       
       if (existing) {
-        // Update existing record
         const { error } = await supabase
           .from('attendance')
           .update({ 
@@ -215,7 +256,6 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
           .eq('id', existing.id);
         if (error) throw error;
       } else {
-        // Insert new record
         const { error } = await supabase
           .from('attendance')
           .insert({
@@ -237,7 +277,6 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     if (editCell) {
       const key = getOverrideKey(editCell.employeeId, editCell.date);
       
-      // Save to database
       try {
         await saveStatusMutation.mutateAsync({
           employeeId: editCell.employeeId,
@@ -358,9 +397,9 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
 
   // Calculate summary for each employee
   const employeeSummaries = useMemo(() => {
-    return employees.map((emp, index) => {
+    return filteredEmployees.map((emp, index) => {
       const counts = {
-        P: 0, SB: 0, WB: 0, H: 0, A: 0, HDA: 0, VL: 0, HDSL: 0, SL: 0, DO: 0
+        P: 0, L: 0, A: 0, VL: 0, SL: 0, DO: 0, H: 0, SB: 0, WB: 0, HDA: 0, HDSL: 0, PH: 0
       };
       
       daysInMonth.forEach(day => {
@@ -372,7 +411,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       
       return { ...emp, index: index + 1, ...counts };
     });
-  }, [employees, daysInMonth, allAttendance, leaveRecords, publicHolidays, manualOverrides]);
+  }, [filteredEmployees, daysInMonth, allAttendance, leaveRecords, publicHolidays, manualOverrides]);
 
   // PDF Generation
   const generateMatrixPDF = () => {
@@ -400,16 +439,14 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     doc.setTextColor(0, 0, 0);
     const legends = [
       { code: 'P', color: STATUS_CONFIG.P.pdfBg },
-      { code: 'SB', color: STATUS_CONFIG.SB.pdfBg },
-      { code: 'WB', color: STATUS_CONFIG.WB.pdfBg },
-      { code: 'H', color: STATUS_CONFIG.H.pdfBg },
+      { code: 'L', color: STATUS_CONFIG.L.pdfBg },
       { code: 'A', color: STATUS_CONFIG.A.pdfBg },
       { code: 'VL', color: STATUS_CONFIG.VL.pdfBg },
       { code: 'SL', color: STATUS_CONFIG.SL.pdfBg },
       { code: 'DO', color: STATUS_CONFIG.DO.pdfBg },
     ];
     legends.forEach((leg, idx) => {
-      const x = margin + idx * 35;
+      const x = margin + idx * 45;
       doc.setFillColor(leg.color[0], leg.color[1], leg.color[2]);
       doc.rect(x, legendY, 3, 3, 'F');
       doc.text(`${leg.code} = ${STATUS_CONFIG[leg.code as keyof typeof STATUS_CONFIG].name}`, x + 4, legendY + 2.5);
@@ -417,15 +454,15 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
 
     const startY = 25;
     
-    // Table header - Day numbers
+    // Table header
     doc.setFillColor(200, 200, 200);
-    doc.rect(margin, startY, nameWidth + daysInMonth.length * cellWidth + 70, 8, 'F');
+    doc.rect(margin, startY, nameWidth + daysInMonth.length * cellWidth + 50, 8, 'F');
     doc.setFontSize(5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
-    doc.text('EMPLOYEE NAME:', margin + 2, startY + 4);
+    doc.text('EMPLOYEE', margin + 2, startY + 4);
     
-    // Day headers (number and name)
+    // Day headers
     daysInMonth.forEach((day, idx) => {
       const x = margin + nameWidth + idx * cellWidth;
       doc.text(format(day, 'd'), x + cellWidth / 2, startY + 3, { align: 'center' });
@@ -436,27 +473,25 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
 
     // Summary headers
     const summaryStartX = margin + nameWidth + daysInMonth.length * cellWidth + 2;
-    const summaryHeaders = ['P', 'SB', 'WB', 'H', 'A', 'HDA', 'VL', 'HDSL', 'SL', 'DO'];
+    const summaryHeaders = ['P', 'L', 'A', 'VL'];
     doc.setFontSize(4);
     summaryHeaders.forEach((h, idx) => {
-      doc.text(h, summaryStartX + idx * 6.5 + 3, startY + 5, { align: 'center' });
+      doc.text(h, summaryStartX + idx * 10 + 5, startY + 5, { align: 'center' });
     });
 
     // Employee rows
     let currentY = startY + 9;
 
-    employeeSummaries.forEach((emp, empIdx) => {
+    employeeSummaries.forEach((emp) => {
       if (currentY + rowHeight > doc.internal.pageSize.getHeight() - 10) {
         doc.addPage();
         currentY = 15;
       }
 
-      // Row number and name
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(5);
       doc.setTextColor(0, 0, 0);
-      const rowNum = String(emp.index).padStart(2, '0');
-      doc.text(`${rowNum} ${emp.full_name}`, margin + 2, currentY + 3.5);
+      doc.text(emp.full_name, margin + 2, currentY + 3.5);
 
       // Day cells
       daysInMonth.forEach((day, dayIdx) => {
@@ -475,13 +510,13 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       // Summary cells
       doc.setFontSize(5);
       summaryHeaders.forEach((h, idx) => {
-        const x = summaryStartX + idx * 6.5;
+        const x = summaryStartX + idx * 10;
         const count = emp[h as keyof typeof emp] as number || 0;
         const config = STATUS_CONFIG[h as keyof typeof STATUS_CONFIG];
         doc.setFillColor(config.pdfBg[0], config.pdfBg[1], config.pdfBg[2]);
-        doc.rect(x, currentY, 6, rowHeight, 'F');
+        doc.rect(x, currentY, 9, rowHeight, 'F');
         doc.setTextColor(0, 0, 0);
-        doc.text(count.toString(), x + 3, currentY + 3.5, { align: 'center' });
+        doc.text(count.toString(), x + 4.5, currentY + 3.5, { align: 'center' });
       });
 
       currentY += rowHeight;
@@ -491,13 +526,11 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     toast.success('Monthly Matrix PDF generated');
   };
 
-  // Excel Generation with color coding
+  // Excel Generation
   const generateMatrixExcel = () => {
-    // Create workbook and worksheet
     const wb = XLSX.utils.book_new();
     
-    // Build header row with day numbers and names
-    const headerRow1 = ['#', 'Employee Name'];
+    const headerRow1 = ['Employee', 'HRMS No'];
     const headerRow2 = ['', ''];
     
     daysInMonth.forEach(day => {
@@ -505,20 +538,15 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       headerRow2.push(DAY_NAMES[getDay(day)]);
     });
     
-    // Add summary headers
-    const summaryHeaders = ['P', 'SB', 'WB', 'H', 'A', 'HDA', 'VL', 'HDSL', 'SL', 'DO'];
+    const summaryHeaders = ['Present', 'Late', 'Absent', 'On Leave'];
     summaryHeaders.forEach(h => {
       headerRow1.push(h);
       headerRow2.push('');
     });
     
-    // Build data rows
     const dataRows: string[][] = [];
-    employeeSummaries.forEach((emp, idx) => {
-      const row: string[] = [
-        String(idx + 1).padStart(2, '0'),
-        emp.full_name
-      ];
+    employeeSummaries.forEach((emp) => {
+      const row: string[] = [emp.full_name, emp.hrms_no];
       
       daysInMonth.forEach(day => {
         const status = getDayStatus(emp.id, day);
@@ -526,273 +554,247 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
         row.push(config.label);
       });
       
-      // Add summary counts
-      summaryHeaders.forEach(h => {
-        const count = emp[h as keyof typeof emp] as number || 0;
-        row.push(count.toString());
-      });
+      row.push(String(emp.P || 0));
+      row.push(String(emp.L || 0));
+      row.push(String(emp.A || 0));
+      row.push(String(emp.VL || 0));
       
       dataRows.push(row);
     });
     
-    // Combine all rows
     const wsData = [headerRow1, headerRow2, ...dataRows];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     
-    // Set column widths
     const colWidths = [
-      { wch: 4 },  // #
-      { wch: 25 }, // Employee Name
-      ...daysInMonth.map(() => ({ wch: 4 })), // Day columns
-      ...summaryHeaders.map(() => ({ wch: 5 })) // Summary columns
+      { wch: 25 },
+      { wch: 12 },
+      ...daysInMonth.map(() => ({ wch: 4 })),
+      ...summaryHeaders.map(() => ({ wch: 8 }))
     ];
     ws['!cols'] = colWidths;
     
-    // Apply cell styles (colors) - xlsx-style would be needed for full color support
-    // Using cell comments/notes as a workaround for color indication
-    const statusColorMap: Record<string, { rgb: string }> = {
-      'P': { rgb: '22C55E' },   // Green
-      'SB': { rgb: 'A78BFA' },  // Violet
-      'WB': { rgb: 'A78BFA' },  // Violet
-      'SL': { rgb: 'A3E635' },  // Lime
-      'VL': { rgb: 'FDE047' },  // Yellow
-      'H': { rgb: '67E8F9' },   // Cyan
-      'HDA': { rgb: 'F472B6' }, // Pink
-      'HDSL': { rgb: 'A3E635' }, // Lime
-      'A': { rgb: 'EF4444' },   // Red
-      'DO': { rgb: '93C5FD' },  // Blue
-      '-': { rgb: 'E5E7EB' },   // Gray
-      'W': { rgb: '9CA3AF' },   // Dark Gray
-    };
-    
-    // Apply background colors to cells
-    for (let rowIdx = 2; rowIdx < wsData.length; rowIdx++) {
-      for (let colIdx = 2; colIdx < 2 + daysInMonth.length + summaryHeaders.length; colIdx++) {
-        const cellRef = XLSX.utils.encode_cell({ r: rowIdx, c: colIdx });
-        if (ws[cellRef]) {
-          const cellValue = ws[cellRef].v;
-          const colorInfo = statusColorMap[cellValue as string];
-          if (colorInfo) {
-            if (!ws[cellRef].s) ws[cellRef].s = {};
-            ws[cellRef].s = {
-              fill: { fgColor: { rgb: colorInfo.rgb } },
-              alignment: { horizontal: 'center' }
-            };
-          }
-        }
-      }
-    }
-    
-    // Add worksheet to workbook
     XLSX.utils.book_append_sheet(wb, ws, 'Attendance Matrix');
     
-    // Create legend sheet
     const legendData = [
-      ['Status Code', 'Description', 'Color'],
-      ['P', 'Present', 'Green'],
-      ['SB', 'Spring Break', 'Violet'],
-      ['WB', 'Winter Break', 'Violet'],
-      ['SL', 'Sick Leave', 'Yellow-Green'],
-      ['VL', 'Vacation Leave', 'Yellow'],
-      ['H', 'Public Holiday', 'Cyan'],
-      ['HDA', 'Half Day Absent', 'Pink'],
-      ['HDSL', 'Half Day Sick Leave', 'Yellow-Green'],
-      ['A', 'Absent', 'Red'],
-      ['DO', 'Day Off', 'Blue'],
-      ['-', 'No Record', 'Gray'],
-      ['W', 'Weekend', 'Dark Gray'],
+      ['Status Code', 'Description'],
+      ['P', 'Present'],
+      ['L', 'Late'],
+      ['A', 'Absent'],
+      ['VL', 'On Leave'],
+      ['W', 'Weekend'],
+      ['DO', 'Day Off'],
+      ['H', 'Half Day'],
+      ['SL', 'Sick Leave'],
     ];
     const legendWs = XLSX.utils.aoa_to_sheet(legendData);
-    legendWs['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 15 }];
+    legendWs['!cols'] = [{ wch: 12 }, { wch: 20 }];
     XLSX.utils.book_append_sheet(wb, legendWs, 'Legend');
     
-    // Save file
     XLSX.writeFile(wb, `Monthly_Matrix_${months[selectedMonth]}_${selectedYear}.xlsx`);
     toast.success('Monthly Matrix Excel generated');
+  };
+
+  const isWeekendDay = (date: Date) => {
+    const day = getDay(date);
+    return day === 0 || day === 5 || day === 6; // Sun, Fri, Sat
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
   };
 
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Monthly Matrix View</h1>
-          <p className="text-sm text-muted-foreground">
-            Complete attendance matrix with leave types
-          </p>
+          <h1 className="text-2xl font-bold text-foreground">Attendance</h1>
+          <p className="text-sm text-muted-foreground">Monthly matrix view</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button 
             variant={bulkSelectMode ? "default" : "outline"} 
+            size="sm"
             onClick={toggleBulkSelectMode}
-            className={bulkSelectMode ? "bg-primary" : ""}
           >
             {bulkSelectMode ? <CheckSquare className="w-4 h-4 mr-2" /> : <Square className="w-4 h-4 mr-2" />}
-            {bulkSelectMode ? "Selection Mode ON" : "Bulk Select"}
+            {bulkSelectMode ? "Selection ON" : "Bulk Select"}
           </Button>
           {bulkSelectMode && selectedCells.size > 0 && (
             <>
-              <Button variant="default" onClick={() => setBulkEditDialogOpen(true)}>
-                Apply to {selectedCells.size} cells
+              <Button variant="default" size="sm" onClick={() => setBulkEditDialogOpen(true)}>
+                Apply ({selectedCells.size})
               </Button>
               <Button variant="ghost" size="icon" onClick={clearSelection}>
                 <X className="w-4 h-4" />
               </Button>
             </>
           )}
-          <Button variant="outline" onClick={generateMatrixPDF}>
+          <Button variant="outline" size="sm" onClick={generateMatrixPDF}>
             <Download className="w-4 h-4 mr-2" />
             Export PDF
           </Button>
-          <Button variant="outline" onClick={generateMatrixExcel}>
+          <Button variant="outline" size="sm" onClick={generateMatrixExcel}>
             <Download className="w-4 h-4 mr-2" />
             Export Excel
           </Button>
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" size="sm" onClick={onBack}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4">
+      {/* Controls Row */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        {/* Month Navigation */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Month</span>
-          <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
+          <Button variant="outline" size="icon" onClick={() => navigateMonth('prev')}>
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <Button variant="outline" className="min-w-[160px]">
+            {months[selectedMonth]} {selectedYear}
+          </Button>
+          <Button variant="outline" size="icon" onClick={() => navigateMonth('next')}>
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {/* Search & Filter */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search employees..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 w-[200px]"
+            />
+          </div>
+          <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+            <SelectTrigger className="w-[180px]">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="All Departments" />
             </SelectTrigger>
             <SelectContent>
-              {months.map((month, idx) => (
-                <SelectItem key={idx} value={idx.toString()}>{month}</SelectItem>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map(dept => (
+                <SelectItem key={dept} value={dept}>{dept}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Year</span>
-          <Input
-            type="number"
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(parseInt(e.target.value) || currentDate.getFullYear())}
-            className="w-[100px]"
-            min={2020}
-            max={2030}
-          />
-        </div>
-        
-        {bulkSelectMode && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-md text-sm">
-            <CheckSquare className="w-4 h-4 text-primary" />
-            <span className="text-primary font-medium">
-              Click cells to select. {selectedCells.size > 0 ? `${selectedCells.size} selected` : 'None selected'}
-            </span>
-          </div>
-        )}
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-3 text-xs">
-        {Object.entries(STATUS_CONFIG).filter(([key]) => key !== 'W' && key !== '-').map(([key, config]) => (
-          <div key={key} className="flex items-center gap-1">
-            <span className={cn("w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold", config.bg, config.text)}>
-              {config.label}
+      {/* Legend Bar */}
+      <div className="flex items-center gap-4 text-xs flex-wrap py-2 px-4 bg-muted/30 rounded-lg">
+        {LEGEND_ITEMS.map(item => (
+          <div key={item.code} className="flex items-center gap-1.5">
+            <span className={cn("w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold", item.color, 
+              item.code === 'W' ? 'text-slate-600' : 'text-white'
+            )}>
+              {item.code}
             </span>
-            <span>{config.name}</span>
+            <span className="text-muted-foreground">{item.label || STATUS_CONFIG[item.code as keyof typeof STATUS_CONFIG]?.name}</span>
           </div>
         ))}
       </div>
 
       {/* Matrix Grid */}
-      <Card>
-        <CardContent className="p-2 overflow-x-auto">
-          <table className="border-collapse text-xs">
-            <thead>
-              <tr className="bg-gray-200 dark:bg-gray-700">
-                <th className="sticky left-0 bg-gray-200 dark:bg-gray-700 text-left p-1 text-[10px] font-bold min-w-[160px] border border-gray-300">
-                  EMPLOYEE NAME:
-                </th>
-                {daysInMonth.map((day) => (
-                  <th 
-                    key={day.toISOString()} 
-                    className={cn(
-                      "text-center p-0.5 text-[9px] font-medium min-w-[24px] border border-gray-300",
-                      (getDay(day) === 0 || getDay(day) === 6) && "bg-gray-300 dark:bg-gray-600"
-                    )}
-                  >
-                    <div>{format(day, 'd')}</div>
-                    <div className="text-[8px] text-muted-foreground">{DAY_NAMES[getDay(day)]}</div>
+      <Card className="overflow-hidden">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="border-collapse text-xs w-full">
+              <thead>
+                <tr className="bg-muted">
+                  <th className="sticky left-0 z-20 bg-muted text-left p-2 text-xs font-semibold min-w-[220px] border-r border-border">
+                    Employee
                   </th>
-                ))}
-                {/* Summary headers */}
-                {['P', 'SB', 'WB', 'H', 'A', 'HDA', 'VL', 'HDSL', 'SL', 'DO'].map((h) => (
-                  <th 
-                    key={h} 
-                    className={cn(
-                      "p-0.5 text-[8px] font-bold min-w-[28px] border border-gray-300 writing-vertical",
-                      STATUS_CONFIG[h as keyof typeof STATUS_CONFIG].bg
-                    )}
-                    style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
-                  >
-                    {STATUS_CONFIG[h as keyof typeof STATUS_CONFIG].name.toUpperCase()}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {employeeSummaries.map((emp) => (
-                <tr key={emp.id}>
-                  <td 
-                    className="sticky left-0 bg-card p-1 border border-gray-300 text-[10px] font-medium whitespace-nowrap cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => setSelectedEmployee({ id: emp.id, name: emp.full_name })}
-                  >
-                    <span className="text-muted-foreground mr-1">{String(emp.index).padStart(2, '0')}</span>
-                    <span className="text-primary hover:underline">{emp.full_name}</span>
-                    <Calendar className="inline-block w-3 h-3 ml-1 text-muted-foreground" />
-                  </td>
                   {daysInMonth.map((day) => {
-                    const status = getDayStatus(emp.id, day);
-                    const config = STATUS_CONFIG[status];
-                    const cellKey = getOverrideKey(emp.id, day);
-                    const isSelected = selectedCells.has(cellKey);
+                    const isWeekend = isWeekendDay(day);
                     return (
-                      <td 
+                      <th 
                         key={day.toISOString()} 
                         className={cn(
-                          "text-center p-0 border-2 cursor-pointer hover:opacity-80 transition-all relative",
-                          config.bg,
-                          isSelected ? "border-primary ring-2 ring-primary ring-inset" : "border-gray-300"
+                          "text-center p-1 text-[10px] font-medium min-w-[32px] border-x border-border",
+                          isWeekend && "text-blue-600"
                         )}
-                        onClick={() => handleCellClick(emp.id, emp.full_name, day, status)}
                       >
-                        <span className={cn("text-[9px] font-bold", config.text)}>
-                          {config.label}
-                        </span>
-                        {isSelected && (
-                          <div className="absolute inset-0 bg-primary/20 pointer-events-none" />
-                        )}
-                      </td>
+                        <div className="font-bold">{format(day, 'd')}</div>
+                        <div className="text-[9px] opacity-70">{DAY_NAMES[getDay(day)]}</div>
+                      </th>
                     );
                   })}
-                  {/* Summary cells */}
-                  {['P', 'SB', 'WB', 'H', 'A', 'HDA', 'VL', 'HDSL', 'SL', 'DO'].map((h) => {
-                    const count = emp[h as keyof typeof emp] as number || 0;
-                    const config = STATUS_CONFIG[h as keyof typeof STATUS_CONFIG];
-                    return (
-                      <td 
-                        key={h}
-                        className={cn("text-center p-0.5 border border-gray-300", config.bg)}
-                      >
-                        <span className={cn("text-[10px] font-bold", config.text)}>{count}</span>
-                      </td>
-                    );
-                  })}
+                  {/* Summary headers */}
+                  <th className="bg-emerald-500 text-white p-1 text-[9px] font-bold min-w-[36px] border-x border-border" style={{ writingMode: 'vertical-rl' }}>PRESENT</th>
+                  <th className="bg-amber-400 text-amber-900 p-1 text-[9px] font-bold min-w-[36px] border-x border-border" style={{ writingMode: 'vertical-rl' }}>LATE</th>
+                  <th className="bg-red-500 text-white p-1 text-[9px] font-bold min-w-[36px] border-x border-border" style={{ writingMode: 'vertical-rl' }}>ABSENT</th>
+                  <th className="bg-blue-500 text-white p-1 text-[9px] font-bold min-w-[36px] border-x border-border" style={{ writingMode: 'vertical-rl' }}>ON LEAVE</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {employeeSummaries.map((emp) => (
+                  <tr key={emp.id} className="hover:bg-muted/30 transition-colors">
+                    <td 
+                      className="sticky left-0 z-10 bg-card p-2 border-r border-b border-border cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => setSelectedEmployee({ id: emp.id, name: emp.full_name })}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={emp.photo_url || ''} />
+                          <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                            {getInitials(emp.full_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="font-medium text-primary text-sm truncate hover:underline">
+                            {emp.full_name}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">{emp.hrms_no}</div>
+                        </div>
+                      </div>
+                    </td>
+                    {daysInMonth.map((day) => {
+                      const status = getDayStatus(emp.id, day);
+                      const config = STATUS_CONFIG[status];
+                      const cellKey = getOverrideKey(emp.id, day);
+                      const isSelected = selectedCells.has(cellKey);
+                      return (
+                        <td 
+                          key={day.toISOString()} 
+                          className={cn(
+                            "text-center p-0.5 border border-border cursor-pointer hover:opacity-80 transition-all",
+                            isSelected && "ring-2 ring-primary ring-inset"
+                          )}
+                          onClick={() => handleCellClick(emp.id, emp.full_name, day, status)}
+                        >
+                          <span className={cn(
+                            "inline-flex items-center justify-center w-6 h-6 rounded text-[10px] font-bold",
+                            config.bg, config.text
+                          )}>
+                            {config.label}
+                          </span>
+                        </td>
+                      );
+                    })}
+                    {/* Summary cells */}
+                    <td className="text-center p-1 border border-border bg-emerald-500/10">
+                      <span className="font-bold text-emerald-700">{emp.P || 0}</span>
+                    </td>
+                    <td className="text-center p-1 border border-border bg-amber-400/10">
+                      <span className="font-bold text-amber-700">{emp.L || 0}</span>
+                    </td>
+                    <td className="text-center p-1 border border-border bg-red-500/10">
+                      <span className="font-bold text-red-700">{emp.A || 0}</span>
+                    </td>
+                    <td className="text-center p-1 border border-border bg-blue-500/10">
+                      <span className="font-bold text-blue-700">{emp.VL || 0}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
 
@@ -824,7 +826,8 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
                   </SelectTrigger>
                   <SelectContent>
                     {EDITABLE_STATUSES.map((status) => {
-                      const config = STATUS_CONFIG[status];
+                      const config = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG];
+                      if (!config) return null;
                       return (
                         <SelectItem key={status} value={status}>
                           <div className="flex items-center gap-2">
@@ -856,7 +859,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
           <div className="space-y-4">
             <div className="text-sm">
               <p><strong>Selected Cells:</strong> {selectedCells.size}</p>
-              <p className="text-muted-foreground">All selected cells will be updated to the chosen status.</p>
+              <p className="text-muted-foreground">All selected cells will be updated.</p>
             </div>
             <div>
               <label className="text-sm font-medium mb-2 block">Select Status for All</label>
@@ -870,6 +873,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
                 <SelectContent>
                   {EDITABLE_STATUSES.map((status) => {
                     const config = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG];
+                    if (!config) return null;
                     return (
                       <SelectItem key={status} value={status}>
                         <div className="flex items-center gap-2">
