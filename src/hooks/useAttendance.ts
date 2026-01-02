@@ -180,11 +180,12 @@ export function useCheckInByHRMS() {
         }
       }
       
-      // Work hours: 8:00 AM to 5:00 PM, Monday to Friday
-      // Late if check-in after 8:00 AM
+      // Work hours: 8:00 AM to 7:00 PM, Monday to Friday
+      // Late if check-in after 8:00 AM (8:01 or later)
       const hour = now.getHours();
       const minutes = now.getMinutes();
-      const isLate = hour > 8 || (hour === 8 && minutes > 0);
+      // On time if check-in is before 8:01 AM (i.e., 8:00:xx is still on time)
+      const isLate = hour > 8 || (hour === 8 && minutes >= 1);
       const status = isLate ? 'Late' : 'Present';
       
       const { data, error } = await supabase
@@ -368,10 +369,11 @@ export function useCheckInById() {
         }
       }
       
-      // Late if check-in after 8:00 AM
+      // Late if check-in after 8:00 AM (8:01 or later)
       const hour = now.getHours();
       const minutes = now.getMinutes();
-      const isLate = hour > 8 || (hour === 8 && minutes > 0);
+      // On time if check-in is before 8:01 AM (i.e., 8:00:xx is still on time)
+      const isLate = hour > 8 || (hour === 8 && minutes >= 1);
       const status = isLate ? 'Late' : 'Present';
       
       const { data, error } = await supabase
