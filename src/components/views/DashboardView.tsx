@@ -4,7 +4,8 @@ import { useContracts } from '@/hooks/useContracts';
 import { useTodayAttendance, useRealtimeAttendance } from '@/hooks/useAttendance';
 import { useHRStore } from '@/store/hrStore';
 import { cn } from '@/lib/utils';
-import { Users, FileText, Clock, AlertTriangle, TrendingUp, Calendar, ArrowRight, RefreshCw, LogIn, LogOut, CheckCircle, QrCode, Bell, Zap, Cake } from 'lucide-react';
+import { Users, FileText, Clock, AlertTriangle, TrendingUp, Calendar, ArrowRight, RefreshCw, LogIn, LogOut, CheckCircle, QrCode, Bell, Zap, Cake, Monitor } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { differenceInDays, parseISO, format, isAfter, isBefore, addDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
@@ -60,6 +61,7 @@ function StatCard({ label, value, subtext, subtextColor = 'text-primary', icon, 
 const CHART_COLORS = ['hsl(152, 100%, 30%)', 'hsl(210, 100%, 35%)', 'hsl(45, 100%, 50%)', 'hsl(355, 78%, 44%)'];
 
 export function DashboardView() {
+  const navigate = useNavigate();
   const { setCurrentView } = useHRStore();
   const { data: employees = [], isLoading: employeesLoading, refetch: refetchEmployees } = useEmployees();
   const { data: leave = [], isLoading: leaveLoading } = useLeave();
@@ -187,15 +189,26 @@ export function DashboardView() {
           </div>
         </div>
       )}
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => refetchEmployees()}
-          className="gap-2 border-border hover:bg-secondary"
-        >
-          <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="default" 
+            size="sm" 
+            onClick={() => navigate('/qr?kiosk=true')}
+            className="gap-2"
+          >
+            <Monitor className="w-4 h-4" />
+            Kiosk Mode
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => refetchEmployees()}
+            className="gap-2 border-border hover:bg-secondary"
+          >
+            <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Stats Grid */}
