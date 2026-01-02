@@ -224,10 +224,10 @@ export default function KioskPage() {
       </div>
 
       {/* Scanner Area */}
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="relative w-full max-w-lg aspect-square">
+      <div className="flex-1 flex items-center justify-center p-2 sm:p-4 min-h-0">
+        <div className="relative w-full max-w-[min(100vw-1rem,24rem)] sm:max-w-lg aspect-square max-h-[calc(100vh-16rem)]">
           {/* Scanner */}
-          <div className="absolute inset-0 rounded-3xl overflow-hidden">
+          <div className="absolute inset-0 rounded-2xl sm:rounded-3xl overflow-hidden">
             <Scanner
               onScan={(results) => {
                 if (results && results.length > 0) {
@@ -246,23 +246,23 @@ export default function KioskPage() {
           {/* Scan Frame Overlay */}
           <div className="absolute inset-0 pointer-events-none">
             <div className={cn(
-              "absolute inset-8 border-4 rounded-2xl transition-colors duration-300",
+              "absolute inset-4 sm:inset-8 border-4 rounded-xl sm:rounded-2xl transition-colors duration-300",
               scanMode === 'check-in' ? "border-green-500/50" : "border-blue-500/50"
             )}>
               <div className={cn(
-                "absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 rounded-tl-xl",
+                "absolute -top-1 -left-1 w-6 h-6 sm:w-8 sm:h-8 border-t-4 border-l-4 rounded-tl-lg sm:rounded-tl-xl",
                 scanMode === 'check-in' ? "border-green-500" : "border-blue-500"
               )} />
               <div className={cn(
-                "absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 rounded-tr-xl",
+                "absolute -top-1 -right-1 w-6 h-6 sm:w-8 sm:h-8 border-t-4 border-r-4 rounded-tr-lg sm:rounded-tr-xl",
                 scanMode === 'check-in' ? "border-green-500" : "border-blue-500"
               )} />
               <div className={cn(
-                "absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 rounded-bl-xl",
+                "absolute -bottom-1 -left-1 w-6 h-6 sm:w-8 sm:h-8 border-b-4 border-l-4 rounded-bl-lg sm:rounded-bl-xl",
                 scanMode === 'check-in' ? "border-green-500" : "border-blue-500"
               )} />
               <div className={cn(
-                "absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 rounded-br-xl",
+                "absolute -bottom-1 -right-1 w-6 h-6 sm:w-8 sm:h-8 border-b-4 border-r-4 rounded-br-lg sm:rounded-br-xl",
                 scanMode === 'check-in' ? "border-green-500" : "border-blue-500"
               )} />
             </div>
@@ -270,7 +270,7 @@ export default function KioskPage() {
 
           {/* Result Overlay */}
           {(scannedEmployee || scanError) && (
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-3xl flex items-center justify-center p-8">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-2xl sm:rounded-3xl flex items-center justify-center p-4 sm:p-8">
               {scannedEmployee ? (
                 <div className="text-center space-y-4">
                   <div className={cn(
