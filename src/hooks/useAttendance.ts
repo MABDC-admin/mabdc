@@ -249,12 +249,46 @@ export function useCheckOutByHRMS() {
         .maybeSingle();
       
       if (attError) throw attError;
-      if (!attendance) throw new Error(`${employee.full_name} hasn't checked in today`);
-      if (attendance.check_out) throw new Error(`${employee.full_name} already checked out`);
+      
+      // If already checked out, prevent double checkout
+      if (attendance?.check_out) throw new Error(`${employee.full_name} already checked out`);
       
       // Check if undertime (before 7:00 PM / 19:00)
       const hour = now.getHours();
       const isUndertime = hour < 19;
+      
+      // If no attendance record exists (no check-in), create one with miss_punch_in status
+      if (!attendance) {
+        const status = isUndertime ? 'Miss Punch In | Undertime' : 'Miss Punch In';
+        
+        const { data, error } = await supabase
+          .from('attendance')
+          .insert([{
+            employee_id: employee.id,
+            date: today,
+            check_in: null,
+            check_out: checkOutTime,
+            status
+          }])
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return { 
+          ...data, 
+          employeeName: employee.full_name,
+          employeePhoto: employee.photo_url,
+          department: employee.department,
+          jobPosition: employee.job_position,
+          checkInTime: null,
+          checkOutTime,
+          status,
+          isUndertime,
+          isMissPunch: true
+        };
+      }
+      
+      // Normal checkout - has check-in record
       const wasLate = String(attendance.status).includes('Late');
       
       // Determine combined status
