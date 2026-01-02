@@ -193,7 +193,7 @@ export function DashboardView() {
           <Button 
             variant="default" 
             size="sm" 
-            onClick={() => navigate('/qr?kiosk=true')}
+            onClick={() => navigate('/kiosk')}
             className="gap-2"
           >
             <Monitor className="w-4 h-4" />

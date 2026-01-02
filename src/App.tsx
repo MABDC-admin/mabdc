@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 import EmployeePortal from "./pages/EmployeePortal";
 import AttendanceScanner from "./pages/AttendanceScanner";
 import QRScannerPage from "./pages/QRScannerPage";
+import KioskPage from "./pages/KioskPage";
 import InstallPage from "./pages/InstallPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AuthPage from "./pages/AuthPage";
@@ -32,6 +33,9 @@ const App = () => (
           {/* Dedicated QR Scanner routes - short URLs for easy access */}
           <Route path="/qr" element={<QRScannerPage />} />
           <Route path="/scan" element={<QRScannerPage />} />
+          
+          {/* Dedicated Kiosk page - fullscreen PWA-optimized */}
+          <Route path="/kiosk" element={<KioskPage />} />
           
           {/* PWA Install page */}
           <Route path="/install" element={<InstallPage />} />
