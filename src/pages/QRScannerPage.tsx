@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { useCheckInByHRMS, useCheckOutByHRMS, useTodayAttendance } from '@/hooks/useAttendance';
+import { useScannerSounds } from '@/hooks/useScannerSounds';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -45,6 +46,7 @@ export default function QRScannerPage() {
   const checkIn = useCheckInByHRMS();
   const checkOut = useCheckOutByHRMS();
   const { data: todayAttendance = [], refetch } = useTodayAttendance();
+  const { playSound } = useScannerSounds();
 
   // Auto-select mode based on time of day
   useEffect(() => {
@@ -146,19 +148,28 @@ export default function QRScannerPage() {
     try {
       if (scanMode === 'check-in') {
         const data = await checkIn.mutateAsync(result);
+        const isLate = data.status === 'Late';
+        
+        // Play appropriate sound
+        if (isLate) {
+          playSound('late');
+        } else {
+          playSound('check-in');
+        }
+        
         setScannedEmployee({
           name: data.employeeName,
           photo: data.employeePhoto,
           department: data.department,
           jobPosition: data.jobPosition,
           status: data.status,
-          isLate: data.status === 'Late',
+          isLate: isLate,
           checkInTime: data.checkInTime,
           mode: 'check-in',
           hrmsNo: result,
         });
 
-        if (data.status === 'Late') {
+        if (isLate) {
           sendLateNotification({
             employeeName: data.employeeName,
             employeeId: data.employeeId,
@@ -171,6 +182,10 @@ export default function QRScannerPage() {
         }
       } else {
         const data = await checkOut.mutateAsync(result);
+        
+        // Play check-out sound
+        playSound('check-out');
+        
         setScannedEmployee({
           name: data.employeeName,
           photo: data.employeePhoto,
@@ -198,6 +213,7 @@ export default function QRScannerPage() {
       
     } catch (error: any) {
       console.error('Scan error:', error);
+      playSound('error');
       setScanError(error.message || 'Scan failed');
       
       resultTimeoutRef.current = setTimeout(() => {
