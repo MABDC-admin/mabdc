@@ -46,6 +46,14 @@ export default function KioskPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Auto-refresh page every 5 seconds to keep data fresh
+  useEffect(() => {
+    const interval = setInterval(() => {
+      window.location.reload();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Auto-update scan mode based on time
   useEffect(() => {
     const interval = setInterval(() => {
