@@ -28,6 +28,7 @@ export default function KioskPage() {
   } | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -234,13 +235,16 @@ export default function KioskPage() {
                   handleScan(results[0].rawValue);
                 }
               }}
-              onError={(error) => console.error('Scanner error:', error)}
+              onError={(error) => {
+                console.error('Scanner error:', error);
+                const errorMessage = error instanceof Error ? error.message : 'Camera initialization failed. Please check permissions.';
+                setCameraError(errorMessage);
+              }}
               formats={['qr_code']}
-              scanDelay={300}
+              scanDelay={500}
+              paused={isProcessing}
               constraints={{ 
-                facingMode: 'user',
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
+                facingMode: 'environment'
               }}
               styles={{
                 container: { width: '100%', height: '100%' },
@@ -324,6 +328,23 @@ export default function KioskPage() {
           {isProcessing && (
             <div className="absolute inset-0 bg-black/60 rounded-3xl flex items-center justify-center">
               <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+            </div>
+          )}
+
+          {/* Camera Error Overlay */}
+          {cameraError && (
+            <div className="absolute inset-0 bg-black/90 rounded-2xl sm:rounded-3xl flex items-center justify-center p-4 sm:p-8">
+              <div className="text-center space-y-4">
+                <XCircle className="w-16 h-16 text-red-400 mx-auto" />
+                <h2 className="text-xl font-bold">Camera Error</h2>
+                <p className="text-white/60 text-sm">{cameraError}</p>
+                <Button 
+                  onClick={() => setCameraError(null)}
+                  className="bg-primary hover:bg-primary/80"
+                >
+                  Retry
+                </Button>
+              </div>
             </div>
           )}
         </div>
