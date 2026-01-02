@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { QrCode, LogIn, LogOut, CheckCircle, XCircle, AlertTriangle, Download, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useCheckInByHRMS, useCheckOutByHRMS, useTodayAttendance } from '@/hooks/useAttendance';
+import { useCheckInByHRMS, useCheckOutByHRMS, useRealtimeAttendance } from '@/hooks/useAttendance';
 import { useScannerSounds } from '@/hooks/useScannerSounds';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { format } from 'date-fns';
@@ -39,21 +39,15 @@ export default function KioskPage() {
   const checkIn = useCheckInByHRMS();
   const checkOut = useCheckOutByHRMS();
   const { playSound } = useScannerSounds();
-  const { refetch: refetchAttendance } = useTodayAttendance();
+  
+  // Use realtime subscription for live attendance updates
+  useRealtimeAttendance();
 
   // Update time every second
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
-
-  // Auto-refresh attendance data every 5 seconds without reloading page
-  useEffect(() => {
-    const interval = setInterval(() => {
-      refetchAttendance();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [refetchAttendance]);
 
   // Auto-update scan mode based on time
   useEffect(() => {
