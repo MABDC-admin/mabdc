@@ -287,6 +287,10 @@ export default function KioskPage() {
                     clearTimeout(cameraAutoOffRef.current);
                   }
                   setCameraActive(true);
+                  // Start 10-second auto-off timer immediately when camera starts
+                  cameraAutoOffRef.current = setTimeout(() => {
+                    setCameraActive(false);
+                  }, 10000);
                 }}
                 className="gap-2 bg-primary hover:bg-primary/80"
               >
