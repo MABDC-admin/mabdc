@@ -221,8 +221,8 @@ export default function KioskPage() {
             </Button>
           )}
           
-          {/* Time */}
-          <div className="text-right">
+          {/* Time - desktop only */}
+          <div className="text-right hidden sm:block">
             <p className="text-2xl font-bold font-mono">{format(currentTime, 'HH:mm:ss')}</p>
             <p className="text-xs text-white/60">{format(currentTime, 'EEEE, MMM d')}</p>
           </div>
@@ -230,7 +230,7 @@ export default function KioskPage() {
       </div>
 
       {/* Mode Toggle */}
-      <div className="flex justify-center gap-4 p-4">
+      <div className="flex justify-center gap-4 p-4 pb-2">
         <Button
           size="lg"
           variant={scanMode === 'check-in' ? 'default' : 'outline'}
@@ -259,6 +259,12 @@ export default function KioskPage() {
           <LogOut className="w-5 h-5" />
           Check Out
         </Button>
+      </div>
+
+      {/* Time - mobile only, big display below mode toggle */}
+      <div className="sm:hidden text-center pb-3">
+        <p className="text-5xl font-bold font-mono tracking-wider">{format(currentTime, 'HH:mm:ss')}</p>
+        <p className="text-sm text-white/60 mt-1">{format(currentTime, 'EEEE, MMM d')}</p>
       </div>
 
       {/* Scanner Area */}
