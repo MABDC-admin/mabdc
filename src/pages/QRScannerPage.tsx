@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   QrCode, CheckCircle, Clock, Users, ArrowLeft, 
-  LogIn, LogOut, RefreshCw, Camera, AlertTriangle, User
+  LogIn, LogOut, RefreshCw, Camera, AlertTriangle, User,
+  Maximize, Minimize
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -38,10 +39,13 @@ export default function QRScannerPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastScannedHRMS, setLastScannedHRMS] = useState<string | null>(null);
   const [cooldownEndTime, setCooldownEndTime] = useState<number>(0);
+  const [kioskMode, setKioskMode] = useState(false);
+  const [showHeader, setShowHeader] = useState(true);
   
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const resultTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const postScanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const headerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const checkIn = useCheckInByHRMS();
   const checkOut = useCheckOutByHRMS();
@@ -77,13 +81,74 @@ export default function QRScannerPage() {
       if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
       if (resultTimeoutRef.current) clearTimeout(resultTimeoutRef.current);
       if (postScanTimeoutRef.current) clearTimeout(postScanTimeoutRef.current);
+      if (headerTimeoutRef.current) clearTimeout(headerTimeoutRef.current);
     };
   }, []);
+
+  // Auto-hide header in kiosk mode
+  useEffect(() => {
+    if (!kioskMode) {
+      setShowHeader(true);
+      return;
+    }
+
+    // Initially hide header in kiosk mode
+    const timeout = setTimeout(() => {
+      setShowHeader(false);
+    }, 3000);
+
+    return () => clearTimeout(timeout);
+  }, [kioskMode]);
+
+  const handleMouseMove = useCallback(() => {
+    if (!kioskMode) return;
+    
+    setShowHeader(true);
+    
+    if (headerTimeoutRef.current) {
+      clearTimeout(headerTimeoutRef.current);
+    }
+    
+    headerTimeoutRef.current = setTimeout(() => {
+      setShowHeader(false);
+    }, 3000);
+  }, [kioskMode]);
+
+  const toggleKioskMode = useCallback(() => {
+    if (!kioskMode) {
+      // Enter fullscreen
+      document.documentElement.requestFullscreen?.().catch(() => {
+        // Fullscreen not supported, continue without it
+      });
+      setKioskMode(true);
+      // Auto-start scanning in kiosk mode
+      setScannerState('scanning');
+    } else {
+      // Exit fullscreen
+      document.exitFullscreen?.().catch(() => {});
+      setKioskMode(false);
+      setShowHeader(true);
+    }
+  }, [kioskMode]);
+
+  // Listen for fullscreen exit
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && kioskMode) {
+        setKioskMode(false);
+        setShowHeader(true);
+      }
+    };
+    
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [kioskMode]);
 
   const clearAllTimeouts = useCallback(() => {
     if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
     if (resultTimeoutRef.current) clearTimeout(resultTimeoutRef.current);
     if (postScanTimeoutRef.current) clearTimeout(postScanTimeoutRef.current);
+    if (headerTimeoutRef.current) clearTimeout(headerTimeoutRef.current);
   }, []);
 
   const startScanning = useCallback(() => {
@@ -233,17 +298,32 @@ export default function QRScannerPage() {
   const workHours = "8:00 AM - 7:00 PM";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/5">
-      {/* Header */}
-      <header className="bg-card border-b border-border">
+    <div 
+      className={cn(
+        "min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/5 transition-all",
+        kioskMode && "bg-black"
+      )}
+      onMouseMove={handleMouseMove}
+      onTouchStart={handleMouseMove}
+    >
+      {/* Header - auto-hide in kiosk mode */}
+      <header 
+        className={cn(
+          "bg-card border-b border-border transition-all duration-300",
+          kioskMode && "fixed top-0 left-0 right-0 z-50",
+          kioskMode && !showHeader && "-translate-y-full opacity-0"
+        )}
+      >
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Link to="/">
-                <Button variant="ghost" size="icon">
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-              </Link>
+              {!kioskMode && (
+                <Link to="/">
+                  <Button variant="ghost" size="icon">
+                    <ArrowLeft className="w-5 h-5" />
+                  </Button>
+                </Link>
+              )}
               <div>
                 <h1 className="text-xl font-bold text-foreground">QR Attendance Scanner</h1>
                 <p className="text-sm text-muted-foreground">{format(currentTime, 'EEEE, dd MMMM yyyy')}</p>
@@ -257,27 +337,48 @@ export default function QRScannerPage() {
                 </div>
                 <p className="text-xs text-muted-foreground hidden sm:block">Work hours: {workHours}</p>
               </div>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={toggleKioskMode}
+                title={kioskMode ? "Exit Kiosk Mode" : "Enter Kiosk Mode"}
+              >
+                {kioskMode ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+              </Button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <main className={cn(
+        "max-w-6xl mx-auto px-4 py-6",
+        kioskMode && "max-w-none h-screen flex flex-col p-0"
+      )}>
+        <div className={cn(
+          "grid grid-cols-1 lg:grid-cols-3 gap-6",
+          kioskMode && "flex-1 flex flex-col lg:grid-cols-1"
+        )}>
           {/* Main Scanner Section - Full Width */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className={cn(
+            "lg:col-span-2 space-y-4",
+            kioskMode && "flex-1 flex flex-col space-y-0"
+          )}>
             {/* Mode Toggle */}
-            <div className="flex gap-2 p-1 bg-secondary rounded-xl">
+            <div className={cn(
+              "flex gap-2 p-1 bg-secondary rounded-xl",
+              kioskMode && "rounded-none"
+            )}>
               <button
                 onClick={() => setScanMode('check-in')}
                 className={cn(
                   "flex-1 flex items-center justify-center gap-2 py-4 px-4 rounded-lg font-medium transition-all text-lg",
                   scanMode === 'check-in'
                     ? "bg-primary text-primary-foreground shadow-lg"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                  kioskMode && "py-6 text-xl"
                 )}
               >
-                <LogIn className="w-6 h-6" />
+                <LogIn className={cn("w-6 h-6", kioskMode && "w-8 h-8")} />
                 Check In
               </button>
               <button
@@ -286,18 +387,25 @@ export default function QRScannerPage() {
                   "flex-1 flex items-center justify-center gap-2 py-4 px-4 rounded-lg font-medium transition-all text-lg",
                   scanMode === 'check-out'
                     ? "bg-accent text-accent-foreground shadow-lg"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                  kioskMode && "py-6 text-xl"
                 )}
               >
-                <LogOut className="w-6 h-6" />
+                <LogOut className={cn("w-6 h-6", kioskMode && "w-8 h-8")} />
                 Check Out
               </button>
             </div>
 
             {/* QR Scanner Card - Large */}
-            <Card className="overflow-hidden">
-              <CardContent className="p-0">
-                <div className="relative aspect-[4/3] md:aspect-video bg-gradient-to-br from-secondary to-muted min-h-[400px]">
+            <Card className={cn(
+              "overflow-hidden",
+              kioskMode && "flex-1 rounded-none border-0"
+            )}>
+              <CardContent className="p-0 h-full">
+                <div className={cn(
+                  "relative aspect-[4/3] md:aspect-video bg-gradient-to-br from-secondary to-muted min-h-[400px]",
+                  kioskMode && "aspect-auto h-full min-h-0"
+                )}>
                   {scannerState === 'scanning' && !scannedEmployee && (
                     <>
                       <Scanner
@@ -484,7 +592,8 @@ export default function QRScannerPage() {
             </Card>
           </div>
 
-          {/* Stats & Recent Activity Sidebar */}
+          {/* Stats & Recent Activity Sidebar - Hidden in kiosk mode */}
+          {!kioskMode && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
               <Card>
@@ -554,6 +663,7 @@ export default function QRScannerPage() {
               </CardContent>
             </Card>
           </div>
+          )}
         </div>
       </main>
     </div>
