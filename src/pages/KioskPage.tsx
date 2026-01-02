@@ -235,7 +235,13 @@ export default function KioskPage() {
                 }
               }}
               onError={(error) => console.error('Scanner error:', error)}
-              constraints={{ facingMode: 'user' }}
+              formats={['qr_code']}
+              scanDelay={300}
+              constraints={{ 
+                facingMode: 'user',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              }}
               styles={{
                 container: { width: '100%', height: '100%' },
                 video: { width: '100%', height: '100%', objectFit: 'cover' }
