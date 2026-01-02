@@ -41,6 +41,7 @@ export default function KioskPage() {
   const lastScannedRef = useRef<{ hrmsNo: string; timestamp: number } | null>(null);
   const resultTimeoutRef = useRef<NodeJS.Timeout>();
   const processingRef = useRef(false);
+  const cameraAutoOffRef = useRef<NodeJS.Timeout>();
 
   const checkIn = useCheckInByHRMS();
   const checkOut = useCheckOutByHRMS();
@@ -171,7 +172,15 @@ export default function KioskPage() {
     } finally {
       processingRef.current = false;
       setIsProcessing(false);
-      resultTimeoutRef.current = setTimeout(clearResult, 5000);
+      resultTimeoutRef.current = setTimeout(clearResult, 4000);
+      
+      // Auto-turn off camera after 10 seconds
+      if (cameraAutoOffRef.current) {
+        clearTimeout(cameraAutoOffRef.current);
+      }
+      cameraAutoOffRef.current = setTimeout(() => {
+        setCameraActive(false);
+      }, 10000);
     }
   };
 
@@ -267,7 +276,12 @@ export default function KioskPage() {
               </div>
               <Button
                 size="lg"
-                onClick={() => setCameraActive(true)}
+                onClick={() => {
+                  if (cameraAutoOffRef.current) {
+                    clearTimeout(cameraAutoOffRef.current);
+                  }
+                  setCameraActive(true);
+                }}
                 className="gap-2 bg-primary hover:bg-primary/80"
               >
                 <Camera className="w-5 h-5" />
