@@ -35,20 +35,36 @@ interface ScannedEmployee {
 
 export default function AttendanceScanner() {
   const [scanMode, setScanMode] = useState<ScanMode>('check-in');
-  const [scanMethod, setScanMethod] = useState<ScanMethod>('face');
+  const [scanMethod, setScanMethod] = useState<ScanMethod>('qr'); // QR as default
   const [scannerState, setScannerState] = useState<ScannerState>('standby');
   const [scannedEmployee, setScannedEmployee] = useState<ScannedEmployee | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [enrollModalOpen, setEnrollModalOpen] = useState(false);
   const [faceProcessing, setFaceProcessing] = useState(false);
+  const [lastScannedHRMS, setLastScannedHRMS] = useState<string | null>(null);
+  const [cooldownEndTime, setCooldownEndTime] = useState<number>(0);
+  
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const resultTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const postScanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const checkIn = useCheckInByHRMS();
   const checkOut = useCheckOutByHRMS();
   const checkInById = useCheckInById();
   const checkOutById = useCheckOutById();
   const { data: todayAttendance = [], refetch } = useTodayAttendance();
+
+  // Auto-select mode based on time of day
+  useEffect(() => {
+    const currentHour = new Date().getHours();
+    // Before 1 PM (13:00) = Check-in, After 1 PM = Check-out
+    if (currentHour < 13) {
+      setScanMode('check-in');
+    } else {
+      setScanMode('check-out');
+    }
+  }, []);
 
   // Update current time every second
   useEffect(() => {
@@ -62,28 +78,32 @@ export default function AttendanceScanner() {
     return () => clearInterval(interval);
   }, [refetch]);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
-      if (scanTimeoutRef.current) {
-        clearTimeout(scanTimeoutRef.current);
-      }
+      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+      if (resultTimeoutRef.current) clearTimeout(resultTimeoutRef.current);
+      if (postScanTimeoutRef.current) clearTimeout(postScanTimeoutRef.current);
     };
+  }, []);
+
+  const clearAllTimeouts = useCallback(() => {
+    if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+    if (resultTimeoutRef.current) clearTimeout(resultTimeoutRef.current);
+    if (postScanTimeoutRef.current) clearTimeout(postScanTimeoutRef.current);
   }, []);
 
   const startScanning = useCallback(() => {
     setScannerState('scanning');
     setScannedEmployee(null);
     setScanError(null);
+    clearAllTimeouts();
     
-    // Auto-standby after 10 seconds
-    if (scanTimeoutRef.current) {
-      clearTimeout(scanTimeoutRef.current);
-    }
+    // Auto-standby after 10 seconds if no scan
     scanTimeoutRef.current = setTimeout(() => {
       setScannerState('standby');
     }, 10000);
-  }, []);
+  }, [clearAllTimeouts]);
 
   const sendLateNotification = async (employeeData: {
     employeeName: string;
@@ -123,12 +143,16 @@ export default function AttendanceScanner() {
   const handleScan = async (result: string) => {
     if (!result || scannerState !== 'scanning') return;
     
-    // Clear the timeout
-    if (scanTimeoutRef.current) {
-      clearTimeout(scanTimeoutRef.current);
+    // Check for duplicate scan within cooldown period
+    const now = Date.now();
+    if (result === lastScannedHRMS && now < cooldownEndTime) {
+      return; // Skip duplicate scan
     }
     
+    clearAllTimeouts();
     setScannerState('result');
+    setLastScannedHRMS(result);
+    setCooldownEndTime(now + 30000); // 30 second cooldown for same HRMS
     
     try {
       if (scanMode === 'check-in') {
@@ -170,22 +194,33 @@ export default function AttendanceScanner() {
           mode: 'check-out',
         });
       }
+      
+      // Show result for 5 seconds, then keep camera on for 10 more seconds
+      resultTimeoutRef.current = setTimeout(() => {
+        setScannedEmployee(null);
+        setScannerState('scanning');
+        
+        // Keep camera on for 10 more seconds
+        postScanTimeoutRef.current = setTimeout(() => {
+          setScannerState('standby');
+        }, 10000);
+      }, 5000);
+      
     } catch (error: any) {
       console.error('Scan error:', error);
       setScanError(error.message || 'Scan failed');
-      // Return to standby after showing error for 4 seconds
-      setTimeout(() => {
-        setScannerState('standby');
+      
+      // Return to scanning after showing error for 4 seconds
+      resultTimeoutRef.current = setTimeout(() => {
+        setScannerState('scanning');
         setScanError(null);
+        
+        // Keep camera on for 10 more seconds
+        postScanTimeoutRef.current = setTimeout(() => {
+          setScannerState('standby');
+        }, 10000);
       }, 4000);
-      return;
     }
-    
-    // Return to standby after showing result for 5 seconds
-    setTimeout(() => {
-      setScannerState('standby');
-      setScannedEmployee(null);
-    }, 5000);
   };
 
   // Handle face recognition
@@ -331,16 +366,16 @@ export default function AttendanceScanner() {
               </button>
             </div>
 
-            {/* Scan Method Tabs */}
+            {/* Scan Method Tabs - QR Code first as default */}
             <Tabs value={scanMethod} onValueChange={(v) => setScanMethod(v as ScanMethod)} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="face" className="gap-2">
-                  <ScanFace className="w-4 h-4" />
-                  Face ID
-                </TabsTrigger>
                 <TabsTrigger value="qr" className="gap-2">
                   <QrCode className="w-4 h-4" />
                   QR Code
+                </TabsTrigger>
+                <TabsTrigger value="face" className="gap-2">
+                  <ScanFace className="w-4 h-4" />
+                  Face ID
                 </TabsTrigger>
               </TabsList>
 
