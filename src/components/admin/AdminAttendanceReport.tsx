@@ -1,14 +1,18 @@
 import { useState, useMemo } from 'react';
-import { useAttendance, useDeleteAttendance, useUpdateAttendance } from '@/hooks/useAttendance';
+import { useAttendance, useDeleteAttendance, useUpdateAttendance, useCreateAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, FileText, Calendar, Clock, Users, Trash2, Search, LogIn, LogOut, AlertTriangle, Pencil } from 'lucide-react';
+import { Download, FileText, Calendar as CalendarIcon, Clock, Users, Trash2, Search, LogIn, LogOut, AlertTriangle, Pencil, Plus, MessageSquare } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,19 +38,55 @@ interface EditRecord {
   date: string;
   check_in: string;
   check_out: string;
+  status: string;
+  admin_remarks: string;
 }
+
+interface NewAttendanceRecord {
+  employee_id: string;
+  date: string;
+  check_in: string;
+  check_out: string;
+  status: string;
+  admin_remarks: string;
+}
+
+const ATTENDANCE_STATUSES = [
+  'Present',
+  'Late',
+  'Absent',
+  'Half Day',
+  'Undertime',
+  'Late | Undertime',
+  'Miss Punch In',
+  'Miss Punch In | Undertime',
+  'Miss Punch Out',
+  'Appealed',
+  'On Time',
+];
 
 export function AdminAttendanceReport() {
   const { data: attendance = [] } = useAttendance();
   const { data: employees = [] } = useEmployees();
   const deleteAttendance = useDeleteAttendance();
   const updateAttendance = useUpdateAttendance();
+  const createAttendance = useCreateAttendance();
   
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(currentDate, 'yyyy-MM'));
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [editRecord, setEditRecord] = useState<EditRecord | null>(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newRecord, setNewRecord] = useState<NewAttendanceRecord>({
+    employee_id: '',
+    date: format(new Date(), 'yyyy-MM-dd'),
+    check_in: '',
+    check_out: '',
+    status: 'Present',
+    admin_remarks: '',
+  });
 
   const months = useMemo(() => {
     const result = [];
@@ -101,6 +141,20 @@ export function AdminAttendanceReport() {
     return { totalPresent, totalLate, totalAbsent, avgAttendance };
   }, [reportData]);
 
+  // Filter attendance records by selected date
+  const filteredAttendance = useMemo(() => {
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    return attendance.filter(a => {
+      const matchesDate = a.date === dateStr;
+      if (!searchQuery) return matchesDate;
+      const emp = employees.find(e => e.id === a.employee_id);
+      return matchesDate && (
+        emp?.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        emp?.hrms_no.includes(searchQuery)
+      );
+    });
+  }, [attendance, employees, selectedDate, searchQuery]);
+
   const downloadCSV = () => {
     const headers = ['HRMS No', 'Employee Name', 'Department', 'Present Days', 'Late Days', 'Absent Days', 'Attendance Rate'];
     const rows = reportData.map(r => [
@@ -123,6 +177,64 @@ export function AdminAttendanceReport() {
     URL.revokeObjectURL(url);
   };
 
+  const handleCreateAttendance = () => {
+    if (!newRecord.employee_id) {
+      toast.error('Please select an employee');
+      return;
+    }
+    if (!newRecord.date) {
+      toast.error('Please select a date');
+      return;
+    }
+
+    createAttendance.mutate({
+      employee_id: newRecord.employee_id,
+      date: newRecord.date,
+      check_in: newRecord.check_in || null,
+      check_out: newRecord.check_out || null,
+      status: newRecord.status,
+      admin_remarks: newRecord.admin_remarks || null,
+    }, {
+      onSuccess: () => {
+        toast.success('Attendance record created successfully');
+        setShowAddDialog(false);
+        setNewRecord({
+          employee_id: '',
+          date: format(selectedDate, 'yyyy-MM-dd'),
+          check_in: '',
+          check_out: '',
+          status: 'Present',
+          admin_remarks: '',
+        });
+      },
+      onError: (error) => {
+        toast.error('Failed to create attendance record');
+        console.error(error);
+      }
+    });
+  };
+
+  const handleUpdateAttendance = () => {
+    if (!editRecord) return;
+
+    updateAttendance.mutate({
+      id: editRecord.id,
+      check_in: editRecord.check_in || undefined,
+      check_out: editRecord.check_out || undefined,
+      status: editRecord.status,
+      admin_remarks: editRecord.admin_remarks || undefined,
+    }, {
+      onSuccess: () => {
+        toast.success('Attendance record updated successfully');
+        setEditRecord(null);
+      },
+      onError: (error) => {
+        toast.error('Failed to update attendance record');
+        console.error(error);
+      }
+    });
+  };
+
   return (
     <div className="glass-card rounded-3xl border border-border p-6 space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -133,7 +245,7 @@ export function AdminAttendanceReport() {
         <div className="flex items-center gap-2">
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
             <SelectTrigger className="w-48">
-              <Calendar className="w-4 h-4 mr-2" />
+              <CalendarIcon className="w-4 h-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -227,21 +339,55 @@ export function AdminAttendanceReport() {
         </Table>
       </div>
 
-      {/* Individual Attendance Records Management */}
+      {/* Daily Attendance Records Management */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h3 className="text-md font-semibold text-foreground">Manage Attendance Records</h3>
-            <p className="text-xs text-muted-foreground">View and delete individual check-in/check-out records</p>
+            <h3 className="text-md font-semibold text-foreground">Daily Attendance Records</h3>
+            <p className="text-xs text-muted-foreground">View, edit, and delete attendance for a specific date</p>
           </div>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name or HRMS..."
-              className="pl-9 bg-secondary/50 border-border"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Date Picker */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-[180px] justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(selectedDate, 'dd MMM yyyy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  initialFocus
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+
+            {/* Search */}
+            <div className="relative w-full sm:w-48">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search..."
+                className="pl-9 bg-secondary/50 border-border"
+              />
+            </div>
+
+            {/* Add Attendance Button */}
+            <Button 
+              onClick={() => {
+                setNewRecord(prev => ({ ...prev, date: format(selectedDate, 'yyyy-MM-dd') }));
+                setShowAddDialog(true);
+              }}
+              className="bg-primary text-primary-foreground"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Attendance
+            </Button>
           </div>
         </div>
 
@@ -249,31 +395,27 @@ export function AdminAttendanceReport() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
-                <TableHead>Date</TableHead>
                 <TableHead>Employee</TableHead>
                 <TableHead>HRMS</TableHead>
                 <TableHead className="text-center">Check In</TableHead>
                 <TableHead className="text-center">Check Out</TableHead>
                 <TableHead className="text-center">Status</TableHead>
+                <TableHead>Remarks</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {attendance
-                .filter(a => {
-                  if (!searchQuery) return true;
-                  const emp = employees.find(e => e.id === a.employee_id);
-                  return emp?.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         emp?.hrms_no.includes(searchQuery);
-                })
-                .slice(0, 50)
-                .map((record) => {
+              {filteredAttendance.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    No attendance records for {format(selectedDate, 'dd MMM yyyy')}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredAttendance.map((record) => {
                   const emp = employees.find(e => e.id === record.employee_id);
                   return (
                     <TableRow key={record.id} className="group">
-                      <TableCell className="text-xs">
-                        {format(parseISO(record.date), 'dd MMM yyyy')}
-                      </TableCell>
                       <TableCell className="text-sm font-medium">
                         {emp?.full_name || 'Unknown'}
                       </TableCell>
@@ -296,13 +438,20 @@ export function AdminAttendanceReport() {
                         <span className={cn(
                           "text-xs px-2 py-1 rounded-full",
                           record.status === 'Present' && "bg-primary/10 text-primary",
+                          record.status === 'On Time' && "bg-emerald-500/10 text-emerald-500",
                           String(record.status).includes('Late') && String(record.status).includes('Undertime') && "bg-gradient-to-r from-amber-500/10 to-cyan-500/10 text-amber-500",
                           record.status === 'Late' && "bg-amber-500/10 text-amber-500",
                           String(record.status) === 'Undertime' && "bg-cyan-500/10 text-cyan-500",
-                          record.status === 'Absent' && "bg-destructive/10 text-destructive"
+                          record.status === 'Absent' && "bg-destructive/10 text-destructive",
+                          String(record.status).includes('Miss Punch') && "bg-orange-500/10 text-orange-500",
+                          record.status === 'Half Day' && "bg-purple-500/10 text-purple-500",
+                          record.status === 'Appealed' && "bg-blue-500/10 text-blue-500"
                         )}>
                           {record.status}
                         </span>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">
+                        {record.admin_remarks || '-'}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -315,6 +464,8 @@ export function AdminAttendanceReport() {
                               date: record.date,
                               check_in: record.check_in || '',
                               check_out: record.check_out || '',
+                              status: record.status || 'Present',
+                              admin_remarks: record.admin_remarks || '',
                             })}
                             className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
                           >
@@ -332,37 +483,166 @@ export function AdminAttendanceReport() {
                       </TableCell>
                     </TableRow>
                   );
-                })}
-              {attendance.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No attendance records found
-                  </TableCell>
-                </TableRow>
+                })
               )}
             </TableBody>
           </Table>
         </div>
-        {attendance.length > 50 && (
-          <p className="text-xs text-muted-foreground text-center">
-            Showing first 50 records. Use search to find specific records.
-          </p>
-        )}
       </div>
+
+      {/* Add Attendance Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" />
+              Add Attendance Record
+            </DialogTitle>
+            <DialogDescription>
+              Manually create a new attendance record
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {/* Employee Select */}
+            <div className="grid gap-2">
+              <Label htmlFor="employee" className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-muted-foreground" />
+                Employee *
+              </Label>
+              <Select 
+                value={newRecord.employee_id} 
+                onValueChange={(value) => setNewRecord(prev => ({ ...prev, employee_id: value }))}
+              >
+                <SelectTrigger className="bg-secondary/50">
+                  <SelectValue placeholder="Select employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.full_name} ({emp.hrms_no})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date */}
+            <div className="grid gap-2">
+              <Label htmlFor="date" className="flex items-center gap-2">
+                <CalendarIcon className="w-4 h-4 text-muted-foreground" />
+                Date *
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal bg-secondary/50">
+                    {newRecord.date ? format(parseISO(newRecord.date), 'dd MMM yyyy') : 'Select date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={newRecord.date ? parseISO(newRecord.date) : undefined}
+                    onSelect={(date) => date && setNewRecord(prev => ({ ...prev, date: format(date, 'yyyy-MM-dd') }))}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Check In */}
+            <div className="grid gap-2">
+              <Label htmlFor="new_check_in" className="flex items-center gap-2">
+                <LogIn className="w-4 h-4 text-primary" />
+                Check In Time
+              </Label>
+              <Input
+                id="new_check_in"
+                type="time"
+                value={newRecord.check_in}
+                onChange={(e) => setNewRecord(prev => ({ ...prev, check_in: e.target.value }))}
+                className="bg-secondary/50"
+              />
+            </div>
+
+            {/* Check Out */}
+            <div className="grid gap-2">
+              <Label htmlFor="new_check_out" className="flex items-center gap-2">
+                <LogOut className="w-4 h-4 text-accent" />
+                Check Out Time
+              </Label>
+              <Input
+                id="new_check_out"
+                type="time"
+                value={newRecord.check_out}
+                onChange={(e) => setNewRecord(prev => ({ ...prev, check_out: e.target.value }))}
+                className="bg-secondary/50"
+              />
+            </div>
+
+            {/* Status */}
+            <div className="grid gap-2">
+              <Label htmlFor="new_status" className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                Status *
+              </Label>
+              <Select 
+                value={newRecord.status} 
+                onValueChange={(value) => setNewRecord(prev => ({ ...prev, status: value }))}
+              >
+                <SelectTrigger className="bg-secondary/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ATTENDANCE_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Admin Remarks */}
+            <div className="grid gap-2">
+              <Label htmlFor="new_admin_remarks" className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                Admin Remarks
+              </Label>
+              <Textarea
+                id="new_admin_remarks"
+                value={newRecord.admin_remarks}
+                onChange={(e) => setNewRecord(prev => ({ ...prev, admin_remarks: e.target.value }))}
+                placeholder="Add notes..."
+                className="bg-secondary/50 min-h-[60px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
+            <Button 
+              onClick={handleCreateAttendance}
+              disabled={createAttendance.isPending}
+              className="bg-primary text-primary-foreground"
+            >
+              {createAttendance.isPending ? 'Creating...' : 'Create Record'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Attendance Dialog */}
       <Dialog open={!!editRecord} onOpenChange={() => setEditRecord(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5 text-primary" />
               Edit Attendance Record
             </DialogTitle>
             <DialogDescription>
-              Modify check-in and check-out times for {editRecord?.employee_name} on {editRecord?.date ? format(parseISO(editRecord.date), 'dd MMM yyyy') : ''}
+              Modify attendance for {editRecord?.employee_name} on {editRecord?.date ? format(parseISO(editRecord.date), 'dd MMM yyyy') : ''}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {/* Check In */}
             <div className="grid gap-2">
               <Label htmlFor="check_in" className="flex items-center gap-2">
                 <LogIn className="w-4 h-4 text-primary" />
@@ -376,6 +656,8 @@ export function AdminAttendanceReport() {
                 className="bg-secondary/50"
               />
             </div>
+
+            {/* Check Out */}
             <div className="grid gap-2">
               <Label htmlFor="check_out" className="flex items-center gap-2">
                 <LogOut className="w-4 h-4 text-accent" />
@@ -389,26 +671,51 @@ export function AdminAttendanceReport() {
                 className="bg-secondary/50"
               />
             </div>
+
+            {/* Status */}
+            <div className="grid gap-2">
+              <Label htmlFor="status" className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                Status
+              </Label>
+              <Select 
+                value={editRecord?.status || 'Present'} 
+                onValueChange={(value) => setEditRecord(prev => prev ? { ...prev, status: value } : null)}
+              >
+                <SelectTrigger className="bg-secondary/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ATTENDANCE_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Admin Remarks */}
+            <div className="grid gap-2">
+              <Label htmlFor="admin_remarks" className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                Admin Remarks
+              </Label>
+              <Textarea
+                id="admin_remarks"
+                value={editRecord?.admin_remarks || ''}
+                onChange={(e) => setEditRecord(prev => prev ? { ...prev, admin_remarks: e.target.value } : null)}
+                placeholder="Add admin notes..."
+                className="bg-secondary/50 min-h-[60px]"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditRecord(null)}>Cancel</Button>
             <Button 
-              onClick={() => {
-                if (editRecord) {
-                  const checkInTime = editRecord.check_in || undefined;
-                  const isLate = checkInTime && checkInTime > '08:00';
-                  updateAttendance.mutate({
-                    id: editRecord.id,
-                    check_in: checkInTime,
-                    check_out: editRecord.check_out || undefined,
-                    status: checkInTime ? (isLate ? 'Late' : 'Present') : 'Absent',
-                  });
-                  setEditRecord(null);
-                }
-              }}
+              onClick={handleUpdateAttendance}
+              disabled={updateAttendance.isPending}
               className="bg-primary text-primary-foreground"
             >
-              Save Changes
+              {updateAttendance.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -431,8 +738,12 @@ export function AdminAttendanceReport() {
             <AlertDialogAction
               onClick={() => {
                 if (deleteConfirm) {
-                  deleteAttendance.mutate(deleteConfirm);
-                  setDeleteConfirm(null);
+                  deleteAttendance.mutate(deleteConfirm, {
+                    onSuccess: () => {
+                      toast.success('Attendance record deleted');
+                      setDeleteConfirm(null);
+                    }
+                  });
                 }
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
