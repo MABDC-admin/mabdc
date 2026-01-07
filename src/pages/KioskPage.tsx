@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { QrCode, LogIn, LogOut, CheckCircle, XCircle, AlertTriangle, Download, Wifi, WifiOff, Camera, SwitchCamera, User } from 'lucide-react';
+import { QrCode, LogIn, LogOut, CheckCircle, XCircle, AlertTriangle, Download, Wifi, WifiOff, Camera, SwitchCamera, User, Clock, PartyPopper, Frown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useCheckInByHRMS, useCheckOutByHRMS, useRealtimeAttendance } from '@/hooks/useAttendance';
@@ -266,6 +266,94 @@ export default function KioskPage() {
         <p className="text-5xl font-bold font-mono tracking-wider">{format(currentTime, 'HH:mm:ss')}</p>
         <p className="text-sm text-white/60 mt-1">{format(currentTime, 'EEEE, MMM d')}</p>
       </div>
+
+      {/* Attendance Status Notification */}
+      {scannedEmployee && !scanError && (
+        <div className="px-4 pb-3">
+          <div className={cn(
+            "rounded-2xl p-4 shadow-lg border mx-auto max-w-md",
+            scannedEmployee.isLate 
+              ? "bg-red-950/80 border-red-500/30" 
+              : scannedEmployee.status === 'Checked In'
+                ? "bg-green-950/80 border-green-500/30"
+                : "bg-blue-950/80 border-blue-500/30"
+          )}>
+            <div className="flex items-center gap-4">
+              {/* Icon */}
+              <div className={cn(
+                "w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0",
+                scannedEmployee.isLate 
+                  ? "bg-red-500/20" 
+                  : scannedEmployee.status === 'Checked In'
+                    ? "bg-green-500/20"
+                    : "bg-blue-500/20"
+              )}>
+                {scannedEmployee.isLate ? (
+                  <Frown className="w-8 h-8 text-red-400" />
+                ) : scannedEmployee.status === 'Checked In' ? (
+                  <PartyPopper className="w-8 h-8 text-green-400" />
+                ) : (
+                  <CheckCircle className="w-8 h-8 text-blue-400" />
+                )}
+              </div>
+              
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <h3 className={cn(
+                  "text-lg font-bold",
+                  scannedEmployee.isLate 
+                    ? "text-red-400" 
+                    : scannedEmployee.status === 'Checked In'
+                      ? "text-green-400"
+                      : "text-blue-400"
+                )}>
+                  {scannedEmployee.isLate 
+                    ? "You're Late" 
+                    : scannedEmployee.status === 'Checked In'
+                      ? "Good Job!"
+                      : "See You!"}
+                </h3>
+                <p className="text-white/70 text-sm">
+                  {scannedEmployee.isLate 
+                    ? "You checked in late" 
+                    : scannedEmployee.status === 'Checked In'
+                      ? "You're ON TIME!"
+                      : "Have a great day!"}
+                </p>
+              </div>
+
+              {/* Time Badge */}
+              <div className={cn(
+                "px-3 py-1.5 rounded-lg text-sm font-mono font-bold flex-shrink-0",
+                scannedEmployee.isLate 
+                  ? "bg-red-500/20 text-red-300" 
+                  : scannedEmployee.status === 'Checked In'
+                    ? "bg-green-500/20 text-green-300"
+                    : "bg-blue-500/20 text-blue-300"
+              )}>
+                {scannedEmployee.time}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Already Checked In Error Notification */}
+      {scanError && scanError.toLowerCase().includes('already') && (
+        <div className="px-4 pb-3">
+          <div className="rounded-2xl p-4 shadow-lg border mx-auto max-w-md bg-slate-900/80 border-slate-500/30">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 bg-slate-500/20">
+                <Clock className="w-8 h-8 text-slate-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-bold text-slate-300">Already Checked In</h3>
+                <p className="text-white/70 text-sm">You've already checked in today</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Scanner Area */}
       <div className="flex-1 flex items-center justify-center p-2 sm:p-4 min-h-0">
