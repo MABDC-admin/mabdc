@@ -36,7 +36,7 @@ export default function KioskPage() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [cameraActive, setCameraActive] = useState(false);
-  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   
   const lastScannedRef = useRef<{ hrmsNo: string; timestamp: number } | null>(null);
   const resultTimeoutRef = useRef<NodeJS.Timeout>();
