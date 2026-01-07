@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Database, Trash2, RefreshCw, Users, Calendar, Clock, DollarSign, FileText } from 'lucide-react';
+import { AlertTriangle, Database, Trash2, RefreshCw, Users, Calendar, Clock, DollarSign, FileText, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -14,12 +14,18 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useQueryClient } from '@tanstack/react-query';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
-type DataType = 'attendance' | 'leave_records' | 'payroll' | 'contracts' | 'employees' | 'all';
+type DataType = 'attendance' | 'attendance_by_date' | 'leave_records' | 'payroll' | 'contracts' | 'employees' | 'all';
 
 export function AdminDataReset() {
   const [confirmType, setConfirmType] = useState<DataType | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const dataTypes = [
@@ -57,7 +63,13 @@ export function AdminDataReset() {
         await supabase.from('leave_balances').delete().gte('id', '00000000-0000-0000-0000-000000000000');
         await supabase.from('employees').delete().gte('id', '00000000-0000-0000-0000-000000000000');
         toast.success('All employees and related data deleted');
-      } else {
+      } else if (type === 'attendance_by_date' && selectedDate) {
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        const { error } = await supabase.from('attendance').delete().eq('date', dateStr);
+        if (error) throw error;
+        toast.success(`Attendance records for ${format(selectedDate, 'MMM d, yyyy')} deleted successfully`);
+        setSelectedDate(undefined);
+      } else if (type !== 'attendance_by_date') {
         const { error } = await supabase.from(type).delete().gte('id', '00000000-0000-0000-0000-000000000000');
         if (error) throw error;
         toast.success(`${type.replace('_', ' ')} deleted successfully`);
@@ -116,14 +128,47 @@ export function AdminDataReset() {
                   <p className="text-xs text-muted-foreground">{data.description}</p>
                 </div>
               </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setConfirmType(data.type)}
-                className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
-              >
-                <Trash2 size={14} className="mr-1" /> Delete
-              </Button>
+              <div className="flex items-center gap-2">
+                {data.type === 'attendance' && (
+                  <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "text-muted-foreground border-border hover:bg-muted/40",
+                          selectedDate && "text-foreground"
+                        )}
+                      >
+                        <CalendarDays size={14} className="mr-1" />
+                        {selectedDate ? format(selectedDate, 'MMM d') : 'By Date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <CalendarComponent
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => {
+                          setSelectedDate(date);
+                          setDatePickerOpen(false);
+                          if (date) {
+                            setConfirmType('attendance_by_date');
+                          }
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setConfirmType(data.type)}
+                  className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 size={14} className="mr-1" /> Delete
+                </Button>
+              </div>
             </div>
           ))}
         </div>
@@ -163,6 +208,8 @@ export function AdminDataReset() {
                 ? 'This will permanently delete ALL data from the system including employees, attendance, leave records, payroll, and contracts. This action cannot be undone.'
                 : confirmType === 'employees'
                 ? 'This will permanently delete all employees and all their related data (attendance, leave, payroll, contracts). This action cannot be undone.'
+                : confirmType === 'attendance_by_date' && selectedDate
+                ? `This will permanently delete all attendance records for ${format(selectedDate, 'MMMM d, yyyy')}. This action cannot be undone.`
                 : `This will permanently delete all ${confirmType?.replace('_', ' ')} from the system. This action cannot be undone.`
               }
             </AlertDialogDescription>
