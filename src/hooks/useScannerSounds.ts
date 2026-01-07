@@ -36,24 +36,48 @@ export const useScannerSounds = () => {
     const audioContext = getAudioContext();
     const now = audioContext.currentTime;
 
-    // Ascending cheerful tones (C5 -> E5 -> G5)
-    [523.25, 659.25, 783.99].forEach((freq, i) => {
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
+    // Melodic "Ding-Dong" / "Ta-da" sound - warm and pleasing
+    // First note: G5 (higher, bright "ding")
+    const osc1 = audioContext.createOscillator();
+    const gain1 = audioContext.createGain();
+    osc1.connect(gain1);
+    gain1.connect(audioContext.destination);
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(784, now); // G5
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(0.35, now + 0.02);
+    gain1.gain.exponentialRampToValueAtTime(0.15, now + 0.2);
+    gain1.gain.linearRampToValueAtTime(0, now + 0.4);
+    osc1.start(now);
+    osc1.stop(now + 0.4);
 
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
+    // Second note: E5 (lower, warm "dong") - slight delay for the pleasant cascade
+    const osc2 = audioContext.createOscillator();
+    const gain2 = audioContext.createGain();
+    osc2.connect(gain2);
+    gain2.connect(audioContext.destination);
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(659.25, now + 0.15); // E5
+    gain2.gain.setValueAtTime(0, now + 0.15);
+    gain2.gain.linearRampToValueAtTime(0.3, now + 0.17);
+    gain2.gain.exponentialRampToValueAtTime(0.1, now + 0.45);
+    gain2.gain.linearRampToValueAtTime(0, now + 0.7);
+    osc2.start(now + 0.15);
+    osc2.stop(now + 0.7);
 
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(freq, now + i * 0.12);
-
-      gainNode.gain.setValueAtTime(0, now + i * 0.12);
-      gainNode.gain.linearRampToValueAtTime(0.25, now + i * 0.12 + 0.03);
-      gainNode.gain.linearRampToValueAtTime(0, now + i * 0.12 + 0.15);
-
-      oscillator.start(now + i * 0.12);
-      oscillator.stop(now + i * 0.12 + 0.15);
-    });
+    // Soft harmonic overlay for richness (octave above first note)
+    const osc3 = audioContext.createOscillator();
+    const gain3 = audioContext.createGain();
+    osc3.connect(gain3);
+    gain3.connect(audioContext.destination);
+    osc3.type = 'sine';
+    osc3.frequency.setValueAtTime(1568, now); // G6 (octave above G5)
+    gain3.gain.setValueAtTime(0, now);
+    gain3.gain.linearRampToValueAtTime(0.1, now + 0.02);
+    gain3.gain.exponentialRampToValueAtTime(0.02, now + 0.25);
+    gain3.gain.linearRampToValueAtTime(0, now + 0.35);
+    osc3.start(now);
+    osc3.stop(now + 0.35);
   }, [getAudioContext]);
 
   const playCheckOutSound = useCallback(() => {
