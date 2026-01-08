@@ -1098,29 +1098,121 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                     <input ref={fileInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.pdf,.xlsx,.xls,.doc,.docx" onChange={(e) => handleFileUpload(e)} className="hidden" />
                   </div>
 
-                  {/* Uploaded Documents List */}
-                  {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit'].includes(d.category || '')).length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-foreground mb-2">Other Uploaded Documents</p>
-                      {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit'].includes(d.category || '')).map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border group">
-                          <div className="flex items-center gap-3">
-                            <FileText className="w-5 h-5 text-primary" />
-                            <div>
-                              <p className="text-sm font-medium text-foreground">{doc.name}</p>
-                              <p className="text-xs text-muted-foreground">{doc.file_size}</p>
+                  {/* Uploaded Documents Thumbnail Grid */}
+                  {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit'].includes(d.category || '') && !d.is_renewed).length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-foreground">Other Uploaded Documents</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit'].includes(d.category || '') && !d.is_renewed).map((doc) => {
+                          const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                          const isPdf = /\.pdf$/i.test(doc.file_url);
+                          const hasExpiry = doc.expiry_date;
+                          const isExpiringSoon = hasExpiry && differenceInDays(parseISO(doc.expiry_date!), new Date()) <= 30;
+                          const isExpired = hasExpiry && differenceInDays(parseISO(doc.expiry_date!), new Date()) < 0;
+                          
+                          return (
+                            <div 
+                              key={doc.id} 
+                              className="group relative rounded-xl border border-border bg-card overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
+                            >
+                              {/* Thumbnail Area */}
+                              <div 
+                                className="aspect-square bg-muted/30 flex items-center justify-center cursor-pointer overflow-hidden"
+                                onClick={() => {
+                                  if (isImage) {
+                                    setPreviewImage({ url: doc.file_url, title: doc.name });
+                                  } else {
+                                    window.open(doc.file_url, '_blank');
+                                  }
+                                }}
+                              >
+                                {isImage ? (
+                                  <img 
+                                    src={doc.file_url} 
+                                    alt={doc.name} 
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  />
+                                ) : isPdf ? (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="w-12 h-12 rounded-lg bg-red-500/20 flex items-center justify-center">
+                                      <FileText className="w-6 h-6 text-red-500" />
+                                    </div>
+                                    <span className="text-[10px] font-medium text-red-500 uppercase">PDF</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center">
+                                      <FileText className="w-6 h-6 text-primary" />
+                                    </div>
+                                    <span className="text-[10px] font-medium text-muted-foreground uppercase">
+                                      {doc.file_url.split('.').pop()?.toUpperCase() || 'FILE'}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Expiry Badge */}
+                              {hasExpiry && (
+                                <div className={cn(
+                                  "absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-medium",
+                                  isExpired ? "bg-destructive text-destructive-foreground" :
+                                  isExpiringSoon ? "bg-yellow-500 text-white" :
+                                  "bg-green-500/80 text-white"
+                                )}>
+                                  {isExpired ? 'Expired' : isExpiringSoon ? 'Expiring' : format(parseISO(doc.expiry_date!), 'MMM yy')}
+                                </div>
+                              )}
+                              
+                              {/* Category Badge */}
+                              {doc.category && !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit'].includes(doc.category) && (
+                                <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-primary/80 text-primary-foreground text-[9px] font-medium truncate max-w-[80px]">
+                                  {doc.category}
+                                </div>
+                              )}
+                              
+                              {/* Document Info */}
+                              <div className="p-2 border-t border-border">
+                                <p className="text-xs font-medium text-foreground truncate" title={doc.name}>{doc.name}</p>
+                                <p className="text-[10px] text-muted-foreground">{doc.file_size}</p>
+                              </div>
+                              
+                              {/* Hover Actions */}
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                <Button 
+                                  size="icon" 
+                                  variant="secondary" 
+                                  className="h-8 w-8 rounded-full"
+                                  onClick={() => {
+                                    if (isImage) {
+                                      setPreviewImage({ url: doc.file_url, title: doc.name });
+                                    } else {
+                                      window.open(doc.file_url, '_blank');
+                                    }
+                                  }}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  size="icon" 
+                                  variant="secondary" 
+                                  className="h-8 w-8 rounded-full"
+                                  onClick={() => window.open(doc.file_url, '_blank')}
+                                >
+                                  <Download className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  size="icon" 
+                                  variant="destructive" 
+                                  className="h-8 w-8 rounded-full"
+                                  onClick={() => handleDeleteDocument(doc.id, doc.file_url)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.open(doc.file_url, '_blank')}>
-                              <Download className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteDocument(doc.id, doc.file_url)}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
