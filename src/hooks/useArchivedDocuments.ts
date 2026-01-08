@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface ArchivedDocument {
   id: string;
@@ -141,6 +142,54 @@ export function useArchivedContracts() {
       }));
 
       return archivedContracts;
+    },
+  });
+}
+
+export function useRestoreArchivedDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (documentId: string) => {
+      // Get the archived document to find the new document that replaced it
+      const { data: archivedDoc, error: fetchError } = await supabase
+        .from('employee_documents')
+        .select('id, renewed_document_id')
+        .eq('id', documentId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // If there's a replacement document, unlink it
+      if (archivedDoc.renewed_document_id) {
+        const { error: unlinkError } = await supabase
+          .from('employee_documents')
+          .update({ previous_document_id: null })
+          .eq('id', archivedDoc.renewed_document_id);
+
+        if (unlinkError) throw unlinkError;
+      }
+
+      // Restore the archived document
+      const { error } = await supabase
+        .from('employee_documents')
+        .update({
+          is_renewed: false,
+          renewed_at: null,
+          renewed_document_id: null,
+        })
+        .eq('id', documentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['archived-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['document-renewal-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-documents'] });
+      toast.success('Document restored successfully');
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to restore document: ${error.message}`);
     },
   });
 }
