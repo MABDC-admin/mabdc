@@ -183,3 +183,25 @@ export function useCheckContractExpiry() {
     },
   });
 }
+
+export function useDeleteContract() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (contractId: string) => {
+      const { error } = await supabase
+        .from('contracts')
+        .delete()
+        .eq('id', contractId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      toast.success('Contract deleted successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete contract: ${error.message}`);
+    },
+  });
+}
