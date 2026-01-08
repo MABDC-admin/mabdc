@@ -5,12 +5,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDocumentRenewalQueue, RenewalQueueItem } from '@/hooks/useDocumentRenewalQueue';
-import { useArchivedDocuments, useArchivedContracts } from '@/hooks/useArchivedDocuments';
+import { useArchivedDocuments, useArchivedContracts, useRestoreArchivedDocument } from '@/hooks/useArchivedDocuments';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useDocumentTypes } from '@/hooks/useDocumentTypes';
 import { useRenewDocument } from '@/hooks/useDocuments';
 import { DocumentTypesManager } from '@/components/documents/DocumentTypesManager';
-import { AlertTriangle, CheckCircle, Clock, FileText, User, Settings2, Calendar, RefreshCw, Link2, Archive, ExternalLink, FileCheck, History } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, FileText, User, Settings2, Calendar, RefreshCw, Link2, Archive, ExternalLink, FileCheck, History, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +32,7 @@ export function RenewalView() {
   const { data: archivedContracts = [], isLoading: isLoadingArchivedContracts } = useArchivedContracts();
   const { data: employees = [] } = useEmployees();
   const { data: documentTypes = [] } = useDocumentTypes();
+  const restoreDocument = useRestoreArchivedDocument();
   const renewDocument = useRenewDocument();
 
   const filteredItems = queueItems.filter(item => {
@@ -399,14 +400,26 @@ export function RenewalView() {
                               Expired: {doc.expiry_date ? format(parseISO(doc.expiry_date), 'dd MMM yyyy') : 'N/A'}
                             </p>
                           </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 px-2"
-                            onClick={() => window.open(doc.file_url, '_blank')}
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2"
+                              onClick={() => window.open(doc.file_url, '_blank')}
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-primary border-primary/30 hover:bg-primary/10"
+                              onClick={() => restoreDocument.mutate(doc.id)}
+                              disabled={restoreDocument.isPending}
+                            >
+                              <RotateCcw className="w-3 h-3 mr-1" />
+                              Restore
+                            </Button>
+                          </div>
                         </div>
 
                         {/* Arrow */}
