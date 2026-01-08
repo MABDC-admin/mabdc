@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Sparkles, FileText, User, Calendar, Hash, Building, Loader2, Check, AlertCircle, ChevronDown, DollarSign, Briefcase, MapPin, XCircle } from 'lucide-react';
+import { ArrowLeft, Upload, Sparkles, FileText, User, Calendar, Hash, Building, Loader2, Check, AlertCircle, ChevronDown, DollarSign, Briefcase, MapPin, XCircle, Files } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,14 +10,22 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSmartDocumentUpload, ExtractedData, MatchedEmployee } from '@/hooks/useSmartDocumentUpload';
+import { useBulkDocumentUpload } from '@/hooks/useBulkDocumentUpload';
 import { useEmployees } from '@/hooks/useEmployees';
 import { cn } from '@/lib/utils';
 import { parseISO, isBefore, startOfDay } from 'date-fns';
+import { BulkUploadDropzone } from '@/components/smart-upload/BulkUploadDropzone';
+import { BulkProgressView } from '@/components/smart-upload/BulkProgressView';
+import { BulkValidationTable } from '@/components/smart-upload/BulkValidationTable';
+import { BulkSummaryStats } from '@/components/smart-upload/BulkSummaryStats';
 
 export default function SmartDocumentUpload() {
   const navigate = useNavigate();
   const { data: employees } = useEmployees();
+  
+  // Single upload hook
   const {
     isAnalyzing,
     isSaving,
@@ -33,6 +41,10 @@ export default function SmartDocumentUpload() {
     reset,
   } = useSmartDocumentUpload();
 
+  // Bulk upload hook
+  const bulkUpload = useBulkDocumentUpload();
+
+  const [uploadMode, setUploadMode] = useState<'single' | 'bulk'>('single');
   const [isDragging, setIsDragging] = useState(false);
   const [updateEmployeeRecord, setUpdateEmployeeRecord] = useState(true);
   const [autoActivateContract, setAutoActivateContract] = useState(true);
@@ -181,6 +193,128 @@ export default function SmartDocumentUpload() {
           </div>
         </div>
 
+        {/* Upload Mode Tabs */}
+        <Tabs value={uploadMode} onValueChange={(v) => setUploadMode(v as 'single' | 'bulk')} className="mb-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="single" className="flex items-center gap-2">
+              <Upload className="h-4 w-4" />
+              Single Upload
+            </TabsTrigger>
+            <TabsTrigger value="bulk" className="flex items-center gap-2">
+              <Files className="h-4 w-4" />
+              Bulk Upload
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* Bulk Upload Mode */}
+        {uploadMode === 'bulk' && (
+          <div className="space-y-6">
+            {/* Bulk Dropzone - Show when no items or not processing */}
+            {bulkUpload.items.length === 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Files className="h-5 w-5" />
+                    Bulk Document Upload
+                  </CardTitle>
+                  <CardDescription>
+                    Upload multiple documents at once. AI will analyze and validate each file.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <BulkUploadDropzone
+                    onFilesSelected={bulkUpload.addFiles}
+                    fileCount={bulkUpload.items.length}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Processing View */}
+            {bulkUpload.isProcessing && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Analyzing Documents
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BulkProgressView
+                    items={bulkUpload.items}
+                    currentIndex={bulkUpload.currentIndex}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Files Added but not started */}
+            {bulkUpload.items.length > 0 && bulkUpload.stats.pending > 0 && !bulkUpload.isProcessing && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Files className="h-5 w-5" />
+                    Files Ready for Analysis
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <BulkUploadDropzone
+                    onFilesSelected={bulkUpload.addFiles}
+                    fileCount={bulkUpload.items.length}
+                  />
+                  
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <span className="text-sm">
+                      <span className="font-medium">{bulkUpload.items.length}</span> file(s) ready
+                    </span>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={bulkUpload.reset}>
+                        Clear All
+                      </Button>
+                      <Button size="sm" onClick={bulkUpload.startProcessing}>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Start Analysis
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Results View */}
+            {bulkUpload.items.length > 0 && bulkUpload.stats.pending === 0 && !bulkUpload.isProcessing && (
+              <>
+                <BulkSummaryStats
+                  stats={bulkUpload.stats}
+                  isSaving={bulkUpload.isSaving}
+                  onSaveAllValid={bulkUpload.saveAllValid}
+                  onClearAll={bulkUpload.reset}
+                />
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Validation Results</CardTitle>
+                    <CardDescription>
+                      Review each document. Select employees for unmatched documents before saving.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <BulkValidationTable
+                      items={bulkUpload.items}
+                      employees={employees || []}
+                      onRemove={bulkUpload.removeItem}
+                      onUpdateEmployee={bulkUpload.updateEmployeeSelection}
+                    />
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Single Upload Mode */}
+        {uploadMode === 'single' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Upload & Preview */}
           <div className="space-y-6">
@@ -773,6 +907,7 @@ export default function SmartDocumentUpload() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );
