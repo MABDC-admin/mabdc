@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   Shield, Users, Calendar, FileText, DollarSign, ClipboardList, 
   Trash2, Edit, Plus, Download, RefreshCw, Database, BarChart3,
-  ChevronDown, AlertTriangle, Star, Scale, LogOut, MessageSquare
+  ChevronDown, AlertTriangle, Star, Scale, LogOut, MessageSquare, FileSignature
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -20,6 +20,7 @@ import { AdminDataReset } from '@/components/admin/AdminDataReset';
 import { AdminPerformanceSection } from '@/components/admin/AdminPerformanceSection';
 import { AdminDisciplineSection } from '@/components/admin/AdminDisciplineSection';
 import { AdminAppealsSection } from '@/components/admin/AdminAppealsSection';
+import { AdminContractsSection } from '@/components/admin/AdminContractsSection';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -44,6 +45,7 @@ export default function AdminDashboard() {
 
   const stats = [
     { label: 'Employees', value: employees.length, icon: Users, color: 'text-primary' },
+    { label: 'Contracts', value: contracts.length, icon: FileSignature, color: 'text-violet-500' },
     { label: 'Leave Records', value: leaveRecords.length, icon: Calendar, color: 'text-emerald-500' },
     { label: 'Attendance Records', value: attendance.length, icon: ClipboardList, color: 'text-blue-500' },
     { label: 'Payroll Records', value: payroll.length, icon: DollarSign, color: 'text-amber-500' },
@@ -80,7 +82,7 @@ export default function AdminDashboard() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           {stats.map((stat) => (
             <div key={stat.label} className="glass-card rounded-2xl border border-border p-4 relative">
               <div className="flex items-center gap-2 mb-2">
@@ -105,6 +107,9 @@ export default function AdminDashboard() {
             </TabsTrigger>
             <TabsTrigger value="employees" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Users className="w-4 h-4 mr-2" />Employees
+            </TabsTrigger>
+            <TabsTrigger value="contracts" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <FileSignature className="w-4 h-4 mr-2" />Contracts
             </TabsTrigger>
             <TabsTrigger value="leave" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Calendar className="w-4 h-4 mr-2" />Leave History
@@ -179,6 +184,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="employees">
             <AdminEmployeeSection />
+          </TabsContent>
+
+          <TabsContent value="contracts">
+            <AdminContractsSection />
           </TabsContent>
 
           <TabsContent value="leave">
