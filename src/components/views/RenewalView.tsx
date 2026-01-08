@@ -1,16 +1,16 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDocumentRenewalQueue, RenewalQueueItem } from '@/hooks/useDocumentRenewalQueue';
+import { useArchivedDocuments, useArchivedContracts } from '@/hooks/useArchivedDocuments';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useDocumentTypes } from '@/hooks/useDocumentTypes';
 import { useRenewDocument } from '@/hooks/useDocuments';
 import { DocumentTypesManager } from '@/components/documents/DocumentTypesManager';
-import { DocumentUploadDropzone } from '@/components/documents/DocumentUploadDropzone';
-import { AlertTriangle, CheckCircle, Clock, FileText, User, Settings2, Calendar, Upload, RefreshCw, Link2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, FileText, User, Settings2, Calendar, RefreshCw, Link2, Archive, ExternalLink, FileCheck, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +28,8 @@ export function RenewalView() {
   const [isUploading, setIsUploading] = useState(false);
   
   const { data: queueItems = [], isLoading, refetch } = useDocumentRenewalQueue(daysFilter);
+  const { data: archivedDocs = [], isLoading: isLoadingArchived } = useArchivedDocuments();
+  const { data: archivedContracts = [], isLoading: isLoadingArchivedContracts } = useArchivedContracts();
   const { data: employees = [] } = useEmployees();
   const { data: documentTypes = [] } = useDocumentTypes();
   const renewDocument = useRenewDocument();
@@ -131,10 +133,14 @@ export function RenewalView() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="queue" className="gap-2">
             <Clock className="w-4 h-4" />
             Renewal Queue
+          </TabsTrigger>
+          <TabsTrigger value="archived" className="gap-2">
+            <Archive className="w-4 h-4" />
+            Archived
           </TabsTrigger>
           <TabsTrigger value="settings" className="gap-2">
             <Settings2 className="w-4 h-4" />
@@ -330,6 +336,232 @@ export function RenewalView() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="archived" className="mt-6">
+          <div className="space-y-6">
+            {/* Archived Documents Section */}
+            <div>
+              <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                <FileCheck className="w-5 h-5 text-primary" />
+                Renewed Documents ({archivedDocs.length})
+              </h3>
+
+              {isLoadingArchived ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : archivedDocs.length === 0 ? (
+                <div className="glass-card rounded-xl p-8 text-center border border-border">
+                  <Archive className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">No archived documents yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {archivedDocs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="glass-card p-4 rounded-xl border border-border hover:border-primary/30 transition-all"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          {doc.employee_photo ? (
+                            <img
+                              src={doc.employee_photo}
+                              alt={doc.employee_name}
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+                              <User className="w-5 h-5 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-medium text-foreground">{doc.employee_name}</p>
+                            <p className="text-xs text-muted-foreground">{doc.department}</p>
+                          </div>
+                        </div>
+
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                          {doc.category}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 pl-13 space-y-2">
+                        {/* Old Document */}
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-destructive/5 border border-destructive/20">
+                          <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                            <History className="w-4 h-4 text-destructive" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{doc.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Expired: {doc.expiry_date ? format(parseISO(doc.expiry_date), 'dd MMM yyyy') : 'N/A'}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2"
+                            onClick={() => window.open(doc.file_url, '_blank')}
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </Button>
+                        </div>
+
+                        {/* Arrow */}
+                        <div className="flex items-center gap-2 pl-3">
+                          <div className="w-0.5 h-4 bg-primary/30" />
+                          <span className="text-xs text-muted-foreground">
+                            Renewed on {format(parseISO(doc.renewed_at), 'dd MMM yyyy')}
+                          </span>
+                        </div>
+
+                        {/* New Document */}
+                        {doc.new_document ? (
+                          <div className="flex items-center gap-3 p-2 rounded-lg bg-primary/5 border border-primary/20">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <FileCheck className="w-4 h-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">{doc.new_document.name}</p>
+                              <p className="text-xs text-primary">
+                                New expiry: {doc.new_document.expiry_date ? format(parseISO(doc.new_document.expiry_date), 'dd MMM yyyy') : 'N/A'}
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2"
+                              onClick={() => window.open(doc.new_document!.file_url, '_blank')}
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border">
+                            <Link2 className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Replacement document not linked</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Archived Contracts Section */}
+            <div>
+              <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-amber-500" />
+                Expired/Terminated Contracts ({archivedContracts.length})
+              </h3>
+
+              {isLoadingArchivedContracts ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : archivedContracts.length === 0 ? (
+                <div className="glass-card rounded-xl p-8 text-center border border-border">
+                  <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">No archived contracts yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {archivedContracts.map((contract) => (
+                    <div
+                      key={contract.id}
+                      className="glass-card p-4 rounded-xl border border-border hover:border-amber-500/30 transition-all"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          {contract.employee_photo ? (
+                            <img
+                              src={contract.employee_photo}
+                              alt={contract.employee_name}
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+                              <User className="w-5 h-5 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-medium text-foreground">{contract.employee_name}</p>
+                            <p className="text-xs text-muted-foreground">{contract.department}</p>
+                          </div>
+                        </div>
+
+                        <span className={cn(
+                          "px-2 py-1 rounded-full text-xs font-medium",
+                          contract.status === 'Expired' 
+                            ? "bg-destructive/10 text-destructive" 
+                            : "bg-amber-500/10 text-amber-500"
+                        )}>
+                          {contract.status}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div>
+                          <p className="text-xs text-muted-foreground">MOHRE No</p>
+                          <p className="font-medium text-foreground">{contract.mohre_contract_no}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Type</p>
+                          <p className="font-medium text-foreground">{contract.contract_type}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Start Date</p>
+                          <p className="font-medium text-foreground">{format(parseISO(contract.start_date), 'dd MMM yyyy')}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">End Date</p>
+                          <p className="font-medium text-foreground">
+                            {contract.end_date ? format(parseISO(contract.end_date), 'dd MMM yyyy') : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {contract.notes && (
+                        <p className="mt-3 text-xs text-muted-foreground italic border-t border-border pt-2">
+                          {contract.notes}
+                        </p>
+                      )}
+
+                      {(contract.page1_url || contract.page2_url) && (
+                        <div className="mt-3 flex gap-2">
+                          {contract.page1_url && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              onClick={() => window.open(contract.page1_url!, '_blank')}
+                            >
+                              <ExternalLink className="w-3 h-3 mr-1" />
+                              Page 1
+                            </Button>
+                          )}
+                          {contract.page2_url && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              onClick={() => window.open(contract.page2_url!, '_blank')}
+                            >
+                              <ExternalLink className="w-3 h-3 mr-1" />
+                              Page 2
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="settings" className="mt-6">
