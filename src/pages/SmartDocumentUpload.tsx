@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Sparkles, FileText, User, Calendar, Hash, Building, Loader2, Check, AlertCircle, ChevronDown, DollarSign, Briefcase, MapPin } from 'lucide-react';
+import { ArrowLeft, Upload, Sparkles, FileText, User, Calendar, Hash, Building, Loader2, Check, AlertCircle, ChevronDown, DollarSign, Briefcase, MapPin, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,9 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useSmartDocumentUpload, ExtractedData, MatchedEmployee } from '@/hooks/useSmartDocumentUpload';
 import { useEmployees } from '@/hooks/useEmployees';
 import { cn } from '@/lib/utils';
+import { parseISO, isBefore, startOfDay } from 'date-fns';
 
 export default function SmartDocumentUpload() {
   const navigate = useNavigate();
@@ -131,6 +133,39 @@ export default function SmartDocumentUpload() {
     const transport = Number(displayData?.transportationAllowance) || 0;
     return basic + housing + transport;
   };
+
+  // Expiry validation - check if document is expired
+  const expiryValidation = useMemo(() => {
+    if (!displayData) return { isExpired: false, message: '' };
+    
+    const today = startOfDay(new Date());
+    
+    // For contracts, check endDate
+    if (isContract && displayData.endDate) {
+      const endDate = parseISO(displayData.endDate);
+      if (isBefore(endDate, today)) {
+        return {
+          isExpired: true,
+          message: 'This contract has already expired. The end date is in the past.',
+          field: 'endDate',
+        };
+      }
+    }
+    
+    // For regular documents, check expiryDate
+    if (!isContract && displayData.expiryDate) {
+      const expiryDate = parseISO(displayData.expiryDate);
+      if (isBefore(expiryDate, today)) {
+        return {
+          isExpired: true,
+          message: `This ${displayData.documentType} has already expired. Please upload a valid document.`,
+          field: 'expiryDate',
+        };
+      }
+    }
+    
+    return { isExpired: false, message: '', field: '' };
+  }, [displayData, isContract]);
 
   return (
     <div className="min-h-screen bg-background p-4 lg:p-6">
@@ -363,17 +398,40 @@ export default function SmartDocumentUpload() {
                             />
                           </div>
                           <div className="space-y-1.5">
-                            <Label className="flex items-center gap-2 text-muted-foreground">
+                            <Label className={cn(
+                              "flex items-center gap-2",
+                              expiryValidation.isExpired && expiryValidation.field === 'endDate' 
+                                ? "text-destructive" 
+                                : "text-muted-foreground"
+                            )}>
                               <Calendar className="h-4 w-4" />
                               End Date
+                              {expiryValidation.isExpired && expiryValidation.field === 'endDate' && (
+                                <XCircle className="h-4 w-4" />
+                              )}
                             </Label>
                             <Input
                               type="date"
                               value={displayData.endDate || ''}
                               onChange={(e) => handleDataEdit('endDate', e.target.value)}
+                              className={cn(
+                                expiryValidation.isExpired && expiryValidation.field === 'endDate' && 
+                                "border-destructive focus-visible:ring-destructive"
+                              )}
                             />
                           </div>
                         </div>
+
+                        {/* Contract Expiry Error */}
+                        {expiryValidation.isExpired && expiryValidation.field === 'endDate' && (
+                          <Alert variant="destructive">
+                            <XCircle className="h-4 w-4" />
+                            <AlertTitle>Expired Contract Detected</AlertTitle>
+                            <AlertDescription>
+                              {expiryValidation.message}
+                            </AlertDescription>
+                          </Alert>
+                        )}
 
                         {/* Salary Breakdown */}
                         <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
@@ -465,14 +523,26 @@ export default function SmartDocumentUpload() {
                         <div className="grid grid-cols-2 gap-4">
                           {displayData.expiryDate && (
                             <div className="space-y-1.5">
-                              <Label className="flex items-center gap-2 text-muted-foreground">
+                              <Label className={cn(
+                                "flex items-center gap-2",
+                                expiryValidation.isExpired && expiryValidation.field === 'expiryDate' 
+                                  ? "text-destructive" 
+                                  : "text-muted-foreground"
+                              )}>
                                 <Calendar className="h-4 w-4" />
                                 Expiry Date
+                                {expiryValidation.isExpired && expiryValidation.field === 'expiryDate' && (
+                                  <XCircle className="h-4 w-4" />
+                                )}
                               </Label>
                               <Input
                                 type="date"
                                 value={displayData.expiryDate}
                                 onChange={(e) => handleDataEdit('expiryDate', e.target.value)}
+                                className={cn(
+                                  expiryValidation.isExpired && expiryValidation.field === 'expiryDate' && 
+                                  "border-destructive focus-visible:ring-destructive"
+                                )}
                               />
                             </div>
                           )}
@@ -490,6 +560,17 @@ export default function SmartDocumentUpload() {
                             </div>
                           )}
                         </div>
+
+                        {/* Document Expiry Error */}
+                        {expiryValidation.isExpired && expiryValidation.field === 'expiryDate' && (
+                          <Alert variant="destructive">
+                            <XCircle className="h-4 w-4" />
+                            <AlertTitle>Expired Document Detected</AlertTitle>
+                            <AlertDescription>
+                              {expiryValidation.message}
+                            </AlertDescription>
+                          </Alert>
+                        )}
 
                         {/* Additional fields based on document type */}
                         {displayData.nationality && (
@@ -663,13 +744,18 @@ export default function SmartDocumentUpload() {
                     </Button>
                     <Button
                       onClick={handleSave}
-                      disabled={!selectedEmployee || isSaving}
+                      disabled={!selectedEmployee || isSaving || expiryValidation.isExpired}
                       className="flex-1"
                     >
                       {isSaving ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           {isContract ? 'Creating Contract...' : 'Saving...'}
+                        </>
+                      ) : expiryValidation.isExpired ? (
+                        <>
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Cannot Save Expired {isContract ? 'Contract' : 'Document'}
                         </>
                       ) : (
                         <>
