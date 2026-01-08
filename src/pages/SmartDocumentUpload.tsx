@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Sparkles, FileText, User, Calendar, Hash, Building, Loader2, Check, AlertCircle, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Upload, Sparkles, FileText, User, Calendar, Hash, Building, Loader2, Check, AlertCircle, ChevronDown, DollarSign, Briefcase, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,13 +23,17 @@ export default function SmartDocumentUpload() {
     selectedEmployee,
     setSelectedEmployee,
     previewUrl,
+    contractPages,
+    isPdf,
     analyzeDocument,
     saveDocument,
+    saveContract,
     reset,
   } = useSmartDocumentUpload();
 
   const [isDragging, setIsDragging] = useState(false);
   const [updateEmployeeRecord, setUpdateEmployeeRecord] = useState(true);
+  const [autoActivateContract, setAutoActivateContract] = useState(true);
   const [editedData, setEditedData] = useState<ExtractedData | null>(null);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [showAlternatives, setShowAlternatives] = useState(false);
@@ -77,14 +81,28 @@ export default function SmartDocumentUpload() {
     await analyzeDocument(file);
   };
 
+  const isContractDocument = (docType: string) => {
+    return docType?.toLowerCase().includes('contract') || docType?.toLowerCase().includes('employment');
+  };
+
   const handleSave = async () => {
-    if (!currentFile || !selectedEmployee || !extractionResult) return;
+    if (!selectedEmployee || !extractionResult) return;
 
     const dataToSave = editedData || extractionResult.extractedData;
-    const success = await saveDocument(currentFile, dataToSave, selectedEmployee.id, updateEmployeeRecord);
-
-    if (success) {
-      handleReset();
+    
+    // If it's a contract, use saveContract
+    if (isContractDocument(dataToSave.documentType)) {
+      const success = await saveContract(dataToSave, selectedEmployee.id, autoActivateContract);
+      if (success) {
+        handleReset();
+      }
+    } else {
+      // Regular document save
+      if (!currentFile) return;
+      const success = await saveDocument(currentFile, dataToSave, selectedEmployee.id, updateEmployeeRecord);
+      if (success) {
+        handleReset();
+      }
     }
   };
 
@@ -93,9 +111,10 @@ export default function SmartDocumentUpload() {
     setCurrentFile(null);
     setEditedData(null);
     setShowAlternatives(false);
+    setAutoActivateContract(true);
   };
 
-  const handleDataEdit = (field: keyof ExtractedData, value: string) => {
+  const handleDataEdit = (field: keyof ExtractedData, value: string | number) => {
     setEditedData((prev) => ({
       ...(prev || extractionResult?.extractedData || {} as ExtractedData),
       [field]: value,
@@ -103,6 +122,15 @@ export default function SmartDocumentUpload() {
   };
 
   const displayData = editedData || extractionResult?.extractedData;
+  const isContract = displayData && isContractDocument(displayData.documentType);
+
+  // Calculate total salary for display
+  const calculateTotal = () => {
+    const basic = Number(displayData?.basicSalary) || 0;
+    const housing = Number(displayData?.housingAllowance) || 0;
+    const transport = Number(displayData?.transportationAllowance) || 0;
+    return basic + housing + transport;
+  };
 
   return (
     <div className="min-h-screen bg-background p-4 lg:p-6">
@@ -158,6 +186,9 @@ export default function SmartDocumentUpload() {
                       <div className="space-y-4">
                         <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin" />
                         <p className="text-muted-foreground">Analyzing document with AI...</p>
+                        {isPdf && (
+                          <p className="text-sm text-muted-foreground">Converting PDF pages to images...</p>
+                        )}
                       </div>
                     ) : (
                       <>
@@ -176,8 +207,48 @@ export default function SmartDocumentUpload() {
               </Card>
             )}
 
-            {/* Document Preview */}
-            {previewUrl && (
+            {/* Document Preview - Contract with 2 pages */}
+            {contractPages && isContract && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Contract Pages ({contractPages.page2Url ? '2 pages' : '1 page'})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Page 1 */}
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">Page 1</Label>
+                      <div className="border rounded-lg overflow-hidden">
+                        <img
+                          src={contractPages.page1Url}
+                          alt="Contract Page 1"
+                          className="w-full h-auto"
+                        />
+                      </div>
+                    </div>
+                    {/* Page 2 */}
+                    {contractPages.page2Url && (
+                      <div className="space-y-2">
+                        <Label className="text-sm text-muted-foreground">Page 2</Label>
+                        <div className="border rounded-lg overflow-hidden">
+                          <img
+                            src={contractPages.page2Url}
+                            alt="Contract Page 2"
+                            className="w-full h-auto"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Regular Document Preview */}
+            {previewUrl && !isContract && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -186,7 +257,7 @@ export default function SmartDocumentUpload() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {currentFile?.type === 'application/pdf' ? (
+                  {currentFile?.type === 'application/pdf' && !contractPages ? (
                     <div className="bg-muted rounded-lg p-8 text-center">
                       <FileText className="h-16 w-16 mx-auto text-muted-foreground mb-2" />
                       <p className="text-sm text-muted-foreground">{currentFile.name}</p>
@@ -220,6 +291,12 @@ export default function SmartDocumentUpload() {
                     <Badge variant="secondary" className="text-base px-3 py-1">
                       {displayData.documentType}
                     </Badge>
+                    {isContract && (
+                      <Badge variant="outline" className="bg-primary/10 text-primary">
+                        <Briefcase className="h-3 w-3 mr-1" />
+                        Contract Mode
+                      </Badge>
+                    )}
                   </div>
 
                   {/* Fields Grid */}
@@ -239,81 +316,205 @@ export default function SmartDocumentUpload() {
                       )}
                     </div>
 
-                    {/* Document Number */}
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-2 text-muted-foreground">
-                        <Hash className="h-4 w-4" />
-                        Document Number
-                      </Label>
-                      <Input
-                        value={displayData.documentNumber || ''}
-                        onChange={(e) => handleDataEdit('documentNumber', e.target.value)}
-                      />
-                    </div>
-
-                    {/* Dates */}
-                    <div className="grid grid-cols-2 gap-4">
-                      {displayData.expiryDate && (
+                    {/* Contract-specific fields */}
+                    {isContract && (
+                      <>
+                        {/* MOHRE Contract No */}
                         <div className="space-y-1.5">
                           <Label className="flex items-center gap-2 text-muted-foreground">
-                            <Calendar className="h-4 w-4" />
-                            Expiry Date
+                            <Hash className="h-4 w-4" />
+                            MOHRE Contract No
                           </Label>
                           <Input
-                            type="date"
-                            value={displayData.expiryDate}
-                            onChange={(e) => handleDataEdit('expiryDate', e.target.value)}
+                            value={displayData.mohreContractNo || ''}
+                            onChange={(e) => handleDataEdit('mohreContractNo', e.target.value)}
+                            placeholder="e.g., MOL-2024-123456"
                           />
                         </div>
-                      )}
-                      {displayData.issueDate && (
+
+                        {/* Contract Type */}
+                        <div className="space-y-1.5">
+                          <Label className="text-muted-foreground">Contract Type</Label>
+                          <Select
+                            value={displayData.contractType || 'Unlimited'}
+                            onValueChange={(value) => handleDataEdit('contractType', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Unlimited">Unlimited</SelectItem>
+                              <SelectItem value="Limited">Limited</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Start & End Date */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <Label className="flex items-center gap-2 text-muted-foreground">
+                              <Calendar className="h-4 w-4" />
+                              Start Date
+                            </Label>
+                            <Input
+                              type="date"
+                              value={displayData.startDate || ''}
+                              onChange={(e) => handleDataEdit('startDate', e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="flex items-center gap-2 text-muted-foreground">
+                              <Calendar className="h-4 w-4" />
+                              End Date
+                            </Label>
+                            <Input
+                              type="date"
+                              value={displayData.endDate || ''}
+                              onChange={(e) => handleDataEdit('endDate', e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Salary Breakdown */}
+                        <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                          <Label className="flex items-center gap-2 font-medium">
+                            <DollarSign className="h-4 w-4" />
+                            Salary Breakdown (AED)
+                          </Label>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Basic</Label>
+                              <Input
+                                type="number"
+                                value={displayData.basicSalary || ''}
+                                onChange={(e) => handleDataEdit('basicSalary', Number(e.target.value))}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Housing</Label>
+                              <Input
+                                type="number"
+                                value={displayData.housingAllowance || ''}
+                                onChange={(e) => handleDataEdit('housingAllowance', Number(e.target.value))}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Transport</Label>
+                              <Input
+                                type="number"
+                                value={displayData.transportationAllowance || ''}
+                                onChange={(e) => handleDataEdit('transportationAllowance', Number(e.target.value))}
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center pt-2 border-t">
+                            <Label className="text-sm font-medium">Total Salary</Label>
+                            <span className="text-lg font-bold text-primary">
+                              {calculateTotal().toLocaleString()} AED
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Job Title Arabic */}
                         <div className="space-y-1.5">
                           <Label className="flex items-center gap-2 text-muted-foreground">
-                            <Calendar className="h-4 w-4" />
-                            Issue Date
+                            <Building className="h-4 w-4" />
+                            Job Title (Arabic)
                           </Label>
                           <Input
-                            type="date"
-                            value={displayData.issueDate}
-                            onChange={(e) => handleDataEdit('issueDate', e.target.value)}
+                            value={displayData.jobTitleArabic || ''}
+                            onChange={(e) => handleDataEdit('jobTitleArabic', e.target.value)}
+                            dir="rtl"
+                            placeholder="المسمى الوظيفي"
                           />
                         </div>
-                      )}
-                    </div>
 
-                    {/* Additional fields based on document type */}
-                    {displayData.nationality && (
-                      <div className="space-y-1.5">
-                        <Label className="text-muted-foreground">Nationality</Label>
-                        <Input
-                          value={displayData.nationality}
-                          onChange={(e) => handleDataEdit('nationality', e.target.value)}
-                        />
-                      </div>
+                        {/* Work Location */}
+                        <div className="space-y-1.5">
+                          <Label className="flex items-center gap-2 text-muted-foreground">
+                            <MapPin className="h-4 w-4" />
+                            Work Location
+                          </Label>
+                          <Input
+                            value={displayData.workLocation || 'Abu Dhabi'}
+                            onChange={(e) => handleDataEdit('workLocation', e.target.value)}
+                          />
+                        </div>
+                      </>
                     )}
 
-                    {displayData.jobTitle && (
-                      <div className="space-y-1.5">
-                        <Label className="flex items-center gap-2 text-muted-foreground">
-                          <Building className="h-4 w-4" />
-                          Job Title
-                        </Label>
-                        <Input
-                          value={displayData.jobTitle}
-                          onChange={(e) => handleDataEdit('jobTitle', e.target.value)}
-                        />
-                      </div>
-                    )}
+                    {/* Non-contract fields */}
+                    {!isContract && (
+                      <>
+                        {/* Document Number */}
+                        <div className="space-y-1.5">
+                          <Label className="flex items-center gap-2 text-muted-foreground">
+                            <Hash className="h-4 w-4" />
+                            Document Number
+                          </Label>
+                          <Input
+                            value={displayData.documentNumber || ''}
+                            onChange={(e) => handleDataEdit('documentNumber', e.target.value)}
+                          />
+                        </div>
 
-                    {displayData.basicSalary && (
-                      <div className="space-y-1.5">
-                        <Label className="text-muted-foreground">Basic Salary</Label>
-                        <Input
-                          type="number"
-                          value={displayData.basicSalary}
-                          onChange={(e) => handleDataEdit('basicSalary', e.target.value)}
-                        />
-                      </div>
+                        {/* Dates */}
+                        <div className="grid grid-cols-2 gap-4">
+                          {displayData.expiryDate && (
+                            <div className="space-y-1.5">
+                              <Label className="flex items-center gap-2 text-muted-foreground">
+                                <Calendar className="h-4 w-4" />
+                                Expiry Date
+                              </Label>
+                              <Input
+                                type="date"
+                                value={displayData.expiryDate}
+                                onChange={(e) => handleDataEdit('expiryDate', e.target.value)}
+                              />
+                            </div>
+                          )}
+                          {displayData.issueDate && (
+                            <div className="space-y-1.5">
+                              <Label className="flex items-center gap-2 text-muted-foreground">
+                                <Calendar className="h-4 w-4" />
+                                Issue Date
+                              </Label>
+                              <Input
+                                type="date"
+                                value={displayData.issueDate}
+                                onChange={(e) => handleDataEdit('issueDate', e.target.value)}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Additional fields based on document type */}
+                        {displayData.nationality && (
+                          <div className="space-y-1.5">
+                            <Label className="text-muted-foreground">Nationality</Label>
+                            <Input
+                              value={displayData.nationality}
+                              onChange={(e) => handleDataEdit('nationality', e.target.value)}
+                            />
+                          </div>
+                        )}
+
+                        {displayData.jobTitle && (
+                          <div className="space-y-1.5">
+                            <Label className="flex items-center gap-2 text-muted-foreground">
+                              <Building className="h-4 w-4" />
+                              Job Title
+                            </Label>
+                            <Input
+                              value={displayData.jobTitle}
+                              onChange={(e) => handleDataEdit('jobTitle', e.target.value)}
+                            />
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </CardContent>
@@ -416,8 +617,28 @@ export default function SmartDocumentUpload() {
               {/* Update Options & Actions */}
               <Card>
                 <CardContent className="pt-6 space-y-4">
-                  {/* Update checkbox */}
-                  {shouldShowUpdateOption(displayData.documentType) && (
+                  {/* Contract auto-activate option */}
+                  {isContract && (
+                    <div className="flex items-start gap-3 p-3 border rounded-lg bg-primary/5 border-primary/20">
+                      <Checkbox
+                        id="auto-activate"
+                        checked={autoActivateContract}
+                        onCheckedChange={(checked) => setAutoActivateContract(checked as boolean)}
+                      />
+                      <div className="space-y-1">
+                        <Label htmlFor="auto-activate" className="font-medium cursor-pointer">
+                          Auto-activate contract
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Activates the contract and syncs salary to employee profile automatically.
+                          The contract will be set to "Active" status.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Update checkbox for non-contracts */}
+                  {!isContract && shouldShowUpdateOption(displayData.documentType) && (
                     <div className="flex items-start gap-3 p-3 border rounded-lg bg-muted/50">
                       <Checkbox
                         id="update-employee"
@@ -448,12 +669,15 @@ export default function SmartDocumentUpload() {
                       {isSaving ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Saving...
+                          {isContract ? 'Creating Contract...' : 'Saving...'}
                         </>
                       ) : (
                         <>
                           <Check className="h-4 w-4 mr-2" />
-                          Save Document
+                          {isContract 
+                            ? (autoActivateContract ? 'Create & Activate Contract' : 'Create Contract (Draft)')
+                            : 'Save Document'
+                          }
                         </>
                       )}
                     </Button>
