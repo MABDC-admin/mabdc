@@ -914,20 +914,24 @@ export default function SmartDocumentUpload() {
 }
 
 function shouldShowUpdateOption(documentType: string): boolean {
+  const type = documentType.toLowerCase();
   const updateableTypes = ['passport', 'emirates id', 'visa'];
-  return updateableTypes.includes(documentType.toLowerCase());
+  return updateableTypes.includes(type) || 
+         type.includes('visa') || 
+         type.includes('residency') || 
+         type.includes('residence');
 }
 
 function getUpdateDescription(documentType: string): string {
   const type = documentType.toLowerCase();
   if (type === 'passport') {
-    return 'Will update passport number, expiry date, and nationality in employee profile';
+    return 'Will update: Passport No, Passport Expiry, Nationality';
   }
   if (type === 'emirates id') {
-    return 'Will update Emirates ID number and expiry date in employee profile';
+    return 'Will update: Emirates ID, Emirates ID Expiry';
   }
-  if (type === 'visa' || type.includes('visa')) {
-    return 'Will update visa number and expiry date in employee profile';
+  if (type === 'visa' || type.includes('visa') || type.includes('residency') || type.includes('residence')) {
+    return 'Will update: Visa No, Visa Expiry';
   }
   return '';
 }
