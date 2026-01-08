@@ -84,7 +84,7 @@ Analyze the provided document image and extract all relevant information.
 You must identify the document type from these categories:
 - Passport
 - Emirates ID
-- Visa (UAE Residence Visa)
+- Visa (UAE Residence Visa / Residency Permit - treat ALL residence/residency documents as "Visa" type)
 - Work Permit
 - Labor Card
 - Medical Insurance

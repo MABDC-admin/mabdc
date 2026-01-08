@@ -282,7 +282,12 @@ export function useSmartDocumentUpload() {
         } else if (docType === 'emirates id') {
           if (extractedData.documentNumber) updates.emirates_id = extractedData.documentNumber;
           if (extractedData.expiryDate) updates.emirates_id_expiry = extractedData.expiryDate;
-        } else if (docType === 'visa' || docType.includes('visa')) {
+        } else if (
+          docType === 'visa' || 
+          docType.includes('visa') || 
+          docType.includes('residency') ||
+          docType.includes('residence')
+        ) {
           if (extractedData.documentNumber) updates.visa_no = extractedData.documentNumber;
           if (extractedData.expiryDate) updates.visa_expiration = extractedData.expiryDate;
         }
