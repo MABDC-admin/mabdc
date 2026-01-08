@@ -143,6 +143,78 @@ export function useSmartDocumentUpload() {
     }
   };
 
+  const archiveExpiredDocuments = async (
+    employeeId: string,
+    category: string,
+    newDocumentId: string
+  ): Promise<number> => {
+    const today = new Date().toISOString().split('T')[0];
+
+    // Find existing documents of same type that are expired and not already renewed
+    const { data: expiredDocs, error: fetchError } = await supabase
+      .from('employee_documents')
+      .select('id')
+      .eq('employee_id', employeeId)
+      .eq('category', category)
+      .lte('expiry_date', today)
+      .or('is_renewed.is.null,is_renewed.eq.false');
+
+    if (fetchError || !expiredDocs || expiredDocs.length === 0) {
+      return 0;
+    }
+
+    // Mark all as renewed and link to new document
+    const { error: updateError } = await supabase
+      .from('employee_documents')
+      .update({
+        is_renewed: true,
+        renewed_at: new Date().toISOString(),
+        renewed_document_id: newDocumentId,
+      })
+      .in('id', expiredDocs.map((d) => d.id));
+
+    if (updateError) {
+      console.error('Failed to archive expired documents:', updateError);
+      return 0;
+    }
+
+    return expiredDocs.length;
+  };
+
+  const archiveExpiredContracts = async (
+    employeeId: string
+  ): Promise<number> => {
+    const today = new Date().toISOString().split('T')[0];
+
+    // Find existing contracts that are expired (end_date passed) and not already terminated/expired
+    const { data: expiredContracts, error: fetchError } = await supabase
+      .from('contracts')
+      .select('id')
+      .eq('employee_id', employeeId)
+      .lte('end_date', today)
+      .not('status', 'in', '("Terminated","Expired")');
+
+    if (fetchError || !expiredContracts || expiredContracts.length === 0) {
+      return 0;
+    }
+
+    // Mark as expired
+    const { error: updateError } = await supabase
+      .from('contracts')
+      .update({
+        status: 'Expired',
+        notes: `Automatically archived on ${today} when new contract was uploaded`,
+      })
+      .in('id', expiredContracts.map((c) => c.id));
+
+    if (updateError) {
+      console.error('Failed to archive expired contracts:', updateError);
+      return 0;
+    }
+
+    return expiredContracts.length;
+  };
+
   const saveDocument = async (
     file: File,
     extractedData: ExtractedData,
@@ -172,7 +244,7 @@ export function useSmartDocumentUpload() {
       const fileUrl = urlData.publicUrl;
 
       // 2. Save to employee_documents table
-      const { error: docError } = await supabase
+      const { data: newDoc, error: docError } = await supabase
         .from('employee_documents')
         .insert({
           employee_id: employeeId,
@@ -182,13 +254,22 @@ export function useSmartDocumentUpload() {
           file_size: formatFileSize(file.size),
           category: extractedData.documentType,
           expiry_date: extractedData.expiryDate || null,
-        });
+        })
+        .select('id')
+        .single();
 
       if (docError) {
         throw new Error('Failed to save document record: ' + docError.message);
       }
 
-      // 3. Update employee record if requested
+      // 3. Archive any expired documents of the same type
+      const archivedCount = await archiveExpiredDocuments(
+        employeeId,
+        extractedData.documentType,
+        newDoc.id
+      );
+
+      // 4. Update employee record if requested
       if (updateEmployeeRecord) {
         const updates: Record<string, any> = {};
         const docType = extractedData.documentType.toLowerCase();
@@ -221,7 +302,8 @@ export function useSmartDocumentUpload() {
         }
       }
 
-      toast.success('Document saved successfully!');
+      const archiveMsg = archivedCount > 0 ? ` ${archivedCount} expired document(s) archived.` : '';
+      toast.success(`Document saved successfully!${archiveMsg}`);
       return true;
     } catch (error) {
       console.error('Error saving document:', error);
@@ -245,7 +327,10 @@ export function useSmartDocumentUpload() {
     setIsSaving(true);
 
     try {
-      // 1. Upload page 1 to contract-documents bucket
+      // 1. Archive any expired contracts first
+      const archivedCount = await archiveExpiredContracts(employeeId);
+
+      // 2. Upload page 1 to contract-documents bucket
       const page1FileName = `${employeeId}/${Date.now()}-contract-page1.jpg`;
       const { error: page1Error } = await supabase.storage
         .from('contract-documents')
@@ -260,7 +345,7 @@ export function useSmartDocumentUpload() {
         .getPublicUrl(page1FileName);
       const page1Url = page1UrlData.publicUrl;
 
-      // 2. Upload page 2 if exists
+      // 3. Upload page 2 if exists
       let page2Url: string | null = null;
       if (contractPages.page2Blob) {
         const page2FileName = `${employeeId}/${Date.now()}-contract-page2.jpg`;
@@ -278,7 +363,7 @@ export function useSmartDocumentUpload() {
         page2Url = page2UrlData.publicUrl;
       }
 
-      // 3. Create contract record
+      // 4. Create contract record
       const contractData = {
         employee_id: employeeId,
         mohre_contract_no: extractedData.mohreContractNo || `MOL-${Date.now()}`,
@@ -314,10 +399,11 @@ export function useSmartDocumentUpload() {
 
       // The database trigger will automatically sync salary to employee when status is 'Active'
       
+      const archiveMsg = archivedCount > 0 ? ` ${archivedCount} expired contract(s) archived.` : '';
       toast.success(
         autoActivate 
-          ? 'Contract created and activated! Salary synced to employee.' 
-          : 'Contract created as draft.'
+          ? `Contract created and activated! Salary synced to employee.${archiveMsg}` 
+          : `Contract created as draft.${archiveMsg}`
       );
       return true;
     } catch (error) {
