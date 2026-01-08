@@ -13,6 +13,9 @@ export interface EmployeeDocument {
   expiry_date: string | null;
   document_type_id: string | null;
   created_at: string;
+  is_renewed: boolean | null;
+  renewed_at: string | null;
+  renewed_document_id: string | null;
 }
 
 export function useEmployeeDocuments(employeeId: string) {
