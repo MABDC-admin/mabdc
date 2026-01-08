@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.send-daily-summary]
 verify_jwt = false
+
+[functions.ai-document-reader]
+verify_jwt = false
+
+[functions.send-document-expiry-notification]
+verify_jwt = false
