@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { extractPdfPagesAsImages, isPdfFile, PdfPageImages } from '@/utils/pdfToImages';
 
 export interface ExtractedData {
   documentType: string;
@@ -13,6 +14,7 @@ export interface ExtractedData {
   dateOfBirth?: string;
   placeOfIssue?: string;
   jobTitle?: string;
+  jobTitleArabic?: string;
   company?: string;
   sponsor?: string;
   policyNumber?: string;
@@ -21,9 +23,15 @@ export interface ExtractedData {
   basicSalary?: number;
   housingAllowance?: number;
   transportationAllowance?: number;
+  totalSalary?: number;
   mohreContractNo?: string;
   startDate?: string;
   endDate?: string;
+  workLocation?: string;
+  workingHours?: number;
+  probationPeriod?: number;
+  noticePeriod?: number;
+  annualLeaveDays?: number;
   additionalInfo?: Record<string, string>;
 }
 
@@ -42,31 +50,69 @@ export interface AIExtractionResult {
   alternativeMatches: MatchedEmployee[];
 }
 
+export interface ContractPageImages {
+  page1Blob: Blob;
+  page2Blob?: Blob;
+  page1Url: string;
+  page2Url?: string;
+}
+
 export function useSmartDocumentUpload() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [extractionResult, setExtractionResult] = useState<AIExtractionResult | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<MatchedEmployee | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [contractPages, setContractPages] = useState<ContractPageImages | null>(null);
+  const [isPdf, setIsPdf] = useState(false);
 
   const analyzeDocument = async (file: File) => {
     setIsAnalyzing(true);
     setExtractionResult(null);
     setSelectedEmployee(null);
+    setContractPages(null);
+    setIsPdf(false);
 
     try {
-      // Create preview URL
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
+      let fileToAnalyze = file;
+      let pdfPages: PdfPageImages | null = null;
+
+      // Check if it's a PDF and extract pages as images
+      if (isPdfFile(file)) {
+        setIsPdf(true);
+        console.log('PDF detected, extracting pages as images...');
+        pdfPages = await extractPdfPagesAsImages(file);
+        console.log(`Extracted ${pdfPages.totalPages} pages from PDF`);
+
+        // Create preview URLs for the PDF pages
+        const page1Url = URL.createObjectURL(pdfPages.page1);
+        const page2Url = pdfPages.page2 ? URL.createObjectURL(pdfPages.page2) : undefined;
+        
+        setContractPages({
+          page1Blob: pdfPages.page1,
+          page2Blob: pdfPages.page2,
+          page1Url,
+          page2Url,
+        });
+        
+        setPreviewUrl(page1Url);
+
+        // Convert the first page image to a file for AI analysis
+        fileToAnalyze = new File([pdfPages.page1], 'page1.jpg', { type: 'image/jpeg' });
+      } else {
+        // Create preview URL for regular images
+        const url = URL.createObjectURL(file);
+        setPreviewUrl(url);
+      }
 
       // Convert file to base64
-      const base64 = await fileToBase64(file);
+      const base64 = await fileToBase64(fileToAnalyze);
 
       // Call edge function
       const { data, error } = await supabase.functions.invoke('ai-document-reader', {
         body: {
           fileBase64: base64,
-          fileType: file.type,
+          fileType: fileToAnalyze.type,
           fileName: file.name,
         },
       });
@@ -91,6 +137,7 @@ export function useSmartDocumentUpload() {
       console.error('Error analyzing document:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to analyze document');
       setPreviewUrl(null);
+      setContractPages(null);
     } finally {
       setIsAnalyzing(false);
     }
@@ -185,13 +232,118 @@ export function useSmartDocumentUpload() {
     }
   };
 
+  const saveContract = async (
+    extractedData: ExtractedData,
+    employeeId: string,
+    autoActivate: boolean
+  ): Promise<boolean> => {
+    if (!contractPages) {
+      toast.error('No contract pages available');
+      return false;
+    }
+
+    setIsSaving(true);
+
+    try {
+      // 1. Upload page 1 to contract-documents bucket
+      const page1FileName = `${employeeId}/${Date.now()}-contract-page1.jpg`;
+      const { error: page1Error } = await supabase.storage
+        .from('contract-documents')
+        .upload(page1FileName, contractPages.page1Blob, { contentType: 'image/jpeg' });
+
+      if (page1Error) {
+        throw new Error('Failed to upload page 1: ' + page1Error.message);
+      }
+
+      const { data: page1UrlData } = supabase.storage
+        .from('contract-documents')
+        .getPublicUrl(page1FileName);
+      const page1Url = page1UrlData.publicUrl;
+
+      // 2. Upload page 2 if exists
+      let page2Url: string | null = null;
+      if (contractPages.page2Blob) {
+        const page2FileName = `${employeeId}/${Date.now()}-contract-page2.jpg`;
+        const { error: page2Error } = await supabase.storage
+          .from('contract-documents')
+          .upload(page2FileName, contractPages.page2Blob, { contentType: 'image/jpeg' });
+
+        if (page2Error) {
+          throw new Error('Failed to upload page 2: ' + page2Error.message);
+        }
+
+        const { data: page2UrlData } = supabase.storage
+          .from('contract-documents')
+          .getPublicUrl(page2FileName);
+        page2Url = page2UrlData.publicUrl;
+      }
+
+      // 3. Create contract record
+      const contractData = {
+        employee_id: employeeId,
+        mohre_contract_no: extractedData.mohreContractNo || `MOL-${Date.now()}`,
+        contract_type: extractedData.contractType || 'Unlimited',
+        start_date: extractedData.startDate || new Date().toISOString().split('T')[0],
+        end_date: extractedData.endDate || null,
+        basic_salary: extractedData.basicSalary || 0,
+        housing_allowance: extractedData.housingAllowance || 0,
+        transportation_allowance: extractedData.transportationAllowance || 0,
+        total_salary: extractedData.totalSalary || (
+          (extractedData.basicSalary || 0) + 
+          (extractedData.housingAllowance || 0) + 
+          (extractedData.transportationAllowance || 0)
+        ),
+        job_title_arabic: extractedData.jobTitleArabic || null,
+        work_location: extractedData.workLocation || 'Abu Dhabi',
+        working_hours: extractedData.workingHours || 8,
+        probation_period: extractedData.probationPeriod || 6,
+        notice_period: extractedData.noticePeriod || 30,
+        annual_leave_days: extractedData.annualLeaveDays || 30,
+        page1_url: page1Url,
+        page2_url: page2Url,
+        status: autoActivate ? 'Active' : 'Draft',
+      };
+
+      const { error: contractError } = await supabase
+        .from('contracts')
+        .insert(contractData);
+
+      if (contractError) {
+        throw new Error('Failed to create contract: ' + contractError.message);
+      }
+
+      // The database trigger will automatically sync salary to employee when status is 'Active'
+      
+      toast.success(
+        autoActivate 
+          ? 'Contract created and activated! Salary synced to employee.' 
+          : 'Contract created as draft.'
+      );
+      return true;
+    } catch (error) {
+      console.error('Error saving contract:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save contract');
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const reset = () => {
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
+    if (contractPages) {
+      URL.revokeObjectURL(contractPages.page1Url);
+      if (contractPages.page2Url) {
+        URL.revokeObjectURL(contractPages.page2Url);
+      }
+    }
     setExtractionResult(null);
     setSelectedEmployee(null);
     setPreviewUrl(null);
+    setContractPages(null);
+    setIsPdf(false);
   };
 
   return {
@@ -201,8 +353,11 @@ export function useSmartDocumentUpload() {
     selectedEmployee,
     setSelectedEmployee,
     previewUrl,
+    contractPages,
+    isPdf,
     analyzeDocument,
     saveDocument,
+    saveContract,
     reset,
   };
 }

@@ -17,6 +17,7 @@ interface ExtractedData {
   dateOfBirth?: string;
   placeOfIssue?: string;
   jobTitle?: string;
+  jobTitleArabic?: string;
   company?: string;
   sponsor?: string;
   policyNumber?: string;
@@ -25,9 +26,15 @@ interface ExtractedData {
   basicSalary?: number;
   housingAllowance?: number;
   transportationAllowance?: number;
+  totalSalary?: number;
   mohreContractNo?: string;
   startDate?: string;
   endDate?: string;
+  workLocation?: string;
+  workingHours?: number;
+  probationPeriod?: number;
+  noticePeriod?: number;
+  annualLeaveDays?: number;
   additionalInfo?: Record<string, string>;
 }
 
@@ -123,12 +130,19 @@ For Medical Insurance:
 For Employment Contract:
 - MOHRE Contract Number
 - Contract Type (Limited/Unlimited)
+- Job Title (English)
 - Job Title (Arabic)
-- Basic Salary
-- Housing Allowance
-- Transportation Allowance
+- Basic Salary (number only)
+- Housing Allowance (number only)
+- Transportation Allowance (number only)
+- Total Salary (number only)
 - Start Date
 - End Date
+- Work Location
+- Working Hours per day
+- Probation Period (in months)
+- Notice Period (in days)
+- Annual Leave Days
 
 Respond ONLY with a valid JSON object in this exact format:
 {
@@ -142,17 +156,24 @@ Respond ONLY with a valid JSON object in this exact format:
   "dateOfBirth": "YYYY-MM-DD or null",
   "placeOfIssue": "string or null",
   "jobTitle": "string or null",
+  "jobTitleArabic": "string or null",
   "company": "string or null",
   "sponsor": "string or null",
   "policyNumber": "string or null",
   "insuranceCompany": "string or null",
-  "contractType": "string or null",
+  "contractType": "Limited or Unlimited or null",
   "basicSalary": "number or null",
   "housingAllowance": "number or null",
   "transportationAllowance": "number or null",
+  "totalSalary": "number or null",
   "mohreContractNo": "string or null",
   "startDate": "YYYY-MM-DD or null",
   "endDate": "YYYY-MM-DD or null",
+  "workLocation": "string or null",
+  "workingHours": "number or null",
+  "probationPeriod": "number or null",
+  "noticePeriod": "number or null",
+  "annualLeaveDays": "number or null",
   "additionalInfo": {}
 }`;
 
