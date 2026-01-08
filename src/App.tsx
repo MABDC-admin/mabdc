@@ -13,6 +13,7 @@ import InstallPage from "./pages/InstallPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AuthPage from "./pages/AuthPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
+import SmartDocumentUpload from "./pages/SmartDocumentUpload";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -56,6 +57,16 @@ const App = () => (
             element={
               <ProtectedRoute requiredRoles={['admin']} portal="admin">
                 <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Smart Document Upload */}
+          <Route 
+            path="/smart-upload" 
+            element={
+              <ProtectedRoute requiredRoles={['hr', 'admin']} portal="hr">
+                <SmartDocumentUpload />
               </ProtectedRoute>
             } 
           />

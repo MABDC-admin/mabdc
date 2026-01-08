@@ -23,7 +23,8 @@ import {
   Timer,
   Eye,
   Gamepad2,
-  Trophy
+  Trophy,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHRStore } from '@/store/hrStore';
@@ -71,7 +72,8 @@ const navItems: NavItem[] = [
     icon: <FileText className="w-5 h-5" />,
     subItems: [
       { id: 'contracts', label: 'All Contracts', icon: <FileText className="w-4 h-4" /> },
-      { id: 'renewal', label: 'Renewal', icon: <Clock className="w-4 h-4" /> }
+      { id: 'renewal', label: 'Renewal', icon: <Clock className="w-4 h-4" /> },
+      { id: 'smart-upload' as ViewType, label: 'Smart Upload', icon: <Sparkles className="w-4 h-4" /> }
     ]
   },
   { 
@@ -202,7 +204,11 @@ export function Sidebar() {
                           <button
                             key={subItem.id}
                             onClick={() => {
-                              setCurrentView(subItem.id);
+                              if (subItem.id === 'smart-upload') {
+                                navigate('/smart-upload');
+                              } else {
+                                setCurrentView(subItem.id);
+                              }
                               setIsMobileOpen(false);
                             }}
                             className={cn(
