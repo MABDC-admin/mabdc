@@ -3,7 +3,7 @@ import { useEmployees, useDeleteEmployee, useUpdateEmployee } from '@/hooks/useE
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash2, Edit, Search, RefreshCw, Save, X, AlertTriangle } from 'lucide-react';
+import { Trash2, Edit, Search, RefreshCw, Save, X, AlertTriangle, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -15,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { BulkAccountGeneration } from './BulkAccountGeneration';
 
 export function AdminEmployeeSection() {
   const { data: employees = [], isLoading, refetch } = useEmployees();
@@ -69,7 +70,8 @@ export function AdminEmployeeSection() {
           <h2 className="text-lg font-semibold text-foreground">Employee Management</h2>
           <p className="text-xs text-muted-foreground">Edit or delete employee records</p>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+          <BulkAccountGeneration />
           <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
@@ -94,6 +96,7 @@ export function AdminEmployeeSection() {
               <TableHead>Department</TableHead>
               <TableHead>Position</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Account</TableHead>
               <TableHead>Salary</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -138,6 +141,7 @@ export function AdminEmployeeSection() {
                         className="h-8 text-xs"
                       />
                     </TableCell>
+                    <TableCell>-</TableCell>
                     <TableCell>
                       <Input 
                         type="number"
@@ -164,6 +168,15 @@ export function AdminEmployeeSection() {
                     <TableCell className="text-xs">{employee.department}</TableCell>
                     <TableCell className="text-xs">{employee.job_position}</TableCell>
                     <TableCell className="text-xs">{employee.work_email}</TableCell>
+                    <TableCell>
+                      {(employee as any).user_id ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-primary">
+                          <UserCheck size={12} /> Active
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No account</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs">AED {employee.basic_salary?.toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
