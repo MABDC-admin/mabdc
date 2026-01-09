@@ -26,6 +26,7 @@ import photoPlaceholder from '@/assets/photo-placeholder.png';
 import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase, MessageCircle, Link2, Copy } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { toast } from 'sonner';
+import { GenerateEmployeeAccountButton } from '@/components/employee/GenerateEmployeeAccountButton';
 
 interface EmployeeProfileModalProps {
   isOpen: boolean;
@@ -294,6 +295,12 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <GenerateEmployeeAccountButton
+                  employeeId={currentEmployee.id}
+                  employeeName={currentEmployee.full_name}
+                  workEmail={currentEmployee.work_email}
+                  hasAccount={!!(currentEmployee as any).user_id}
+                />
                 <Button 
                   size="sm" 
                   variant="outline"
