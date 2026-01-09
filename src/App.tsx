@@ -14,6 +14,8 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AuthPage from "./pages/AuthPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import SmartDocumentUpload from "./pages/SmartDocumentUpload";
+import EmployeeAuthPage from "./pages/EmployeeAuthPage";
+import EmployeeSelfServicePortal from "./pages/EmployeeSelfServicePortal";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -30,6 +32,10 @@ const App = () => (
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route path="/employee/:employeeId" element={<EmployeePortal />} />
           <Route path="/attendance-scanner" element={<AttendanceScanner />} />
+          
+          {/* Employee Self-Service Portal */}
+          <Route path="/employee-auth" element={<EmployeeAuthPage />} />
+          <Route path="/employee-portal" element={<EmployeeSelfServicePortal />} />
           
           {/* Dedicated QR Scanner routes - short URLs for easy access */}
           <Route path="/qr" element={<QRScannerPage />} />

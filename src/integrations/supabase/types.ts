@@ -793,6 +793,7 @@ export type Database = {
           place_of_birth: string | null
           status: string | null
           updated_at: string
+          user_id: string | null
           visa_expiration: string | null
           visa_no: string | null
           work_email: string
@@ -831,6 +832,7 @@ export type Database = {
           place_of_birth?: string | null
           status?: string | null
           updated_at?: string
+          user_id?: string | null
           visa_expiration?: string | null
           visa_no?: string | null
           work_email: string
@@ -869,6 +871,7 @@ export type Database = {
           place_of_birth?: string | null
           status?: string | null
           updated_at?: string
+          user_id?: string | null
           visa_expiration?: string | null
           visa_no?: string | null
           work_email?: string
