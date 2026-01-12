@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.send-document-expiry-notification]
 verify_jwt = false
+
+[functions.create-employee-account]
+verify_jwt = false

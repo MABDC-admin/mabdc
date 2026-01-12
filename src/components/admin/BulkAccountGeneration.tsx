@@ -36,7 +36,7 @@ export function BulkAccountGeneration() {
   const employeesWithAccounts = employees.filter(emp => !!(emp as any).user_id);
 
   const generatePassword = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
     let password = '';
     for (let i = 0; i < 12; i++) {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -62,33 +62,23 @@ export function BulkAccountGeneration() {
       const password = generatePassword();
 
       try {
-        // Create auth user
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: employee.work_email,
-          password,
-          options: {
-            data: { full_name: employee.full_name },
-            emailRedirectTo: window.location.origin,
+        // Call the edge function to create account (uses admin API, won't affect current session)
+        const response = await supabase.functions.invoke('create-employee-account', {
+          body: {
+            employeeId: employee.id,
+            employeeName: employee.full_name,
+            workEmail: employee.work_email,
+            password,
           },
         });
 
-        if (authError) throw authError;
-        if (!authData.user) throw new Error('No user returned');
+        if (response.error) {
+          throw new Error(response.error.message || 'Failed to create account');
+        }
 
-        // Add employee role
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: authData.user.id, role: 'employee' });
-
-        if (roleError) throw roleError;
-
-        // Link user to employee
-        const { error: updateError } = await supabase
-          .from('employees')
-          .update({ user_id: authData.user.id })
-          .eq('id', employee.id);
-
-        if (updateError) throw updateError;
+        if (response.data?.error) {
+          throw new Error(response.data.error);
+        }
 
         generatedAccounts.push({
           employeeId: employee.id,
@@ -97,14 +87,15 @@ export function BulkAccountGeneration() {
           password,
           success: true,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         generatedAccounts.push({
           employeeId: employee.id,
           employeeName: employee.full_name,
           email: employee.work_email,
           password,
           success: false,
-          error: error.message || 'Unknown error',
+          error: errorMessage,
         });
       }
 
