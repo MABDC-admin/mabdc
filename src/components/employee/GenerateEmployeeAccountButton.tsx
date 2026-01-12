@@ -41,46 +41,38 @@ export function GenerateEmployeeAccountButton({
     const password = generatePassword();
 
     try {
-      // Create the auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: workEmail,
-        password: password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/employee-portal`,
-          data: {
-            full_name: employeeName,
-          },
+      // Get current session token for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('You must be logged in to create employee accounts');
+      }
+
+      // Call the edge function to create the account
+      const response = await supabase.functions.invoke('create-employee-account', {
+        body: {
+          employeeId,
+          employeeName,
+          workEmail,
+          password,
         },
       });
 
-      if (authError) throw authError;
-
-      if (authData.user) {
-        // Link the employee to the user
-        const { error: updateError } = await supabase
-          .from('employees')
-          .update({ user_id: authData.user.id })
-          .eq('id', employeeId);
-
-        if (updateError) throw updateError;
-
-        // Add employee role
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({
-            user_id: authData.user.id,
-            role: 'employee',
-          });
-
-        if (roleError) throw roleError;
-
-        setGeneratedPassword(password);
-        toast.success('Employee account created successfully!');
-        onAccountCreated?.();
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to create account');
       }
-    } catch (error: any) {
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      setGeneratedPassword(password);
+      toast.success('Employee account created successfully!');
+      onAccountCreated?.();
+    } catch (error: unknown) {
       console.error('Error creating account:', error);
-      toast.error(error.message || 'Failed to create account');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create account';
+      toast.error(errorMessage);
       setIsOpen(false);
     } finally {
       setIsLoading(false);
