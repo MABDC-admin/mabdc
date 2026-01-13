@@ -1211,6 +1211,63 @@ export type Database = {
           },
         ]
       }
+      leave_accrual_log: {
+        Row: {
+          accrual_date: string
+          accrual_month: number
+          accrual_rate: number
+          accrual_year: number
+          created_at: string
+          days_accrued: number
+          employee_id: string
+          id: string
+          joining_date: string
+          leave_balance_id: string
+          months_of_service: number
+        }
+        Insert: {
+          accrual_date: string
+          accrual_month: number
+          accrual_rate: number
+          accrual_year: number
+          created_at?: string
+          days_accrued: number
+          employee_id: string
+          id?: string
+          joining_date: string
+          leave_balance_id: string
+          months_of_service: number
+        }
+        Update: {
+          accrual_date?: string
+          accrual_month?: number
+          accrual_rate?: number
+          accrual_year?: number
+          created_at?: string
+          days_accrued?: number
+          employee_id?: string
+          id?: string
+          joining_date?: string
+          leave_balance_id?: string
+          months_of_service?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_accrual_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_accrual_log_leave_balance_id_fkey"
+            columns: ["leave_balance_id"]
+            isOneToOne: false
+            referencedRelation: "leave_balances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_balances: {
         Row: {
           carried_forward_days: number
@@ -1750,6 +1807,19 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      process_monthly_leave_accrual: {
+        Args: { target_month?: number; target_year?: number }
+        Returns: {
+          accrual_rate: number
+          days_accrued: number
+          employee_id: string
+          employee_name: string
+          joining_date: string
+          months_of_service: number
+          new_entitled_days: number
+          status: string
+        }[]
       }
     }
     Enums: {
