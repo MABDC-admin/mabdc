@@ -219,27 +219,39 @@ export function useSmartDocumentUpload() {
     file: File,
     extractedData: ExtractedData,
     employeeId: string,
-    updateEmployeeRecord: boolean
+    updateEmployeeRecord: boolean,
+    employeeName?: string
   ) => {
     setIsSaving(true);
 
     try {
+      // Get employee name if not provided
+      let empName = employeeName;
+      if (!empName) {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('full_name')
+          .eq('id', employeeId)
+          .single();
+        empName = emp?.full_name || 'Unknown';
+      }
+
       let fileToUpload: Blob = file;
-      let uploadFileName: string;
       let uploadFileType: string = file.type;
       let uploadFileSize: string = formatFileSize(file.size);
+      let fileExt = file.name.split('.').pop() || 'jpg';
 
       // If this is a PDF and we have extracted page images, use the first page JPEG instead
-      // This ensures the document displays as a thumbnail in the profile modal
       if (isPdfFile(file) && contractPages?.page1Blob) {
         fileToUpload = contractPages.page1Blob;
-        uploadFileName = `${employeeId}/${Date.now()}-${extractedData.documentType.toLowerCase().replace(/\s+/g, '-')}.jpg`;
         uploadFileType = 'image/jpeg';
         uploadFileSize = formatFileSize(contractPages.page1Blob.size);
-      } else {
-        const fileExt = file.name.split('.').pop();
-        uploadFileName = `${employeeId}/${Date.now()}-${extractedData.documentType.toLowerCase().replace(/\s+/g, '-')}.${fileExt}`;
+        fileExt = 'jpg';
       }
+
+      // Generate intelligent filename
+      const smartFilename = generateSmartFilename(extractedData, empName, fileExt);
+      const uploadFileName = `${employeeId}/${Date.now()}-${smartFilename}`;
 
       // 1. Upload file to storage
       const { error: uploadError } = await supabase.storage
@@ -257,12 +269,12 @@ export function useSmartDocumentUpload() {
 
       const fileUrl = urlData.publicUrl;
 
-      // 2. Save to employee_documents table
+      // 2. Save to employee_documents table with intelligent filename
       const { data: newDoc, error: docError } = await supabase
         .from('employee_documents')
         .insert({
           employee_id: employeeId,
-          name: file.name,
+          name: smartFilename, // Use intelligent filename
           file_url: fileUrl,
           file_type: uploadFileType,
           file_size: uploadFileSize,
@@ -487,4 +499,40 @@ function formatFileSize(bytes: number): string {
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+/**
+ * Generate an intelligent filename based on document type and extracted data
+ * Format: DocumentType_EmployeeName_Year.ext
+ * Example: Emirates_ID_John_Smith_2024.jpg
+ */
+export function generateSmartFilename(
+  extractedData: ExtractedData,
+  employeeName: string,
+  fileExtension: string
+): string {
+  // Clean and format document type
+  const docType = extractedData.documentType
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_]/g, '');
+  
+  // Clean and format employee name (FirstName_LastName)
+  const cleanName = employeeName
+    .split(' ')
+    .slice(0, 2) // Take first two parts of name
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join('_')
+    .replace(/[^a-zA-Z_]/g, '');
+  
+  // Get year from expiry date or current year
+  const year = extractedData.expiryDate 
+    ? extractedData.expiryDate.split('-')[0] 
+    : new Date().getFullYear().toString();
+  
+  // Add document number suffix if available (last 4 chars)
+  const docNumSuffix = extractedData.documentNumber 
+    ? '_' + extractedData.documentNumber.slice(-4).replace(/[^a-zA-Z0-9]/g, '')
+    : '';
+  
+  return `${docType}_${cleanName}_${year}${docNumSuffix}.${fileExtension}`;
 }

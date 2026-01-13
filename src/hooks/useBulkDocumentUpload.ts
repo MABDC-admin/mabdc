@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { extractPdfPagesAsImages, isPdfFile, PdfPageImages } from '@/utils/pdfToImages';
-import { ExtractedData, MatchedEmployee, AIExtractionResult, ContractPageImages } from './useSmartDocumentUpload';
+import { ExtractedData, MatchedEmployee, AIExtractionResult, ContractPageImages, generateSmartFilename } from './useSmartDocumentUpload';
 import { parseISO, isBefore, startOfDay } from 'date-fns';
 
 export type BulkValidationStatus = 'valid' | 'expired' | 'no_match' | 'error';
@@ -326,22 +326,22 @@ export function useBulkDocumentUpload() {
         const { error: contractError } = await supabase.from('contracts').insert(contractData);
         if (contractError) throw contractError;
       } else {
-        // Save regular document
-        // For PDFs with extracted page images, use the JPEG for better thumbnail display
+        // Save regular document with intelligent filename
         let fileToUpload: Blob = item.file;
-        let uploadFileName: string;
         let uploadFileType: string = item.file.type;
         let uploadFileSize: string = formatFileSize(item.file.size);
+        let fileExt = item.file.name.split('.').pop() || 'jpg';
 
         if (isPdfFile(item.file) && item.contractPages?.page1Blob) {
           fileToUpload = item.contractPages.page1Blob;
-          uploadFileName = `${item.selectedEmployee.id}/${Date.now()}-${data.documentType.toLowerCase().replace(/\s+/g, '-')}.jpg`;
           uploadFileType = 'image/jpeg';
           uploadFileSize = formatFileSize(item.contractPages.page1Blob.size);
-        } else {
-          const fileExt = item.file.name.split('.').pop();
-          uploadFileName = `${item.selectedEmployee.id}/${Date.now()}-${data.documentType.toLowerCase().replace(/\s+/g, '-')}.${fileExt}`;
+          fileExt = 'jpg';
         }
+
+        // Generate intelligent filename
+        const smartFilename = generateSmartFilename(data, item.selectedEmployee.full_name, fileExt);
+        const uploadFileName = `${item.selectedEmployee.id}/${Date.now()}-${smartFilename}`;
 
         const { error: uploadError } = await supabase.storage
           .from('employee-documents')
@@ -355,7 +355,7 @@ export function useBulkDocumentUpload() {
 
         const { error: docError } = await supabase.from('employee_documents').insert({
           employee_id: item.selectedEmployee.id,
-          name: item.file.name,
+          name: smartFilename, // Use intelligent filename
           file_url: urlData.publicUrl,
           file_type: uploadFileType,
           file_size: uploadFileSize,

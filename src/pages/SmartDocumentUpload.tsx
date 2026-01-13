@@ -113,7 +113,13 @@ export default function SmartDocumentUpload() {
     } else {
       // Regular document save
       if (!currentFile) return;
-      const success = await saveDocument(currentFile, dataToSave, selectedEmployee.id, updateEmployeeRecord);
+      const success = await saveDocument(
+        currentFile, 
+        dataToSave, 
+        selectedEmployee.id, 
+        updateEmployeeRecord,
+        selectedEmployee.full_name // Pass employee name for intelligent filename
+      );
       if (success) {
         handleReset();
       }

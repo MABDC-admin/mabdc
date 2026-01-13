@@ -16,6 +16,10 @@ export interface EmployeeDocument {
   is_renewed: boolean | null;
   renewed_at: string | null;
   renewed_document_id: string | null;
+  employees?: {
+    full_name: string;
+    hrms_no: string;
+  };
 }
 
 export function useEmployeeDocuments(employeeId: string) {
@@ -223,5 +227,185 @@ export function useRenewDocument() {
     onError: (error: Error) => {
       toast.error(`Failed to renew document: ${error.message}`);
     },
+  });
+}
+
+// Fetch all documents for admin view with employee info
+export function useAllDocuments() {
+  return useQuery({
+    queryKey: ['all-documents'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employee_documents')
+        .select(`
+          *,
+          employees (full_name, hrms_no)
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as EmployeeDocument[];
+    },
+  });
+}
+
+// Rename a single document
+export function useRenameDocument() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, newName, employeeId }: { id: string; newName: string; employeeId: string }) => {
+      const { data, error } = await supabase
+        .from('employee_documents')
+        .update({ name: newName })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['employee-documents', variables.employeeId] });
+      queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+      toast.success('Document renamed successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to rename document: ${error.message}`);
+    },
+  });
+}
+
+// AI-powered batch rename for existing documents
+export function useAIBatchRename() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (documentIds: string[]) => {
+      const results: { id: string; oldName: string; newName: string; success: boolean; error?: string }[] = [];
+      
+      for (const docId of documentIds) {
+        try {
+          // Fetch document with employee info
+          const { data: doc, error: fetchError } = await supabase
+            .from('employee_documents')
+            .select(`
+              *,
+              employees (full_name, hrms_no)
+            `)
+            .eq('id', docId)
+            .single();
+          
+          if (fetchError || !doc) {
+            results.push({ id: docId, oldName: '', newName: '', success: false, error: 'Document not found' });
+            continue;
+          }
+          
+          // Check if it's an image file that can be analyzed
+          const isImage = doc.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+          
+          if (!isImage) {
+            results.push({ id: docId, oldName: doc.name, newName: doc.name, success: false, error: 'Only image files can be analyzed' });
+            continue;
+          }
+          
+          // Fetch the image and convert to base64
+          const response = await fetch(doc.file_url);
+          const blob = await response.blob();
+          const base64 = await blobToBase64(blob);
+          
+          // Call AI to analyze the document
+          const { data: aiResult, error: aiError } = await supabase.functions.invoke('ai-document-reader', {
+            body: {
+              fileBase64: base64,
+              fileType: doc.file_type,
+              fileName: doc.name,
+            },
+          });
+          
+          if (aiError || !aiResult?.success) {
+            results.push({ id: docId, oldName: doc.name, newName: doc.name, success: false, error: aiError?.message || 'AI analysis failed' });
+            continue;
+          }
+          
+          // Generate smart filename
+          const employeeName = doc.employees?.full_name || 'Unknown';
+          const fileExt = doc.file_url.split('.').pop() || 'jpg';
+          const extractedData = aiResult.extractedData;
+          
+          const docType = extractedData.documentType
+            .replace(/\s+/g, '_')
+            .replace(/[^a-zA-Z0-9_]/g, '');
+          
+          const cleanName = employeeName
+            .split(' ')
+            .slice(0, 2)
+            .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+            .join('_')
+            .replace(/[^a-zA-Z_]/g, '');
+          
+          const year = extractedData.expiryDate 
+            ? extractedData.expiryDate.split('-')[0] 
+            : new Date().getFullYear().toString();
+          
+          const docNumSuffix = extractedData.documentNumber 
+            ? '_' + extractedData.documentNumber.slice(-4).replace(/[^a-zA-Z0-9]/g, '')
+            : '';
+          
+          const newName = `${docType}_${cleanName}_${year}${docNumSuffix}.${fileExt}`;
+          
+          // Update document name and category
+          const { error: updateError } = await supabase
+            .from('employee_documents')
+            .update({ 
+              name: newName,
+              category: extractedData.documentType,
+              expiry_date: extractedData.expiryDate || doc.expiry_date,
+            })
+            .eq('id', docId);
+          
+          if (updateError) {
+            results.push({ id: docId, oldName: doc.name, newName: newName, success: false, error: updateError.message });
+          } else {
+            results.push({ id: docId, oldName: doc.name, newName: newName, success: true });
+          }
+        } catch (err) {
+          results.push({ id: docId, oldName: '', newName: '', success: false, error: err instanceof Error ? err.message : 'Unknown error' });
+        }
+      }
+      
+      return results;
+    },
+    onSuccess: (results) => {
+      queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-documents'] });
+      
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+      
+      if (successful > 0 && failed === 0) {
+        toast.success(`Successfully renamed ${successful} document(s)`);
+      } else if (successful > 0 && failed > 0) {
+        toast.warning(`Renamed ${successful} document(s), ${failed} failed`);
+      } else {
+        toast.error(`Failed to rename documents`);
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Batch rename failed: ${error.message}`);
+    },
+  });
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
   });
 }
