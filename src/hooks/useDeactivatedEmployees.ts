@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Employee } from '@/types/hr';
+import { calculateGratuity } from '@/utils/gratuityCalculation';
 
 export interface DeactivatedEmployee extends Employee {
   deactivated_at?: string;
@@ -44,6 +45,17 @@ export function useDeactivateEmployee() {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       
+      // Fetch employee details for EOS calculation
+      const { data: employee, error: fetchError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('id', employeeId)
+        .single();
+      
+      if (fetchError || !employee) {
+        throw new Error('Failed to fetch employee details');
+      }
+      
       // Update employee status
       const { error } = await supabase
         .from('employees')
@@ -58,13 +70,36 @@ export function useDeactivateEmployee() {
       
       if (error) throw error;
 
-      // Remove employee role if user_id exists
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('user_id')
-        .eq('id', employeeId)
-        .single();
+      // Calculate and create EOS record automatically
+      const basicSalary = employee.basic_salary || 0;
+      const joiningDate = employee.joining_date;
+      
+      if (joiningDate && basicSalary > 0) {
+        const { yearsOfService, gratuityAmount, isEligible } = calculateGratuity(
+          joiningDate,
+          lastWorkingDay,
+          basicSalary
+        );
+        
+        // Create EOS record
+        const { error: eosError } = await supabase
+          .from('eos_records')
+          .insert({
+            employee_id: employeeId,
+            years_of_service: yearsOfService,
+            basic_salary: basicSalary,
+            gratuity_amount: gratuityAmount,
+            reason: `${status}: ${reason}`,
+            paid: false,
+          });
+        
+        if (eosError) {
+          console.error('Failed to create EOS record:', eosError);
+          // Don't throw - EOS creation is supplementary
+        }
+      }
 
+      // Remove employee role if user_id exists
       if (employee?.user_id) {
         await supabase
           .from('user_roles')
@@ -76,7 +111,8 @@ export function useDeactivateEmployee() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       queryClient.invalidateQueries({ queryKey: ['deactivated-employees'] });
-      toast.success('Employee deactivated successfully');
+      queryClient.invalidateQueries({ queryKey: ['eos-records'] });
+      toast.success('Employee deactivated and EOS record created');
     },
     onError: (error: Error) => {
       toast.error(`Failed to deactivate employee: ${error.message}`);
