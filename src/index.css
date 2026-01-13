@@ -197,6 +197,64 @@
   .file-icon.word { background: hsl(217 91% 60% / 0.1); color: hsl(217 91% 50%); }
   .file-icon.generic { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
 
+  /* Mobile-optimized document thumbnails */
+  .doc-thumbnail {
+    @apply relative overflow-hidden rounded-xl border border-border bg-card;
+    @apply transition-all duration-300 ease-out;
+    @apply hover:shadow-lg hover:border-primary/40;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .doc-thumbnail:active {
+    @apply scale-95;
+  }
+
+  .doc-thumbnail-image {
+    @apply w-full h-full object-cover;
+    @apply transition-transform duration-500 ease-out;
+  }
+
+  .doc-thumbnail:hover .doc-thumbnail-image {
+    @apply scale-110;
+  }
+
+  /* Smooth image loading */
+  .doc-thumbnail-image[loading="lazy"] {
+    opacity: 0;
+    animation: fadeInImage 0.3s ease-in forwards;
+  }
+
+  @keyframes fadeInImage {
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Touch-friendly controls */
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+    @apply flex items-center justify-center;
+  }
+
+  /* Document badge animations */
+  .doc-badge {
+    @apply transition-all duration-200;
+    animation: badgeSlideIn 0.3s ease-out;
+  }
+
+  @keyframes badgeSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   .nav-item {
     @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200;
     color: hsl(var(--muted-foreground));

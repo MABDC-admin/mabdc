@@ -16,7 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { 
   User, Calendar, FileText, Clock, CheckCircle, XCircle, 
   AlertTriangle, Download, Plus, ArrowLeft, Briefcase, Mail,
-  Eye, CreditCard, Home, Car, UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby, Pencil, Save, X, Star, Scale, MessageCircle, Trophy
+  Eye, CreditCard, Home, Car, UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby, Pencil, Save, X, Star, Scale, MessageCircle, Trophy,
+  BookOpen, Plane, HeartPulse, Loader2, Image as ImageIcon
 } from 'lucide-react';
 import { ImagePreviewModal } from '@/components/modals/ImagePreviewModal';
 import { useEmployeeDocuments } from '@/hooks/useDocuments';
@@ -27,7 +28,7 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 import type { Employee } from '@/types/hr';
 
-type TabType = 'overview' | 'attendance' | 'leave' | 'contract' | 'letters' | 'personal' | 'records' | 'gamification';
+type TabType = 'overview' | 'attendance' | 'leave' | 'contract' | 'letters' | 'personal' | 'records' | 'gamification' | 'documents';
 
 export default function EmployeePortal() {
   const { employeeId } = useParams<{ employeeId: string }>();
@@ -197,6 +198,7 @@ export default function EmployeePortal() {
     { id: 'attendance' as TabType, label: 'Attendance', icon: Clock },
     { id: 'leave' as TabType, label: 'Leave', icon: Calendar },
     { id: 'contract' as TabType, label: 'Contract', icon: FileText },
+    { id: 'documents' as TabType, label: 'Documents', icon: ImageIcon },
     { id: 'letters' as TabType, label: 'HR Letters', icon: Mail },
     { id: 'records' as TabType, label: 'Records', icon: Scale },
     { id: 'gamification' as TabType, label: 'Points & Badges', icon: Trophy },
@@ -1179,6 +1181,583 @@ export default function EmployeePortal() {
                 )}
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {/* Documents Tab */}
+        {activeTab === 'documents' && (
+          <div className="space-y-4 animate-fade-in">
+            {/* Key Documents Grid - Mobile Optimized */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <CreditCard className="w-5 h-5 text-primary" />
+                  Identity & Key Documents
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                  {/* Photo */}
+                  {(() => {
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-pink-500/5 to-purple-500/5 hover:border-pink-500/50 transition-all overflow-hidden">
+                        <div className="aspect-square flex items-center justify-center p-3">
+                          {employee.photo_url ? (
+                            <div 
+                              className="relative w-full h-full cursor-pointer"
+                              onClick={() => setPreviewImage({ url: employee.photo_url!, title: 'Employee Photo' })}
+                            >
+                              <img
+                                src={employee.photo_url}
+                                alt="Photo"
+                                className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg" />
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <UserCircle className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">No Photo</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">Photo</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Emirates ID */}
+                  {(() => {
+                    const doc = documents.find(d => d.category === 'Emirates ID' && !d.is_renewed);
+                    const isImage = doc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-primary/5 to-accent/5 hover:border-primary/50 transition-all overflow-hidden">
+                        <div 
+                          className="aspect-square flex items-center justify-center p-3 cursor-pointer"
+                          onClick={() => {
+                            if (doc) {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: 'Emirates ID' });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }
+                          }}
+                        >
+                          {doc ? (
+                            isImage ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={doc.file_url}
+                                  alt="Emirates ID"
+                                  className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg" />
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-xl bg-primary/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <CreditCard className="w-8 h-8 text-primary" />
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <CreditCard className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">Not uploaded</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">Emirates ID</p>
+                          {doc?.expiry_date && (
+                            <p className="text-[9px] text-center text-muted-foreground mt-0.5">
+                              Exp: {format(parseISO(doc.expiry_date), 'MMM yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Passport */}
+                  {(() => {
+                    const doc = documents.find(d => d.category === 'Passport' && !d.is_renewed);
+                    const isImage = doc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-blue-500/5 to-indigo-500/5 hover:border-blue-500/50 transition-all overflow-hidden">
+                        <div 
+                          className="aspect-square flex items-center justify-center p-3 cursor-pointer"
+                          onClick={() => {
+                            if (doc) {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: 'Passport' });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }
+                          }}
+                        >
+                          {doc ? (
+                            isImage ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={doc.file_url}
+                                  alt="Passport"
+                                  className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg" />
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-xl bg-blue-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <BookOpen className="w-8 h-8 text-blue-500" />
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <BookOpen className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">Not uploaded</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">Passport</p>
+                          {doc?.expiry_date && (
+                            <p className="text-[9px] text-center text-muted-foreground mt-0.5">
+                              Exp: {format(parseISO(doc.expiry_date), 'MMM yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Visa */}
+                  {(() => {
+                    const doc = documents.find(d => d.category === 'Visa' && !d.is_renewed);
+                    const isImage = doc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-accent/5 to-primary/5 hover:border-accent/50 transition-all overflow-hidden">
+                        <div 
+                          className="aspect-square flex items-center justify-center p-3 cursor-pointer"
+                          onClick={() => {
+                            if (doc) {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: 'Visa' });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }
+                          }}
+                        >
+                          {doc ? (
+                            isImage ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={doc.file_url}
+                                  alt="Visa"
+                                  className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg" />
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-xl bg-accent/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <Plane className="w-8 h-8 text-accent-foreground" />
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <Plane className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">Not uploaded</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">Visa</p>
+                          {doc?.expiry_date && (
+                            <p className="text-[9px] text-center text-muted-foreground mt-0.5">
+                              Exp: {format(parseISO(doc.expiry_date), 'MMM yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Work Permit */}
+                  {(() => {
+                    const doc = documents.find(d => d.category === 'Work Permit' && !d.is_renewed);
+                    const isImage = doc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-orange-500/5 to-amber-500/5 hover:border-orange-500/50 transition-all overflow-hidden">
+                        <div 
+                          className="aspect-square flex items-center justify-center p-3 cursor-pointer"
+                          onClick={() => {
+                            if (doc) {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: 'Work Permit' });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }
+                          }}
+                        >
+                          {doc ? (
+                            isImage ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={doc.file_url}
+                                  alt="Work Permit"
+                                  className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg" />
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-xl bg-orange-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <Briefcase className="w-8 h-8 text-orange-500" />
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <Briefcase className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">Not uploaded</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">Work Permit</p>
+                          {doc?.expiry_date && (
+                            <p className="text-[9px] text-center text-muted-foreground mt-0.5">
+                              Exp: {format(parseISO(doc.expiry_date), 'MMM yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Medical Insurance */}
+                  {(() => {
+                    const doc = documents.find(d => d.category === 'Medical Insurance' && !d.is_renewed);
+                    const isImage = doc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-rose-500/5 to-pink-500/5 hover:border-rose-500/50 transition-all overflow-hidden">
+                        <div 
+                          className="aspect-square flex items-center justify-center p-3 cursor-pointer"
+                          onClick={() => {
+                            if (doc) {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: 'Medical Insurance' });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }
+                          }}
+                        >
+                          {doc ? (
+                            isImage ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={doc.file_url}
+                                  alt="Medical Insurance"
+                                  className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg" />
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-xl bg-rose-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <HeartPulse className="w-8 h-8 text-rose-500" />
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <HeartPulse className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">Not uploaded</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">Medical</p>
+                          {doc?.expiry_date && (
+                            <p className="text-[9px] text-center text-muted-foreground mt-0.5">
+                              Exp: {format(parseISO(doc.expiry_date), 'MMM yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Contract */}
+                  {(() => {
+                    const doc = documents.find(d => d.category === 'Contract' && !d.is_renewed);
+                    const isImage = doc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-green-500/5 to-emerald-500/5 hover:border-green-500/50 transition-all overflow-hidden">
+                        <div 
+                          className="aspect-square flex items-center justify-center p-3 cursor-pointer"
+                          onClick={() => {
+                            if (doc) {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: 'Contract' });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }
+                          }}
+                        >
+                          {doc ? (
+                            isImage ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={doc.file_url}
+                                  alt="Contract"
+                                  className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg" />
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-xl bg-green-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <FileText className="w-8 h-8 text-green-500" />
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <FileText className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">Not uploaded</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">Contract</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ILOE */}
+                  {(() => {
+                    const doc = documents.find(d => d.category === 'ILOE' && !d.is_renewed);
+                    const isImage = doc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-cyan-500/5 to-teal-500/5 hover:border-cyan-500/50 transition-all overflow-hidden">
+                        <div 
+                          className="aspect-square flex items-center justify-center p-3 cursor-pointer"
+                          onClick={() => {
+                            if (doc) {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: 'ILOE' });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }
+                          }}
+                        >
+                          {doc ? (
+                            isImage ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={doc.file_url}
+                                  alt="ILOE"
+                                  className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg" />
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-xl bg-cyan-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <FileText className="w-8 h-8 text-cyan-500" />
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <FileText className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">Not uploaded</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">ILOE</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Other Documents - Modern Grid Layout */}
+            {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit', 'Medical Insurance', 'ILOE'].includes(d.category || '') && !d.is_renewed).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                    <FileText className="w-5 h-5 text-primary" />
+                    Other Documents ({documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit', 'Medical Insurance', 'ILOE'].includes(d.category || '') && !d.is_renewed).length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
+                    {documents
+                      .filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit', 'Medical Insurance', 'ILOE'].includes(d.category || '') && !d.is_renewed)
+                      .map((doc) => {
+                        const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                        const isPdf = /\.pdf$/i.test(doc.file_url);
+                        const hasExpiry = doc.expiry_date;
+                        const expiryDate = hasExpiry ? parseISO(doc.expiry_date!) : null;
+                        const daysUntilExpiry = expiryDate ? differenceInDays(expiryDate, new Date()) : null;
+                        const isExpired = daysUntilExpiry !== null && daysUntilExpiry < 0;
+                        const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
+
+                        return (
+                          <div
+                            key={doc.id}
+                            className="group relative rounded-xl border border-border bg-card overflow-hidden hover:shadow-lg hover:border-primary/40 transition-all duration-300"
+                          >
+                            {/* Thumbnail Area */}
+                            <div
+                              className="aspect-square bg-gradient-to-br from-muted/30 to-muted/10 flex items-center justify-center cursor-pointer overflow-hidden relative"
+                              onClick={() => {
+                                if (isImage) {
+                                  setPreviewImage({ url: doc.file_url, title: doc.name });
+                                } else {
+                                  window.open(doc.file_url, '_blank');
+                                }
+                              }}
+                            >
+                              {isImage ? (
+                                <>
+                                  <img
+                                    src={doc.file_url}
+                                    alt={doc.name}
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                    loading="lazy"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = 'none';
+                                      const parent = target.parentElement;
+                                      if (parent) {
+                                        parent.innerHTML = `
+                                          <div class="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                                            <svg class="w-12 h-12 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                            </svg>
+                                            <span class="text-[10px] font-medium">Failed to load</span>
+                                          </div>
+                                        `;
+                                      }
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                    <Eye className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </>
+                              ) : isPdf ? (
+                                <div className="flex flex-col items-center justify-center gap-2 p-4">
+                                  <div className="w-14 h-14 rounded-xl bg-red-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <FileText className="w-7 h-7 text-red-500" />
+                                  </div>
+                                  <span className="text-[10px] font-semibold text-red-500 uppercase tracking-wider">PDF</span>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center gap-2 p-4">
+                                  <div className="w-14 h-14 rounded-xl bg-primary/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <FileText className="w-7 h-7 text-primary" />
+                                  </div>
+                                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                    {doc.file_url.split('.').pop()?.toUpperCase() || 'FILE'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Status Badge */}
+                            {hasExpiry && (
+                              <div
+                                className={cn(
+                                  'absolute top-2 right-2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide shadow-lg backdrop-blur-sm',
+                                  isExpired
+                                    ? 'bg-destructive/90 text-destructive-foreground'
+                                    : isExpiringSoon
+                                    ? 'bg-amber-500/90 text-white'
+                                    : 'bg-emerald-500/90 text-white'
+                                )}
+                              >
+                                {isExpired ? '⚠ Expired' : isExpiringSoon ? `${daysUntilExpiry}d left` : '✓ Valid'}
+                              </div>
+                            )}
+
+                            {/* Category Badge */}
+                            {doc.category && (
+                              <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground text-[9px] font-bold uppercase tracking-wide shadow-lg backdrop-blur-sm max-w-[70%] truncate">
+                                {doc.category}
+                              </div>
+                            )}
+
+                            {/* Document Info Footer */}
+                            <div className="p-2.5 bg-gradient-to-t from-muted/50 to-transparent">
+                              <p className="text-xs font-semibold text-foreground truncate mb-0.5" title={doc.name}>
+                                {doc.name}
+                              </p>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] text-muted-foreground">{doc.file_size}</span>
+                                {hasExpiry && expiryDate && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {format(expiryDate, 'MMM yyyy')}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Quick Actions Overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-12 gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isImage) {
+                                    setPreviewImage({ url: doc.file_url, title: doc.name });
+                                  } else {
+                                    window.open(doc.file_url, '_blank');
+                                  }
+                                }}
+                                className="p-2 rounded-full bg-white/90 hover:bg-white transition-colors shadow-lg"
+                                title="View"
+                              >
+                                <Eye className="w-4 h-4 text-gray-900" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(doc.file_url, '_blank');
+                                }}
+                                className="p-2 rounded-full bg-white/90 hover:bg-white transition-colors shadow-lg"
+                                title="Download"
+                              >
+                                <Download className="w-4 h-4 text-gray-900" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Empty State */}
+            {documents.length === 0 && (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center">
+                      <FileText className="w-10 h-10 text-muted-foreground/50" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground mb-1">No Documents Yet</h3>
+                      <p className="text-sm text-muted-foreground">Your documents will appear here once uploaded by HR</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
