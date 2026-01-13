@@ -327,25 +327,38 @@ export function useBulkDocumentUpload() {
         if (contractError) throw contractError;
       } else {
         // Save regular document
-        const fileExt = item.file.name.split('.').pop();
-        const fileName = `${item.selectedEmployee.id}/${Date.now()}-${data.documentType.toLowerCase().replace(/\s+/g, '-')}.${fileExt}`;
+        // For PDFs with extracted page images, use the JPEG for better thumbnail display
+        let fileToUpload: Blob = item.file;
+        let uploadFileName: string;
+        let uploadFileType: string = item.file.type;
+        let uploadFileSize: string = formatFileSize(item.file.size);
+
+        if (isPdfFile(item.file) && item.contractPages?.page1Blob) {
+          fileToUpload = item.contractPages.page1Blob;
+          uploadFileName = `${item.selectedEmployee.id}/${Date.now()}-${data.documentType.toLowerCase().replace(/\s+/g, '-')}.jpg`;
+          uploadFileType = 'image/jpeg';
+          uploadFileSize = formatFileSize(item.contractPages.page1Blob.size);
+        } else {
+          const fileExt = item.file.name.split('.').pop();
+          uploadFileName = `${item.selectedEmployee.id}/${Date.now()}-${data.documentType.toLowerCase().replace(/\s+/g, '-')}.${fileExt}`;
+        }
 
         const { error: uploadError } = await supabase.storage
           .from('employee-documents')
-          .upload(fileName, item.file);
+          .upload(uploadFileName, fileToUpload, { contentType: uploadFileType });
 
         if (uploadError) throw uploadError;
 
         const { data: urlData } = supabase.storage
           .from('employee-documents')
-          .getPublicUrl(fileName);
+          .getPublicUrl(uploadFileName);
 
         const { error: docError } = await supabase.from('employee_documents').insert({
           employee_id: item.selectedEmployee.id,
           name: item.file.name,
           file_url: urlData.publicUrl,
-          file_type: item.file.type,
-          file_size: formatFileSize(item.file.size),
+          file_type: uploadFileType,
+          file_size: uploadFileSize,
           category: data.documentType,
           expiry_date: data.expiryDate || null,
         });

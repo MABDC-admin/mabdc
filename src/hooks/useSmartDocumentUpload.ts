@@ -224,13 +224,27 @@ export function useSmartDocumentUpload() {
     setIsSaving(true);
 
     try {
-      // 1. Upload file to storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${employeeId}/${Date.now()}-${extractedData.documentType.toLowerCase().replace(/\s+/g, '-')}.${fileExt}`;
+      let fileToUpload: Blob = file;
+      let uploadFileName: string;
+      let uploadFileType: string = file.type;
+      let uploadFileSize: string = formatFileSize(file.size);
 
+      // If this is a PDF and we have extracted page images, use the first page JPEG instead
+      // This ensures the document displays as a thumbnail in the profile modal
+      if (isPdfFile(file) && contractPages?.page1Blob) {
+        fileToUpload = contractPages.page1Blob;
+        uploadFileName = `${employeeId}/${Date.now()}-${extractedData.documentType.toLowerCase().replace(/\s+/g, '-')}.jpg`;
+        uploadFileType = 'image/jpeg';
+        uploadFileSize = formatFileSize(contractPages.page1Blob.size);
+      } else {
+        const fileExt = file.name.split('.').pop();
+        uploadFileName = `${employeeId}/${Date.now()}-${extractedData.documentType.toLowerCase().replace(/\s+/g, '-')}.${fileExt}`;
+      }
+
+      // 1. Upload file to storage
       const { error: uploadError } = await supabase.storage
         .from('employee-documents')
-        .upload(fileName, file);
+        .upload(uploadFileName, fileToUpload, { contentType: uploadFileType });
 
       if (uploadError) {
         throw new Error('Failed to upload file: ' + uploadError.message);
@@ -239,7 +253,7 @@ export function useSmartDocumentUpload() {
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('employee-documents')
-        .getPublicUrl(fileName);
+        .getPublicUrl(uploadFileName);
 
       const fileUrl = urlData.publicUrl;
 
@@ -250,8 +264,8 @@ export function useSmartDocumentUpload() {
           employee_id: employeeId,
           name: file.name,
           file_url: fileUrl,
-          file_type: file.type,
-          file_size: formatFileSize(file.size),
+          file_type: uploadFileType,
+          file_size: uploadFileSize,
           category: extractedData.documentType,
           expiry_date: extractedData.expiryDate || null,
         })
