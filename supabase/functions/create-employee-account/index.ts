@@ -106,12 +106,60 @@ Deno.serve(async (req) => {
 
     // Check if email is already registered
     const { data: existingUsers } = await adminClient.auth.admin.listUsers();
-    const emailExists = existingUsers?.users?.some(u => u.email?.toLowerCase() === workEmail.toLowerCase());
-    
-    if (emailExists) {
+    const existingAuthUser = existingUsers?.users?.find(
+      u => u.email?.toLowerCase() === workEmail.toLowerCase()
+    );
+
+    if (existingAuthUser) {
+      // Email exists - link the existing auth user to the employee
+      const userId = existingAuthUser.id;
+      
+      // Update the employee with the existing user_id
+      const { error: updateError } = await adminClient
+        .from('employees')
+        .update({ user_id: userId })
+        .eq('id', employeeId);
+      
+      if (updateError) {
+        console.error('Error linking existing user to employee:', updateError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to link existing auth user to employee' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Check if employee role already exists
+      const { data: existingRoles } = await adminClient
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
+      
+      const hasEmployeeRole = existingRoles?.some(r => r.role === 'employee');
+      
+      if (!hasEmployeeRole) {
+        // Add employee role
+        const { error: roleError } = await adminClient
+          .from('user_roles')
+          .insert({ user_id: userId, role: 'employee' });
+        
+        if (roleError) {
+          console.error('Error adding role to existing user:', roleError);
+        }
+      }
+      
+      // Update the password for the existing user
+      await adminClient.auth.admin.updateUserById(userId, { password });
+      
+      console.log(`Linked existing auth user to employee ${employeeName} (${workEmail})`);
+      
       return new Response(
-        JSON.stringify({ error: 'Email is already registered in the system' }),
-        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          success: true, 
+          userId,
+          message: 'Existing auth user linked to employee successfully',
+          linked: true
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
