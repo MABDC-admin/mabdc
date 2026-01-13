@@ -40,6 +40,7 @@ export function LeaveView() {
   const [isAccrualHistoryOpen, setIsAccrualHistoryOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('requests');
   const [filterEmployee, setFilterEmployee] = useState<string>('all');
+  const [allocationFilterEmployee, setAllocationFilterEmployee] = useState<string>('all');
 
   const [leaveForm, setLeaveForm] = useState({
     employee_id: '',
@@ -304,6 +305,16 @@ export function LeaveView() {
     return acc;
   }, {} as Record<string, { employee: { id: string; full_name: string; hrms_no: string; department: string; photo_url?: string }; balances: typeof allBalances }>);
 
+  // Filter balances by selected employee for allocation tab
+  const filteredBalancesByEmployee = useMemo(() => {
+    if (allocationFilterEmployee === 'all') return balancesByEmployee;
+    const filtered: typeof balancesByEmployee = {};
+    if (balancesByEmployee[allocationFilterEmployee]) {
+      filtered[allocationFilterEmployee] = balancesByEmployee[allocationFilterEmployee];
+    }
+    return filtered;
+  }, [balancesByEmployee, allocationFilterEmployee]);
+
   return (
     <div className="space-y-6 animate-slide-up">
       {/* Header */}
@@ -555,6 +566,31 @@ export function LeaveView() {
                 </Button>
               </div>
             </div>
+            
+            {/* Employee Filter */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground whitespace-nowrap">Filter by Employee:</Label>
+                <Select value={allocationFilterEmployee} onValueChange={setAllocationFilterEmployee}>
+                  <SelectTrigger className="w-[200px] h-9 bg-secondary/50">
+                    <SelectValue placeholder="All Employees" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Employees</SelectItem>
+                    {employees.map(emp => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.full_name} ({emp.hrms_no})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Showing {allocationFilterEmployee === 'all' 
+                  ? Object.keys(balancesByEmployee).length 
+                  : Object.keys(filteredBalancesByEmployee).length} employee(s)
+              </p>
+            </div>
 
             {/* Auto-Accrual Info Card */}
             <div className="mb-4 p-3 rounded-xl bg-primary/5 border border-primary/20">
@@ -583,7 +619,7 @@ export function LeaveView() {
               </div>
             ) : (
               <div className="space-y-4">
-                {Object.values(balancesByEmployee).map(({ employee, balances }) => (
+                {Object.values(filteredBalancesByEmployee).map(({ employee, balances }) => (
                   <div key={employee.id} className="glass-card rounded-xl border border-border p-4">
                     <div className="flex items-center gap-3 mb-3">
                       {employee.photo_url ? (
