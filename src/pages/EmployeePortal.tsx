@@ -76,9 +76,12 @@ export default function EmployeePortal() {
     fetchEmployee();
   }, [employeeId]);
 
-  // Hooks for data
-  const { data: allAttendance = [] } = useAttendance();
-  const { data: allLeave = [] } = useLeave();
+  // Auto-refresh interval (5 seconds)
+  const REFRESH_INTERVAL = 5000;
+
+  // Hooks for data - with auto-refresh for real-time updates
+  const { data: allAttendance = [] } = useAttendance({ refetchInterval: REFRESH_INTERVAL });
+  const { data: allLeave = [] } = useLeave({ refetchInterval: REFRESH_INTERVAL });
   const { data: contracts = [] } = useContracts();
   const { data: letters = [] } = useEmployeeHRLetters(employeeId || '');
   const { data: leaveTypes = [] } = useLeaveTypes();

@@ -22,7 +22,7 @@ export interface Attendance {
   };
 }
 
-export function useAttendance() {
+export function useAttendance(options?: { refetchInterval?: number }) {
   return useQuery({
     queryKey: ['attendance'],
     queryFn: async () => {
@@ -37,6 +37,7 @@ export function useAttendance() {
       if (error) throw error;
       return data as Attendance[];
     },
+    refetchInterval: options?.refetchInterval,
   });
 }
 

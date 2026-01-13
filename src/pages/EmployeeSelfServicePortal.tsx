@@ -60,9 +60,12 @@ export default function EmployeeSelfServicePortal() {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
     const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
-  // Data hooks - use query results properly
-  const attendanceQuery = useAttendance();
-  const leaveQuery = useLeave();
+  // Auto-refresh interval (5 seconds)
+  const REFRESH_INTERVAL = 5000;
+
+  // Data hooks - with auto-refresh for real-time data
+  const attendanceQuery = useAttendance({ refetchInterval: REFRESH_INTERVAL });
+  const leaveQuery = useLeave({ refetchInterval: REFRESH_INTERVAL });
   const contractsQuery = useContracts();
   const performanceQuery = usePerformance();
   const disciplineQuery = useDiscipline();

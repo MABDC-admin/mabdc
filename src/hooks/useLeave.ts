@@ -66,7 +66,7 @@ interface PublicHoliday {
   year: number;
 }
 
-export function useLeave() {
+export function useLeave(options?: { refetchInterval?: number }) {
   return useQuery({
     queryKey: ['leave'],
     queryFn: async () => {
@@ -81,6 +81,7 @@ export function useLeave() {
       if (error) throw error;
       return data as LeaveRecord[];
     },
+    refetchInterval: options?.refetchInterval,
   });
 }
 
