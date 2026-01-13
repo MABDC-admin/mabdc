@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Shield, User, Lock, Mail, ArrowRight, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { CompanyBrandingHeader } from '@/components/CompanyBrandingHeader';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -341,16 +342,15 @@ export default function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
       <Card className="w-full max-w-md border-border/50 shadow-2xl">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-            <PortalIcon className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <CardTitle className="text-2xl font-bold text-foreground">{portalTitle}</CardTitle>
-            <CardDescription className="text-muted-foreground">
-              Sign in to access the {portalType === 'admin' ? 'admin dashboard' : 'HR system'}
-            </CardDescription>
-          </div>
+          <CompanyBrandingHeader 
+            fallbackTitle={portalTitle}
+            fallbackIcon={<PortalIcon className="w-8 h-8 text-primary" />}
+          />
+          <CardDescription className="text-muted-foreground">
+            Sign in to access the {portalType === 'admin' ? 'admin dashboard' : 'HR system'}
+          </CardDescription>
         </CardHeader>
+        
         
         <CardContent>
           {showSignup ? (
