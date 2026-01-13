@@ -214,15 +214,38 @@ export function useUpdateLeaveStatus() {
             .eq('year', currentYear)
             .maybeSingle();
           
-          // If no balance exists and we're approving, create one with default entitlement
+          // If no balance exists and we're approving, create one with tenure-based entitlement
           if (!currentBalance && status === 'Approved') {
+            // Fetch employee's joining date for tenure calculation
+            const { data: employee } = await supabase
+              .from('employees')
+              .select('joining_date')
+              .eq('id', leaveRecord.employee_id)
+              .single();
+            
+            // Calculate tenure-based entitlement
+            let entitledDays = 0;
+            if (employee?.joining_date) {
+              const joining = new Date(employee.joining_date);
+              const now = new Date();
+              const totalMonths = (now.getFullYear() * 12 + now.getMonth()) - 
+                                  (joining.getFullYear() * 12 + joining.getMonth());
+              
+              if (totalMonths > 0) {
+                // First 6 months: 2 days/month, after: 2.5 days/month
+                entitledDays = totalMonths <= 6 
+                  ? totalMonths * 2 
+                  : (6 * 2) + ((totalMonths - 6) * 2.5);
+              }
+            }
+            
             const { data: newBalance, error: insertError } = await supabase
               .from('leave_balances')
               .insert({
                 employee_id: leaveRecord.employee_id,
                 leave_type_id: leaveTypeId,
                 year: currentYear,
-                entitled_days: 30, // Default annual entitlement
+                entitled_days: entitledDays,
                 used_days: 0,
                 pending_days: 0,
                 carried_forward_days: 0
@@ -457,14 +480,37 @@ export function useAddLeave() {
               })
               .eq('id', balance.id);
           } else {
-            // Create new balance record with pending days
+            // Fetch employee's joining date for tenure calculation
+            const { data: employee } = await supabase
+              .from('employees')
+              .select('joining_date')
+              .eq('id', leave.employee_id)
+              .single();
+            
+            // Calculate tenure-based entitlement
+            let entitledDays = 0;
+            if (employee?.joining_date) {
+              const joining = new Date(employee.joining_date);
+              const now = new Date();
+              const totalMonths = (now.getFullYear() * 12 + now.getMonth()) - 
+                                  (joining.getFullYear() * 12 + joining.getMonth());
+              
+              if (totalMonths > 0) {
+                // First 6 months: 2 days/month, after: 2.5 days/month
+                entitledDays = totalMonths <= 6 
+                  ? totalMonths * 2 
+                  : (6 * 2) + ((totalMonths - 6) * 2.5);
+              }
+            }
+            
+            // Create new balance record with tenure-based entitlement and pending days
             await supabase
               .from('leave_balances')
               .insert({
                 employee_id: leave.employee_id,
                 leave_type_id: leaveType.id,
                 year: currentYear,
-                entitled_days: 30,
+                entitled_days: entitledDays,
                 used_days: 0,
                 pending_days: leave.days_count,
                 carried_forward_days: 0
