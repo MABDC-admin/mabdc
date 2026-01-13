@@ -73,14 +73,14 @@ serve(async (req) => {
       if (daysUntilExpiry <= 0) {
         newStatus = "Expired";
         action = "marked_expired";
-      } else if (daysUntilExpiry <= 30) {
-        // Contract expiring very soon - critical
+      } else if (daysUntilExpiry <= 14) {
+        // Contract expiring very soon - critical (2 weeks)
         action = "critical_warning";
-      } else if (daysUntilExpiry <= 60) {
-        // Contract expiring soon - warning
+      } else if (daysUntilExpiry <= 30) {
+        // Contract expiring soon - warning (30 days)
         action = "warning";
-      } else if (daysUntilExpiry <= 90) {
-        // Contract nearing expiry - notice
+      } else if (daysUntilExpiry <= 60) {
+        // Contract nearing expiry - notice (60 days)
         action = "notice";
       }
 
