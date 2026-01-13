@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      announcements: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          priority: string
+          published_at: string | null
+          send_push: boolean
+          target_departments: string[] | null
+          target_employee_ids: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          priority?: string
+          published_at?: string | null
+          send_push?: boolean
+          target_departments?: string[] | null
+          target_employee_ids?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          priority?: string
+          published_at?: string | null
+          send_push?: boolean
+          target_departments?: string[] | null
+          target_employee_ids?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       attendance: {
         Row: {
           admin_remarks: string | null

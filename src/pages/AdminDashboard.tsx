@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   Shield, Users, Calendar, FileText, DollarSign, ClipboardList, 
   Trash2, Edit, Plus, Download, RefreshCw, Database, BarChart3,
-  ChevronDown, AlertTriangle, Star, Scale, LogOut, MessageSquare, FileSignature, UserCog
+  ChevronDown, AlertTriangle, Star, Scale, LogOut, MessageSquare, FileSignature, UserCog, Megaphone
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,6 +22,8 @@ import { AdminDisciplineSection } from '@/components/admin/AdminDisciplineSectio
 import { AdminAppealsSection } from '@/components/admin/AdminAppealsSection';
 import { AdminContractsSection } from '@/components/admin/AdminContractsSection';
 import { AdminUserAccountsSection } from '@/components/admin/AdminUserAccountsSection';
+import { AdminAnnouncementsSection } from '@/components/admin/AdminAnnouncementsSection';
+import { useAnnouncements } from '@/hooks/useAnnouncements';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -34,6 +36,7 @@ export default function AdminDashboard() {
   const { data: payroll = [] } = usePayroll();
   const { data: contracts = [] } = useContracts();
   const { data: appeals = [] } = useAttendanceAppeals();
+  const { data: announcements = [] } = useAnnouncements();
   const { user, signOut } = useAuth();
 
   const handleLogout = async () => {
@@ -49,7 +52,7 @@ export default function AdminDashboard() {
     { label: 'Contracts', value: contracts.length, icon: FileSignature, color: 'text-violet-500' },
     { label: 'Leave Records', value: leaveRecords.length, icon: Calendar, color: 'text-emerald-500' },
     { label: 'Attendance Records', value: attendance.length, icon: ClipboardList, color: 'text-blue-500' },
-    { label: 'Payroll Records', value: payroll.length, icon: DollarSign, color: 'text-amber-500' },
+    { label: 'Announcements', value: announcements.length, icon: Megaphone, color: 'text-orange-500' },
     { label: 'Appeals', value: appeals.length, icon: MessageSquare, color: 'text-purple-500', pending: pendingAppeals },
   ];
 
@@ -138,6 +141,9 @@ export default function AdminDashboard() {
             <TabsTrigger value="user-accounts" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <UserCog className="w-4 h-4 mr-2" />User Accounts
             </TabsTrigger>
+            <TabsTrigger value="announcements" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Megaphone className="w-4 h-4 mr-2" />Announcements
+            </TabsTrigger>
             <TabsTrigger value="data-reset" className="rounded-lg data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
               <Database className="w-4 h-4 mr-2" />Data Management
             </TabsTrigger>
@@ -220,6 +226,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="user-accounts">
             <AdminUserAccountsSection />
+          </TabsContent>
+
+          <TabsContent value="announcements">
+            <AdminAnnouncementsSection />
           </TabsContent>
 
           <TabsContent value="data-reset">
