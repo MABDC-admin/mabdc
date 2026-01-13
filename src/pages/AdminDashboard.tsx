@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   Shield, Users, Calendar, FileText, DollarSign, ClipboardList, 
   Trash2, Edit, Plus, Download, RefreshCw, Database, BarChart3,
-  ChevronDown, AlertTriangle, Star, Scale, LogOut, MessageSquare, FileSignature
+  ChevronDown, AlertTriangle, Star, Scale, LogOut, MessageSquare, FileSignature, UserCog
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,6 +21,7 @@ import { AdminPerformanceSection } from '@/components/admin/AdminPerformanceSect
 import { AdminDisciplineSection } from '@/components/admin/AdminDisciplineSection';
 import { AdminAppealsSection } from '@/components/admin/AdminAppealsSection';
 import { AdminContractsSection } from '@/components/admin/AdminContractsSection';
+import { AdminUserAccountsSection } from '@/components/admin/AdminUserAccountsSection';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -134,6 +135,9 @@ export default function AdminDashboard() {
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger value="user-accounts" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <UserCog className="w-4 h-4 mr-2" />User Accounts
+            </TabsTrigger>
             <TabsTrigger value="data-reset" className="rounded-lg data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
               <Database className="w-4 h-4 mr-2" />Data Management
             </TabsTrigger>
@@ -212,6 +216,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="appeals">
             <AdminAppealsSection />
+          </TabsContent>
+
+          <TabsContent value="user-accounts">
+            <AdminUserAccountsSection />
           </TabsContent>
 
           <TabsContent value="data-reset">
