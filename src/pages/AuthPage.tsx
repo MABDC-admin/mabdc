@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, User, Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { Shield, User, Lock, Mail, ArrowRight, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -25,15 +25,25 @@ const signupSchema = z.object({
   path: ['confirmPassword'],
 });
 
+const resetPasswordSchema = z.object({
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string(),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ['confirmPassword'],
+});
+
 export default function AuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const portalType = searchParams.get('portal') || 'admin';
   const redirectTo = searchParams.get('redirect') || (portalType === 'admin' ? '/admin' : '/');
+  const isPasswordReset = searchParams.get('reset') === 'true';
   
-  const { user, isLoading: authLoading, signIn, signUp, isAdmin, isHR } = useAuth();
+  const { user, isLoading: authLoading, signIn, signUp, resetPassword, updatePassword, isAdmin, isHR } = useAuth();
   
   const [activeTab, setActiveTab] = useState('login');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
   // Login form state
@@ -46,16 +56,23 @@ export default function AuthPage() {
   const [signupPassword, setSignupPassword] = useState('');
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
 
+  // Forgot password state
+  const [forgotEmail, setForgotEmail] = useState('');
+
+  // Reset password state (after clicking email link)
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+
   // Redirect if already authenticated with correct role
   useEffect(() => {
-    if (user && !authLoading) {
+    if (user && !authLoading && !isPasswordReset) {
       if (portalType === 'admin' && isAdmin()) {
         navigate(redirectTo);
       } else if (portalType === 'hr' && (isHR() || isAdmin())) {
         navigate(redirectTo);
       }
     }
-  }, [user, authLoading, isAdmin, isHR, navigate, portalType, redirectTo]);
+  }, [user, authLoading, isAdmin, isHR, navigate, portalType, redirectTo, isPasswordReset]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,6 +135,54 @@ export default function AuthPage() {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const { error } = await resetPassword(forgotEmail);
+      
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success('Password reset email sent! Check your inbox.');
+        setShowForgotPassword(false);
+        setForgotEmail('');
+      }
+    } catch (error) {
+      toast.error('Failed to send reset email');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const validatedData = resetPasswordSchema.parse({
+        password: newPassword,
+        confirmPassword: confirmNewPassword,
+      });
+
+      const { error } = await updatePassword(validatedData.password);
+      
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success('Password updated successfully!');
+        navigate(redirectTo);
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -132,6 +197,128 @@ export default function AuthPage() {
   
   // Only show signup for admin portal
   const showSignup = portalType === 'admin';
+
+  // Password reset form (after clicking email link)
+  if (isPasswordReset && user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
+        <Card className="w-full max-w-md border-border/50 shadow-2xl">
+          <CardHeader className="text-center space-y-4">
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <KeyRound className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-2xl font-bold text-foreground">Set New Password</CardTitle>
+              <CardDescription className="text-muted-foreground">
+                Enter your new password below
+              </CardDescription>
+            </div>
+          </CardHeader>
+          
+          <CardContent>
+            <form onSubmit={handleUpdatePassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="new-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-new-password">Confirm New Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="confirm-new-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                )}
+                Update Password
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Forgot password form
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
+        <Card className="w-full max-w-md border-border/50 shadow-2xl">
+          <CardHeader className="text-center space-y-4">
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <Mail className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-2xl font-bold text-foreground">Forgot Password</CardTitle>
+              <CardDescription className="text-muted-foreground">
+                Enter your email to receive a password reset link
+              </CardDescription>
+            </div>
+          </CardHeader>
+          
+          <CardContent>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                )}
+                Send Reset Link
+              </Button>
+              <Button 
+                type="button" 
+                variant="ghost" 
+                className="w-full" 
+                onClick={() => setShowForgotPassword(false)}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Login
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
@@ -195,6 +382,14 @@ export default function AuthPage() {
                       <ArrowRight className="w-4 h-4 mr-2" />
                     )}
                     Sign In
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="link" 
+                    className="w-full text-muted-foreground"
+                    onClick={() => setShowForgotPassword(true)}
+                  >
+                    Forgot your password?
                   </Button>
                 </form>
               </TabsContent>
@@ -312,6 +507,14 @@ export default function AuthPage() {
                   <ArrowRight className="w-4 h-4 mr-2" />
                 )}
                 Sign In
+              </Button>
+              <Button 
+                type="button" 
+                variant="link" 
+                className="w-full text-muted-foreground"
+                onClick={() => setShowForgotPassword(true)}
+              >
+                Forgot your password?
               </Button>
             </form>
           )}
