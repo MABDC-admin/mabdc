@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Label } from '@/components/ui/label';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -18,7 +19,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Search, UserCog, Shield, UserCheck, User, Plus, Trash2, Loader2, RefreshCw } from 'lucide-react';
+import { Search, UserCog, Shield, UserCheck, User, Plus, Trash2, Loader2, RefreshCw, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEmployees } from '@/hooks/useEmployees';
 
@@ -41,6 +42,12 @@ export function AdminUserAccountsSection() {
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [roleToAdd, setRoleToAdd] = useState<AppRole | ''>('');
   const [roleToRemove, setRoleToRemove] = useState<{ user: UserWithRoles; role: AppRole } | null>(null);
+  
+  // Password reset state
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [userToResetPassword, setUserToResetPassword] = useState<UserWithRoles | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const { data: employees = [] } = useEmployees();
 
@@ -147,6 +154,48 @@ export function AdminUserAccountsSection() {
     },
   });
 
+  // Password reset mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-user-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ userId, newPassword: password }),
+        }
+      );
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to reset password');
+      }
+
+      return result;
+    },
+    onSuccess: () => {
+      toast.success('Password reset successfully');
+      setIsPasswordDialogOpen(false);
+      setUserToResetPassword(null);
+      setNewPassword('');
+      setConfirmPassword('');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to reset password: ' + error.message);
+    },
+  });
+
   const filteredUsers = useMemo(() => {
     if (!search.trim()) return users;
     const lower = search.toLowerCase();
@@ -203,6 +252,26 @@ export function AdminUserAccountsSection() {
   const confirmRemoveRole = () => {
     if (!roleToRemove) return;
     removeRoleMutation.mutate({ userId: roleToRemove.user.id, role: roleToRemove.role });
+  };
+
+  const handleResetPassword = (user: UserWithRoles) => {
+    setUserToResetPassword(user);
+    setNewPassword('');
+    setConfirmPassword('');
+    setIsPasswordDialogOpen(true);
+  };
+
+  const confirmResetPassword = () => {
+    if (!userToResetPassword || !newPassword) return;
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    resetPasswordMutation.mutate({ userId: userToResetPassword.id, password: newPassword });
   };
 
   return (
@@ -308,12 +377,22 @@ export function AdminUserAccountsSection() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    {getAvailableRoles(user.roles).length > 0 && (
-                      <Button variant="ghost" size="sm" onClick={() => handleAddRole(user)}>
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add Role
+                    <div className="flex items-center justify-end gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleResetPassword(user)}
+                        title="Reset Password"
+                      >
+                        <KeyRound className="w-4 h-4" />
                       </Button>
-                    )}
+                      {getAvailableRoles(user.roles).length > 0 && (
+                        <Button variant="ghost" size="sm" onClick={() => handleAddRole(user)}>
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Role
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -392,6 +471,63 @@ export function AdminUserAccountsSection() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-primary" />
+              Reset Password
+            </DialogTitle>
+            <DialogDescription>
+              Set a new password for {userToResetPassword?.full_name || userToResetPassword?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password (min 6 characters)"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+              />
+            </div>
+            {newPassword && confirmPassword && newPassword !== confirmPassword && (
+              <p className="text-sm text-destructive">Passwords do not match</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPasswordDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmResetPassword}
+              disabled={
+                !newPassword || 
+                newPassword !== confirmPassword || 
+                newPassword.length < 6 ||
+                resetPasswordMutation.isPending
+              }
+            >
+              {resetPasswordMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Reset Password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
