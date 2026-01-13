@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 
 type AppRole = 'admin' | 'hr' | 'employee';
@@ -34,7 +35,11 @@ export function ProtectedRoute({
       if (requiredRoles.length > 0) {
         const hasRequiredRole = requiredRoles.some(role => hasRole(role)) || isAdmin();
         if (!hasRequiredRole) {
-          navigate('/unauthorized');
+          // Sign out and redirect to login with access denied error
+          supabase.auth.signOut().then(() => {
+            const authUrl = `/auth?portal=${portal}&redirect=${encodeURIComponent(window.location.pathname)}&error=access_denied`;
+            navigate(authUrl);
+          });
         }
       }
     }

@@ -74,6 +74,16 @@ export default function AuthPage() {
     }
   }, []);
 
+  // Show toast for access denied redirect
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam === 'access_denied') {
+      toast.error("Access Denied", {
+        description: "You don't have permission to access that page. Please sign in with an authorized account."
+      });
+    }
+  }, [searchParams]);
+
   // Also check the reset param
   useEffect(() => {
     if (isPasswordResetParam) {
