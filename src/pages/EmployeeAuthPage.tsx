@@ -135,7 +135,7 @@ export default function EmployeeAuthPage() {
                       <Input
                         id="email"
                         type="email"
-                        placeholder="your.email@company.com"
+                        placeholder="Enter your work email"
                         className="pl-10"
                         value={loginForm.email}
                         onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
@@ -192,7 +192,7 @@ export default function EmployeeAuthPage() {
                       <Input
                         id="reset-email"
                         type="email"
-                        placeholder="your.email@company.com"
+                        placeholder="Enter your work email"
                         className="pl-10"
                         value={resetEmail}
                         onChange={(e) => setResetEmail(e.target.value)}
