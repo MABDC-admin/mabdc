@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useAttendance } from '@/hooks/useAttendance';
+import { useAttendance, useRealtimeAttendance } from '@/hooks/useAttendance';
 import { useLeave, useLeaveTypes, useLeaveBalances } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { useEmployeeHRLetters } from '@/hooks/useHRLetters';
@@ -60,12 +60,12 @@ export default function EmployeeSelfServicePortal() {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
     const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
-  // Auto-refresh interval (5 seconds)
-  const REFRESH_INTERVAL = 5000;
+  // Enable realtime subscription for attendance updates (WebSocket - no polling)
+  useRealtimeAttendance();
 
-  // Data hooks - with auto-refresh for real-time data
-  const attendanceQuery = useAttendance({ refetchInterval: REFRESH_INTERVAL });
-  const leaveQuery = useLeave({ refetchInterval: REFRESH_INTERVAL });
+  // Data hooks - attendance uses realtime, others use standard fetch
+  const attendanceQuery = useAttendance();
+  const leaveQuery = useLeave();
   const contractsQuery = useContracts();
   const performanceQuery = usePerformance();
   const disciplineQuery = useDiscipline();
