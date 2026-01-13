@@ -22,8 +22,9 @@ import {
   User, Calendar, FileText, Award, Clock, LogOut, 
   Briefcase, Mail, Phone, MapPin, Building2, 
   CalendarDays, TrendingUp, AlertTriangle, FileCheck,
-  Loader2, Plus, Star
+  Loader2, Plus, Star, Shield
 } from 'lucide-react';
+import { PasskeyManagement } from '@/components/PasskeyManagement';
 import { toast } from 'sonner';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
@@ -176,6 +177,7 @@ export default function EmployeeSelfServicePortal() {
     { id: 'documents', label: 'Documents', icon: FileCheck },
     { id: 'performance', label: 'Performance', icon: TrendingUp },
     { id: 'achievements', label: 'Achievements', icon: Award },
+    { id: 'security', label: 'Security', icon: Shield },
   ];
 
   return (
@@ -534,6 +536,10 @@ export default function EmployeeSelfServicePortal() {
             {employee && (
               <EmployeeGamificationCard employeeId={employee.id} />
             )}
+          </TabsContent>
+
+          <TabsContent value="security" className="mt-6">
+            <PasskeyManagement />
           </TabsContent>
         </Tabs>
       </main>
