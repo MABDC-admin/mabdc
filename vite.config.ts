@@ -66,7 +66,9 @@ export default defineConfig(({ mode }) => ({
               }
             }
           }
-        ]
+        ],
+        // Import push notification handler
+        importScripts: ['/sw-push.js'],
       }
     })
   ].filter(Boolean),
