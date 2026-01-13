@@ -25,6 +25,8 @@ import {
   Loader2, Plus, Star, Shield
 } from 'lucide-react';
 import { PasskeyManagement } from '@/components/PasskeyManagement';
+import { NotificationSettings } from '@/components/NotificationSettings';
+import { NotificationBell } from '@/components/NotificationBell';
 import { toast } from 'sonner';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
@@ -195,10 +197,13 @@ export default function EmployeeSelfServicePortal() {
               <p className="text-xs text-muted-foreground">{employee.job_position}</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleSignOut}>
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
-          </Button>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <Button variant="ghost" size="sm" onClick={handleSignOut}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -538,8 +543,9 @@ export default function EmployeeSelfServicePortal() {
             )}
           </TabsContent>
 
-          <TabsContent value="security" className="mt-6">
+          <TabsContent value="security" className="mt-6 space-y-6">
             <PasskeyManagement />
+            <NotificationSettings />
           </TabsContent>
         </Tabs>
       </main>

@@ -1356,6 +1356,75 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          announcements: boolean
+          attendance_reminders: boolean
+          created_at: string
+          document_expiry: boolean
+          id: string
+          leave_updates: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          announcements?: boolean
+          attendance_reminders?: boolean
+          created_at?: string
+          document_expiry?: boolean
+          id?: string
+          leave_updates?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          announcements?: boolean
+          attendance_reminders?: boolean
+          created_at?: string
+          document_expiry?: boolean
+          id?: string
+          leave_updates?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string
+          data: Json | null
+          id: string
+          read: boolean
+          read_at: string | null
+          sent_at: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          data?: Json | null
+          id?: string
+          read?: boolean
+          read_at?: string | null
+          sent_at?: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          data?: Json | null
+          id?: string
+          read?: boolean
+          read_at?: string | null
+          sent_at?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       org_chart_positions: {
         Row: {
           created_at: string
@@ -1502,6 +1571,39 @@ export type Database = {
           name?: string
           name_arabic?: string | null
           year?: number | null
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          device_name: string | null
+          endpoint: string
+          id: string
+          last_used_at: string | null
+          p256dh: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          device_name?: string | null
+          endpoint: string
+          id?: string
+          last_used_at?: string | null
+          p256dh: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          device_name?: string | null
+          endpoint?: string
+          id?: string
+          last_used_at?: string | null
+          p256dh?: string
+          user_id?: string
         }
         Relationships: []
       }
