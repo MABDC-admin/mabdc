@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
 import { AddEmployeeModal } from '@/components/modals/AddEmployeeModal';
-import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning, FilePlus, MessageCircle, UserMinus, Calculator, DollarSign, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning, FilePlus, MessageCircle, UserMinus, Calculator, DollarSign, AlertTriangle, Pencil, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/hr';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -98,6 +98,8 @@ export function EmployeesView() {
   const [deactivationStatus, setDeactivationStatus] = useState<'Resigned' | 'Terminated'>('Resigned');
   const [deactivationReason, setDeactivationReason] = useState('');
   const [lastWorkingDay, setLastWorkingDay] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [customGratuity, setCustomGratuity] = useState<number | null>(null);
+  const [isGratuityEditing, setIsGratuityEditing] = useState(false);
 
   // Get employees with pending leave requests
   const employeesWithPendingLeave = new Set(
@@ -132,11 +134,14 @@ export function EmployeesView() {
         status: deactivationStatus,
         reason: deactivationReason,
         lastWorkingDay,
+        customGratuity: customGratuity !== null ? customGratuity : undefined,
       });
       setDeactivateEmployeeId(null);
       setDeactivationReason('');
       setDeactivationStatus('Resigned');
       setLastWorkingDay(format(new Date(), 'yyyy-MM-dd'));
+      setCustomGratuity(null);
+      setIsGratuityEditing(false);
     }
   };
 
@@ -769,16 +774,85 @@ export function EmployeesView() {
                     </div>
                   </div>
                   
-                  {/* Gratuity Amount */}
-                  <div className="bg-primary/10 rounded-lg p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="w-5 h-5 text-primary" />
-                      <span className="text-sm font-medium text-foreground">Estimated Gratuity</span>
+                  {/* Gratuity Amount - Editable */}
+                  <div className="bg-primary/10 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="w-5 h-5 text-primary" />
+                        <span className="text-sm font-medium text-foreground">
+                          {isGratuityEditing ? 'Custom Gratuity' : 'Estimated Gratuity'}
+                        </span>
+                      </div>
+                      {!isGratuityEditing ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setIsGratuityEditing(true);
+                            setCustomGratuity(eosCalc.gratuityAmount);
+                          }}
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          <Pencil className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setIsGratuityEditing(false);
+                            setCustomGratuity(null);
+                          }}
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          <RotateCcw className="w-3 h-3 mr-1" />
+                          Reset
+                        </Button>
+                      )}
                     </div>
-                    <span className="text-xl font-bold text-primary">
-                      AED {eosCalc.gratuityAmount.toLocaleString()}
-                    </span>
+                    
+                    {isGratuityEditing ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">AED</span>
+                          <Input
+                            type="number"
+                            value={customGratuity ?? ''}
+                            onChange={(e) => setCustomGratuity(Number(e.target.value))}
+                            className="bg-background border-primary/30 text-lg font-bold text-primary h-10"
+                            min={0}
+                            step={100}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>Original calculation:</span>
+                          <span className="font-medium">AED {eosCalc.gratuityAmount.toLocaleString()}</span>
+                          {customGratuity !== null && customGratuity !== eosCalc.gratuityAmount && (
+                            <span className={cn(
+                              "font-medium",
+                              customGratuity > eosCalc.gratuityAmount ? "text-green-600" : "text-amber-600"
+                            )}>
+                              ({customGratuity > eosCalc.gratuityAmount ? '+' : ''}{(customGratuity - eosCalc.gratuityAmount).toLocaleString()})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xl font-bold text-primary block">
+                        AED {eosCalc.gratuityAmount.toLocaleString()}
+                      </span>
+                    )}
                   </div>
+                  
+                  {customGratuity !== null && customGratuity !== eosCalc.gratuityAmount && (
+                    <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 p-2 rounded-lg">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      <span>Custom gratuity amount will be recorded. The EOS record will be marked as "Manually adjusted".</span>
+                    </div>
+                  )}
                   
                   {!eosCalc.isEligible && (
                     <div className="flex items-center gap-2 text-xs text-amber-600">
