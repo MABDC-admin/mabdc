@@ -22,8 +22,10 @@ import {
   User, Calendar, FileText, Award, Clock, LogOut, 
   Briefcase, Mail, Phone, MapPin, Building2, 
   CalendarDays, TrendingUp, AlertTriangle, FileCheck,
-  Loader2, Plus, Star, Shield
+  Loader2, Plus, Star, Shield, Image as ImageIcon, CreditCard,
+  BookOpen, Plane, HeartPulse, UserCircle, Eye
 } from 'lucide-react';
+import { ImagePreviewModal } from '@/components/modals/ImagePreviewModal';
 import { PasskeyManagement } from '@/components/PasskeyManagement';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -56,6 +58,7 @@ export default function EmployeeSelfServicePortal() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+    const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
   // Data hooks - use query results properly
   const attendanceQuery = useAttendance();
@@ -438,46 +441,433 @@ export default function EmployeeSelfServicePortal() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="documents" className="mt-6">
+          <TabsContent value="documents" className="mt-6 space-y-6">
+            {/* Key Documents Grid - Mobile Optimized */}
             <Card>
               <CardHeader>
-                <CardTitle>My Documents</CardTitle>
-                <CardDescription>Your uploaded documents and certificates</CardDescription>
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <CreditCard className="w-5 h-5 text-primary" />
+                  Identity & Key Documents
+                </CardTitle>
+                <CardDescription>Your important identity documents</CardDescription>
               </CardHeader>
               <CardContent>
-                {documents.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No documents found</p>
-                ) : (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {documents.map(doc => (
-                      <div key={doc.id} className="p-4 border rounded-lg space-y-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <FileCheck className="w-5 h-5 text-primary" />
-                            <span className="font-medium text-sm">{doc.name}</span>
-                          </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                  {/* Photo */}
+                  {(() => {
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-pink-500/5 to-purple-500/5 hover:border-pink-500/50 transition-all overflow-hidden">
+                        <div className="aspect-square flex items-center justify-center p-3">
+                          {employee.photo_url ? (
+                            <div 
+                              className="relative w-full h-full cursor-pointer"
+                              onClick={() => setPreviewImage({ url: employee.photo_url!, title: 'Employee Photo' })}
+                            >
+                              <img
+                                src={employee.photo_url}
+                                alt="Photo"
+                                className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                loading="lazy"
+                              />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                                <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <UserCircle className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">No Photo</span>
+                            </div>
+                          )}
                         </div>
-                        {doc.expiry_date && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <Calendar className="w-3 h-3" />
-                            <span className={
-                              differenceInDays(parseISO(doc.expiry_date), new Date()) < 30 
-                                ? 'text-destructive' 
-                                : 'text-muted-foreground'
-                            }>
-                              Expires: {format(parseISO(doc.expiry_date), 'dd MMM yyyy')}
-                            </span>
-                          </div>
-                        )}
-                        <Button variant="outline" size="sm" className="w-full" asChild>
-                          <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                            View Document
-                          </a>
-                        </Button>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">Photo</p>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    );
+                  })()}
+
+                  {/* Emirates ID */}
+                  {(() => {
+                    const doc = documents.find(d => d.category === 'Emirates ID' && !d.is_renewed);
+                    const isImage = doc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                    const isExpired = doc?.expiry_date && differenceInDays(parseISO(doc.expiry_date), new Date()) < 0;
+                    const isExpiring = doc?.expiry_date && differenceInDays(parseISO(doc.expiry_date), new Date()) <= 30 && differenceInDays(parseISO(doc.expiry_date), new Date()) >= 0;
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-primary/5 to-accent/5 hover:border-primary/50 transition-all overflow-hidden">
+                        {isExpired && <div className="absolute top-1 right-1 z-10"><Badge variant="destructive" className="text-[9px] px-1.5 py-0">Expired</Badge></div>}
+                        {isExpiring && <div className="absolute top-1 right-1 z-10"><Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-amber-500/20 text-amber-600">Expiring</Badge></div>}
+                        <div 
+                          className="aspect-square flex items-center justify-center p-3 cursor-pointer"
+                          onClick={() => {
+                            if (doc) {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: 'Emirates ID' });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }
+                          }}
+                        >
+                          {doc ? (
+                            isImage ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={doc.file_url}
+                                  alt="Emirates ID"
+                                  className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                  loading="lazy"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                                  <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-xl bg-primary/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <CreditCard className="w-8 h-8 text-primary" />
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <CreditCard className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">Not uploaded</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">Emirates ID</p>
+                          {doc?.expiry_date && (
+                            <p className="text-[9px] text-center text-muted-foreground mt-0.5">
+                              Exp: {format(parseISO(doc.expiry_date), 'MMM yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Passport */}
+                  {(() => {
+                    const doc = documents.find(d => d.category === 'Passport' && !d.is_renewed);
+                    const isImage = doc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                    const isExpired = doc?.expiry_date && differenceInDays(parseISO(doc.expiry_date), new Date()) < 0;
+                    const isExpiring = doc?.expiry_date && differenceInDays(parseISO(doc.expiry_date), new Date()) <= 30 && differenceInDays(parseISO(doc.expiry_date), new Date()) >= 0;
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-blue-500/5 to-indigo-500/5 hover:border-blue-500/50 transition-all overflow-hidden">
+                        {isExpired && <div className="absolute top-1 right-1 z-10"><Badge variant="destructive" className="text-[9px] px-1.5 py-0">Expired</Badge></div>}
+                        {isExpiring && <div className="absolute top-1 right-1 z-10"><Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-amber-500/20 text-amber-600">Expiring</Badge></div>}
+                        <div 
+                          className="aspect-square flex items-center justify-center p-3 cursor-pointer"
+                          onClick={() => {
+                            if (doc) {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: 'Passport' });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }
+                          }}
+                        >
+                          {doc ? (
+                            isImage ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={doc.file_url}
+                                  alt="Passport"
+                                  className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                  loading="lazy"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                                  <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-xl bg-blue-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <BookOpen className="w-8 h-8 text-blue-500" />
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <BookOpen className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">Not uploaded</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">Passport</p>
+                          {doc?.expiry_date && (
+                            <p className="text-[9px] text-center text-muted-foreground mt-0.5">
+                              Exp: {format(parseISO(doc.expiry_date), 'MMM yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Visa */}
+                  {(() => {
+                    const doc = documents.find(d => d.category === 'Visa' && !d.is_renewed);
+                    const isImage = doc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                    const isExpired = doc?.expiry_date && differenceInDays(parseISO(doc.expiry_date), new Date()) < 0;
+                    const isExpiring = doc?.expiry_date && differenceInDays(parseISO(doc.expiry_date), new Date()) <= 30 && differenceInDays(parseISO(doc.expiry_date), new Date()) >= 0;
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-accent/5 to-primary/5 hover:border-accent/50 transition-all overflow-hidden">
+                        {isExpired && <div className="absolute top-1 right-1 z-10"><Badge variant="destructive" className="text-[9px] px-1.5 py-0">Expired</Badge></div>}
+                        {isExpiring && <div className="absolute top-1 right-1 z-10"><Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-amber-500/20 text-amber-600">Expiring</Badge></div>}
+                        <div 
+                          className="aspect-square flex items-center justify-center p-3 cursor-pointer"
+                          onClick={() => {
+                            if (doc) {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: 'Visa' });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }
+                          }}
+                        >
+                          {doc ? (
+                            isImage ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={doc.file_url}
+                                  alt="Visa"
+                                  className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                  loading="lazy"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                                  <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-xl bg-accent/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <Plane className="w-8 h-8 text-accent-foreground" />
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <Plane className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">Not uploaded</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">Visa</p>
+                          {doc?.expiry_date && (
+                            <p className="text-[9px] text-center text-muted-foreground mt-0.5">
+                              Exp: {format(parseISO(doc.expiry_date), 'MMM yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Work Permit */}
+                  {(() => {
+                    const doc = documents.find(d => d.category === 'Work Permit' && !d.is_renewed);
+                    const isImage = doc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                    const isExpired = doc?.expiry_date && differenceInDays(parseISO(doc.expiry_date), new Date()) < 0;
+                    const isExpiring = doc?.expiry_date && differenceInDays(parseISO(doc.expiry_date), new Date()) <= 30 && differenceInDays(parseISO(doc.expiry_date), new Date()) >= 0;
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-emerald-500/5 to-teal-500/5 hover:border-emerald-500/50 transition-all overflow-hidden">
+                        {isExpired && <div className="absolute top-1 right-1 z-10"><Badge variant="destructive" className="text-[9px] px-1.5 py-0">Expired</Badge></div>}
+                        {isExpiring && <div className="absolute top-1 right-1 z-10"><Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-amber-500/20 text-amber-600">Expiring</Badge></div>}
+                        <div 
+                          className="aspect-square flex items-center justify-center p-3 cursor-pointer"
+                          onClick={() => {
+                            if (doc) {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: 'Work Permit' });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }
+                          }}
+                        >
+                          {doc ? (
+                            isImage ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={doc.file_url}
+                                  alt="Work Permit"
+                                  className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                  loading="lazy"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                                  <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-xl bg-emerald-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <Briefcase className="w-8 h-8 text-emerald-500" />
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <Briefcase className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">Not uploaded</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">Work Permit</p>
+                          {doc?.expiry_date && (
+                            <p className="text-[9px] text-center text-muted-foreground mt-0.5">
+                              Exp: {format(parseISO(doc.expiry_date), 'MMM yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Medical Insurance */}
+                  {(() => {
+                    const doc = documents.find(d => d.category === 'Medical Insurance' && !d.is_renewed);
+                    const isImage = doc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                    const isExpired = doc?.expiry_date && differenceInDays(parseISO(doc.expiry_date), new Date()) < 0;
+                    const isExpiring = doc?.expiry_date && differenceInDays(parseISO(doc.expiry_date), new Date()) <= 30 && differenceInDays(parseISO(doc.expiry_date), new Date()) >= 0;
+                    return (
+                      <div className="group relative rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-rose-500/5 to-pink-500/5 hover:border-rose-500/50 transition-all overflow-hidden">
+                        {isExpired && <div className="absolute top-1 right-1 z-10"><Badge variant="destructive" className="text-[9px] px-1.5 py-0">Expired</Badge></div>}
+                        {isExpiring && <div className="absolute top-1 right-1 z-10"><Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-amber-500/20 text-amber-600">Expiring</Badge></div>}
+                        <div 
+                          className="aspect-square flex items-center justify-center p-3 cursor-pointer"
+                          onClick={() => {
+                            if (doc) {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: 'Medical Insurance' });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }
+                          }}
+                        >
+                          {doc ? (
+                            isImage ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={doc.file_url}
+                                  alt="Medical Insurance"
+                                  className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                  loading="lazy"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                                  <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-xl bg-rose-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <HeartPulse className="w-8 h-8 text-rose-500" />
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                              <HeartPulse className="w-12 h-12 opacity-40" />
+                              <span className="text-[10px] font-medium">Not uploaded</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 bg-gradient-to-t from-background/80 to-transparent">
+                          <p className="text-[11px] font-semibold text-center text-foreground">Insurance</p>
+                          {doc?.expiry_date && (
+                            <p className="text-[9px] text-center text-muted-foreground mt-0.5">
+                              Exp: {format(parseISO(doc.expiry_date), 'MMM yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Other Documents */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <FileCheck className="w-5 h-5 text-primary" />
+                  Other Documents
+                </CardTitle>
+                <CardDescription>Additional uploaded documents and certificates</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const keyCategories = ['Emirates ID', 'Passport', 'Visa', 'Work Permit', 'Medical Insurance', 'Contract', 'ILOE'];
+                  const otherDocs = documents.filter(d => !keyCategories.includes(d.category || '') && !d.is_renewed);
+                  
+                  if (otherDocs.length === 0) {
+                    return <p className="text-muted-foreground text-center py-8">No additional documents uploaded</p>;
+                  }
+                  
+                  return (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
+                      {otherDocs.map(doc => {
+                        const isImage = doc.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                        const isExpired = doc.expiry_date && differenceInDays(parseISO(doc.expiry_date), new Date()) < 0;
+                        const isExpiring = doc.expiry_date && differenceInDays(parseISO(doc.expiry_date), new Date()) <= 30 && differenceInDays(parseISO(doc.expiry_date), new Date()) >= 0;
+                        
+                        return (
+                          <div 
+                            key={doc.id}
+                            className="group relative rounded-xl border border-border bg-card hover:border-primary/50 hover:shadow-lg transition-all overflow-hidden cursor-pointer"
+                            onClick={() => {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: doc.name });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }}
+                          >
+                            {isExpired && <div className="absolute top-1 right-1 z-10"><Badge variant="destructive" className="text-[9px] px-1.5 py-0">Expired</Badge></div>}
+                            {isExpiring && <div className="absolute top-1 right-1 z-10"><Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-amber-500/20 text-amber-600">Expiring</Badge></div>}
+                            <div className="aspect-square flex items-center justify-center p-2 bg-muted/30">
+                              {isImage ? (
+                                <div className="relative w-full h-full">
+                                  <img
+                                    src={doc.file_url}
+                                    alt={doc.name}
+                                    className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                    loading="lazy"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = 'none';
+                                      const parent = target.parentElement;
+                                      if (parent) {
+                                        parent.innerHTML = `<div class="flex flex-col items-center justify-center gap-2 text-muted-foreground w-full h-full"><svg class="w-10 h-10 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>`;
+                                      }
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                                    <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                  <FileCheck className="w-6 h-6 text-primary" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-2 space-y-1">
+                              <p className="text-[11px] font-semibold text-foreground line-clamp-1">{doc.name}</p>
+                              {doc.category && (
+                                <p className="text-[9px] text-muted-foreground">{doc.category}</p>
+                              )}
+                              {doc.expiry_date && (
+                                <p className="text-[9px] text-muted-foreground">
+                                  Exp: {format(parseISO(doc.expiry_date), 'MMM yyyy')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </TabsContent>
@@ -562,6 +952,14 @@ export default function EmployeeSelfServicePortal() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        isOpen={!!previewImage}
+        onClose={() => setPreviewImage(null)}
+        imageUrl={previewImage?.url || ''}
+        title={previewImage?.title}
+      />
 
       {/* Modals */}
       <LeaveRequestModal
