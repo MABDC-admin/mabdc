@@ -81,7 +81,7 @@ export function DashboardView() {
   const expiringVisas = employees.filter(e => {
     if (!e.visa_expiration) return false;
     const days = Math.ceil((new Date(e.visa_expiration).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    return days > 0 && days <= 60;
+    return days > 0 && days <= 30;
   });
 
   // Contract expiry calculations
@@ -232,8 +232,8 @@ export function DashboardView() {
         <StatCard 
           label="Visa Alerts" 
           value={expiringVisas.length}
-          subtext="Within 60 days"
-          subtextColor="text-amber-400"
+          subtext="Within 30 days"
+          subtextColor="text-red-500"
           icon={<AlertTriangle className="w-5 h-5" />}
           onClick={() => setCurrentView('employees')}
         />
@@ -287,7 +287,7 @@ export function DashboardView() {
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
                 <CheckCircle className="w-10 h-10 mb-2 text-primary opacity-50" />
                 <p className="text-sm font-medium">All visas valid</p>
-                <p className="text-xs opacity-70">No expiring visas in the next 60 days</p>
+                <p className="text-xs opacity-70">No expiring visas in the next 30 days</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
