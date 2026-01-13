@@ -141,13 +141,17 @@ export default function EmployeeSelfServicePortal() {
 
   const activeContract = employeeContracts.find(c => c.status === 'Active');
 
-  // Calculate total leave balance from leave_balances table (not from employee.leave_balance)
-  const totalLeaveBalance = useMemo(() => {
-    if (leaveBalances.length === 0) return 0;
-    return leaveBalances.reduce((total, lb) => {
-      const available = (lb.entitled_days || 0) + (lb.carried_forward_days || 0) - (lb.used_days || 0) - (lb.pending_days || 0);
-      return total + Math.max(0, available);
-    }, 0);
+  // Calculate Annual Leave balance only (linked to employee via leave_balances table)
+  const annualLeaveBalance = useMemo(() => {
+    const annualLeave = leaveBalances.find(lb => 
+      lb.leave_types?.name === 'Annual Leave'
+    );
+    if (!annualLeave) return 0;
+    const available = (annualLeave.entitled_days || 0) + 
+                      (annualLeave.carried_forward_days || 0) - 
+                      (annualLeave.used_days || 0) - 
+                      (annualLeave.pending_days || 0);
+    return Math.max(0, available);
   }, [leaveBalances]);
 
   // Calculate stats
@@ -226,8 +230,8 @@ export default function EmployeeSelfServicePortal() {
                   <CalendarDays className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{totalLeaveBalance}</p>
-                  <p className="text-xs text-muted-foreground">Leave Balance</p>
+                  <p className="text-2xl font-bold">{annualLeaveBalance}</p>
+                  <p className="text-xs text-muted-foreground">Annual Leave Balance</p>
                 </div>
               </div>
             </CardContent>
