@@ -20,7 +20,8 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  Banknote
+  Banknote,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -74,6 +75,13 @@ export function DeactivatedEmployeesView() {
     });
     return map;
   }, [eosRecords]);
+
+  // Helper to extract gratuity adjustment reason from EOS record
+  const getGratuityAdjustmentReason = (eosRecord: typeof eosRecords[0] | undefined): string | null => {
+    if (!eosRecord?.reason) return null;
+    const match = eosRecord.reason.match(/Gratuity Adjustment:\s*(.+)$/);
+    return match ? match[1] : null;
+  };
 
   // Get unique departments
   const departments = useMemo(() => {
@@ -368,8 +376,8 @@ export function DeactivatedEmployeesView() {
 
                     {/* EOS Info */}
                     {eosRecord && (
-                      <div className="mt-4 pt-3 border-t border-border">
-                        <div className="flex items-center justify-between mb-2">
+                      <div className="mt-4 pt-3 border-t border-border space-y-2">
+                        <div className="flex items-center justify-between">
                           <span className="text-xs text-muted-foreground">Gratuity</span>
                           <span className="text-sm font-bold text-primary">
                             AED {Number(eosRecord.gratuity_amount).toLocaleString()}
@@ -389,11 +397,27 @@ export function DeactivatedEmployeesView() {
                             </Badge>
                           )}
                         </div>
+                        
+                        {/* Gratuity Adjustment Reason */}
+                        {getGratuityAdjustmentReason(eosRecord) && (
+                          <div className="pt-2 border-t border-border/50">
+                            <div className="flex items-start gap-1.5">
+                              <MessageSquare className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <p className="text-[10px] font-medium text-amber-600">Adjustment Reason:</p>
+                                <p className="text-[10px] text-muted-foreground line-clamp-2">
+                                  {getGratuityAdjustmentReason(eosRecord)}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
                         {!eosRecord.paid && (
                           <Button
                             variant="outline"
                             size="sm"
-                            className="w-full mt-3 text-xs border-green-500/50 text-green-600 hover:bg-green-500/10"
+                            className="w-full mt-2 text-xs border-green-500/50 text-green-600 hover:bg-green-500/10"
                             onClick={(e) => { e.stopPropagation(); setPaymentConfirmId(eosRecord.id); }}
                           >
                             <CheckCircle2 className="w-3 h-3 mr-1" />
@@ -461,9 +485,22 @@ export function DeactivatedEmployeesView() {
                     <div className="hidden sm:block text-right min-w-[120px]">
                       <p className="text-xs text-muted-foreground">Gratuity</p>
                       {eosRecord ? (
-                        <p className="text-sm font-bold text-primary">
-                          AED {Number(eosRecord.gratuity_amount).toLocaleString()}
-                        </p>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <p className="text-sm font-bold text-primary cursor-help">
+                              AED {Number(eosRecord.gratuity_amount).toLocaleString()}
+                              {getGratuityAdjustmentReason(eosRecord) && (
+                                <MessageSquare className="w-3 h-3 inline-block ml-1 text-amber-500" />
+                              )}
+                            </p>
+                          </TooltipTrigger>
+                          {getGratuityAdjustmentReason(eosRecord) && (
+                            <TooltipContent className="max-w-[250px]">
+                              <p className="text-xs font-medium text-amber-500 mb-1">Adjustment Reason:</p>
+                              <p className="text-xs">{getGratuityAdjustmentReason(eosRecord)}</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
                       ) : (
                         <p className="text-sm text-muted-foreground">—</p>
                       )}
