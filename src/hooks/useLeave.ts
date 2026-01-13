@@ -177,35 +177,89 @@ export function useUpdateLeaveStatus() {
       
       // Handle leave balance updates
       if (leaveRecord) {
-        const { data: leaveType } = await supabase
+        // Find leave type - try exact match first, then partial match
+        let leaveTypeId: string | null = null;
+        
+        const { data: exactMatch } = await supabase
           .from('leave_types')
           .select('id')
           .eq('name', leaveRecord.leave_type)
-          .single();
+          .maybeSingle();
         
-        if (leaveType) {
+        if (exactMatch) {
+          leaveTypeId = exactMatch.id;
+        } else {
+          // Try partial match (e.g., "Annual" matches "Annual Leave")
+          const { data: partialMatch } = await supabase
+            .from('leave_types')
+            .select('id, name')
+            .ilike('name', `%${leaveRecord.leave_type}%`)
+            .limit(1)
+            .maybeSingle();
+          
+          if (partialMatch) {
+            leaveTypeId = partialMatch.id;
+          }
+        }
+        
+        if (leaveTypeId) {
           const currentYear = new Date().getFullYear();
           
-          const { data: currentBalance } = await supabase
+          // Try to get existing balance
+          let { data: currentBalance } = await supabase
             .from('leave_balances')
-            .select('id, used_days, pending_days')
+            .select('id, used_days, pending_days, entitled_days')
             .eq('employee_id', leaveRecord.employee_id)
-            .eq('leave_type_id', leaveType.id)
+            .eq('leave_type_id', leaveTypeId)
             .eq('year', currentYear)
-            .single();
+            .maybeSingle();
+          
+          // If no balance exists and we're approving, create one with default entitlement
+          if (!currentBalance && status === 'Approved') {
+            const { data: newBalance, error: insertError } = await supabase
+              .from('leave_balances')
+              .insert({
+                employee_id: leaveRecord.employee_id,
+                leave_type_id: leaveTypeId,
+                year: currentYear,
+                entitled_days: 30, // Default annual entitlement
+                used_days: 0,
+                pending_days: 0,
+                carried_forward_days: 0
+              })
+              .select()
+              .single();
+            
+            if (!insertError && newBalance) {
+              currentBalance = newBalance;
+            }
+          }
           
           if (currentBalance) {
-            // If approving (and wasn't previously approved), deduct from balance
+            // If approving (and wasn't previously approved), deduct from balance and decrement pending
             if (status === 'Approved' && previousStatus !== 'Approved') {
+              const newPendingDays = Math.max(0, (currentBalance.pending_days || 0) - leaveRecord.days_count);
               await supabase
                 .from('leave_balances')
                 .update({
                   used_days: (currentBalance.used_days || 0) + leaveRecord.days_count,
+                  pending_days: previousStatus === 'Pending' ? newPendingDays : currentBalance.pending_days,
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', currentBalance.id);
             }
-            // If rejecting a previously approved leave, restore the balance
+            // If rejecting and was pending, just decrement pending_days
+            else if (status === 'Rejected' && previousStatus === 'Pending') {
+              const newPendingDays = Math.max(0, (currentBalance.pending_days || 0) - leaveRecord.days_count);
+              await supabase
+                .from('leave_balances')
+                .update({
+                  pending_days: newPendingDays,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', currentBalance.id);
+            }
+            // If rejecting a previously approved leave, restore used_days
             else if (status === 'Rejected' && previousStatus === 'Approved') {
               const newUsedDays = Math.max(0, (currentBalance.used_days || 0) - leaveRecord.days_count);
               await supabase
@@ -217,6 +271,8 @@ export function useUpdateLeaveStatus() {
                 .eq('id', currentBalance.id);
             }
           }
+        } else {
+          console.warn(`Leave type not found for: ${leaveRecord.leave_type}`);
         }
       }
       
@@ -265,7 +321,7 @@ export function useDeleteLeave() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      // First, get the leave record to check if it was approved
+      // First, get the leave record to check its status
       const { data: leaveRecord, error: fetchError } = await supabase
         .from('leave_records')
         .select('employee_id, leave_type, days_count, status')
@@ -274,35 +330,65 @@ export function useDeleteLeave() {
       
       if (fetchError) throw fetchError;
       
-      // If the leave was approved, restore the balance
-      if (leaveRecord && leaveRecord.status === 'Approved') {
-        const { data: leaveType } = await supabase
+      // Find leave type - try exact match first, then partial match
+      let leaveTypeId: string | null = null;
+      
+      if (leaveRecord) {
+        const { data: exactMatch } = await supabase
           .from('leave_types')
           .select('id')
           .eq('name', leaveRecord.leave_type)
-          .single();
+          .maybeSingle();
         
-        if (leaveType) {
+        if (exactMatch) {
+          leaveTypeId = exactMatch.id;
+        } else {
+          const { data: partialMatch } = await supabase
+            .from('leave_types')
+            .select('id')
+            .ilike('name', `%${leaveRecord.leave_type}%`)
+            .limit(1)
+            .maybeSingle();
+          
+          if (partialMatch) {
+            leaveTypeId = partialMatch.id;
+          }
+        }
+        
+        if (leaveTypeId) {
           const currentYear = new Date().getFullYear();
           
           const { data: currentBalance } = await supabase
             .from('leave_balances')
-            .select('id, used_days')
+            .select('id, used_days, pending_days')
             .eq('employee_id', leaveRecord.employee_id)
-            .eq('leave_type_id', leaveType.id)
+            .eq('leave_type_id', leaveTypeId)
             .eq('year', currentYear)
-            .single();
+            .maybeSingle();
           
           if (currentBalance) {
-            // Restore balance: decrement used_days
-            const newUsedDays = Math.max(0, (currentBalance.used_days || 0) - leaveRecord.days_count);
-            await supabase
-              .from('leave_balances')
-              .update({
-                used_days: newUsedDays,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', currentBalance.id);
+            // If the leave was approved, restore used_days
+            if (leaveRecord.status === 'Approved') {
+              const newUsedDays = Math.max(0, (currentBalance.used_days || 0) - leaveRecord.days_count);
+              await supabase
+                .from('leave_balances')
+                .update({
+                  used_days: newUsedDays,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', currentBalance.id);
+            }
+            // If the leave was pending, restore pending_days
+            else if (leaveRecord.status === 'Pending') {
+              const newPendingDays = Math.max(0, (currentBalance.pending_days || 0) - leaveRecord.days_count);
+              await supabase
+                .from('leave_balances')
+                .update({
+                  pending_days: newPendingDays,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', currentBalance.id);
+            }
           }
         }
       }
@@ -339,11 +425,60 @@ export function useAddLeave() {
         .single();
       
       if (error) throw error;
+      
+      // Increment pending_days in leave_balances when a new request is submitted
+      if (leave.leave_type && leave.status === 'Pending') {
+        // Find leave type
+        const { data: leaveType } = await supabase
+          .from('leave_types')
+          .select('id')
+          .eq('name', leave.leave_type)
+          .maybeSingle();
+        
+        if (leaveType) {
+          const currentYear = new Date().getFullYear();
+          
+          // Get or create leave balance
+          let { data: balance } = await supabase
+            .from('leave_balances')
+            .select('id, pending_days')
+            .eq('employee_id', leave.employee_id)
+            .eq('leave_type_id', leaveType.id)
+            .eq('year', currentYear)
+            .maybeSingle();
+          
+          if (balance) {
+            // Increment pending_days
+            await supabase
+              .from('leave_balances')
+              .update({
+                pending_days: (balance.pending_days || 0) + leave.days_count,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', balance.id);
+          } else {
+            // Create new balance record with pending days
+            await supabase
+              .from('leave_balances')
+              .insert({
+                employee_id: leave.employee_id,
+                leave_type_id: leaveType.id,
+                year: currentYear,
+                entitled_days: 30,
+                used_days: 0,
+                pending_days: leave.days_count,
+                carried_forward_days: 0
+              });
+          }
+        }
+      }
+      
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave'] });
       queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
+      queryClient.invalidateQueries({ queryKey: ['all_leave_balances'] });
       toast.success('Leave request submitted');
     },
     onError: (error: Error) => {
