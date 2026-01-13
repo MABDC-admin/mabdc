@@ -1,18 +1,18 @@
-import { useState, useMemo } from 'react';
-import { useEmployees } from '@/hooks/useEmployees';
-import { useTimeShifts, useAssignShift, useBulkAssignShift, useRemoveShift } from '@/hooks/useTimeShifts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Clock, Sun, Sunset, Search, Users, RefreshCw } from 'lucide-react';
+import { useState, useMemo } from "react";
+import { useEmployees } from "@/hooks/useEmployees";
+import { useTimeShifts, useAssignShift, useBulkAssignShift, useRemoveShift } from "@/hooks/useTimeShifts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Clock, Sun, Sunset, Search, Users, RefreshCw } from "lucide-react";
 
 const SHIFTS = {
-  morning: { label: 'Morning Shift', time: '08:00 - 17:00', icon: Sun },
-  afternoon: { label: 'Afternoon Shift', time: '10:00 - 19:00', icon: Sunset },
+  morning: { label: "Morning Shift", time: "08:00 - 17:00", icon: Sun },
+  afternoon: { label: "Afternoon Shift", time: "09:00 - 18:00", icon: Sunset },
 } as const;
 
 export default function TimeShiftView() {
@@ -22,59 +22,60 @@ export default function TimeShiftView() {
   const bulkAssignShift = useBulkAssignShift();
   const removeShift = useRemoveShift();
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
-  const [activeShiftFilter, setActiveShiftFilter] = useState<'all' | 'morning' | 'afternoon' | 'unassigned'>('all');
+  const [activeShiftFilter, setActiveShiftFilter] = useState<"all" | "morning" | "afternoon" | "unassigned">("all");
 
   const shiftMap = useMemo(() => {
-    const map = new Map<string, 'morning' | 'afternoon'>();
-    shifts.forEach(s => map.set(s.employee_id, s.shift_type));
+    const map = new Map<string, "morning" | "afternoon">();
+    shifts.forEach((s) => map.set(s.employee_id, s.shift_type));
     return map;
   }, [shifts]);
 
   const filteredEmployees = useMemo(() => {
-    return employees.filter(emp => {
-      const matchesSearch = emp.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    return employees.filter((emp) => {
+      const matchesSearch =
+        emp.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         emp.hrms_no.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
       if (!matchesSearch) return false;
 
       const empShift = shiftMap.get(emp.id);
-      
-      if (activeShiftFilter === 'all') return true;
-      if (activeShiftFilter === 'unassigned') return !empShift;
+
+      if (activeShiftFilter === "all") return true;
+      if (activeShiftFilter === "unassigned") return !empShift;
       return empShift === activeShiftFilter;
     });
   }, [employees, searchQuery, activeShiftFilter, shiftMap]);
 
   const shiftStats = useMemo(() => {
-    let morning = 0, afternoon = 0, unassigned = 0;
-    employees.forEach(emp => {
+    let morning = 0,
+      afternoon = 0,
+      unassigned = 0;
+    employees.forEach((emp) => {
       const shift = shiftMap.get(emp.id);
-      if (shift === 'morning') morning++;
-      else if (shift === 'afternoon') afternoon++;
+      if (shift === "morning") morning++;
+      else if (shift === "afternoon") afternoon++;
       else unassigned++;
     });
     return { morning, afternoon, unassigned, total: employees.length };
   }, [employees, shiftMap]);
 
   const handleSelectEmployee = (employeeId: string, checked: boolean) => {
-    setSelectedEmployees(prev => 
-      checked ? [...prev, employeeId] : prev.filter(id => id !== employeeId)
-    );
+    setSelectedEmployees((prev) => (checked ? [...prev, employeeId] : prev.filter((id) => id !== employeeId)));
   };
 
   const handleSelectAll = (checked: boolean) => {
-    setSelectedEmployees(checked ? filteredEmployees.map(e => e.id) : []);
+    setSelectedEmployees(checked ? filteredEmployees.map((e) => e.id) : []);
   };
 
-  const handleBulkAssign = (shiftType: 'morning' | 'afternoon') => {
+  const handleBulkAssign = (shiftType: "morning" | "afternoon") => {
     if (selectedEmployees.length === 0) return;
     bulkAssignShift.mutate({ employeeIds: selectedEmployees, shiftType });
     setSelectedEmployees([]);
   };
 
-  const handleAssignShift = (employeeId: string, shiftType: 'morning' | 'afternoon') => {
+  const handleAssignShift = (employeeId: string, shiftType: "morning" | "afternoon") => {
     assignShift.mutate({ employeeId, shiftType });
   };
 
@@ -83,7 +84,12 @@ export default function TimeShiftView() {
   };
 
   const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   const isLoading = loadingEmployees || loadingShifts;
@@ -104,7 +110,7 @@ export default function TimeShiftView() {
 
       {/* Shift Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveShiftFilter('all')}>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveShiftFilter("all")}>
           <CardContent className="p-4 flex items-center gap-4">
             <div className="p-3 rounded-full bg-primary/10">
               <Users className="h-6 w-6 text-primary" />
@@ -116,9 +122,9 @@ export default function TimeShiftView() {
           </CardContent>
         </Card>
 
-        <Card 
-          className={`cursor-pointer hover:shadow-md transition-shadow ${activeShiftFilter === 'morning' ? 'ring-2 ring-yellow-500' : ''}`}
-          onClick={() => setActiveShiftFilter('morning')}
+        <Card
+          className={`cursor-pointer hover:shadow-md transition-shadow ${activeShiftFilter === "morning" ? "ring-2 ring-yellow-500" : ""}`}
+          onClick={() => setActiveShiftFilter("morning")}
         >
           <CardContent className="p-4 flex items-center gap-4">
             <div className="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900/30">
@@ -131,9 +137,9 @@ export default function TimeShiftView() {
           </CardContent>
         </Card>
 
-        <Card 
-          className={`cursor-pointer hover:shadow-md transition-shadow ${activeShiftFilter === 'afternoon' ? 'ring-2 ring-orange-500' : ''}`}
-          onClick={() => setActiveShiftFilter('afternoon')}
+        <Card
+          className={`cursor-pointer hover:shadow-md transition-shadow ${activeShiftFilter === "afternoon" ? "ring-2 ring-orange-500" : ""}`}
+          onClick={() => setActiveShiftFilter("afternoon")}
         >
           <CardContent className="p-4 flex items-center gap-4">
             <div className="p-3 rounded-full bg-orange-100 dark:bg-orange-900/30">
@@ -146,9 +152,9 @@ export default function TimeShiftView() {
           </CardContent>
         </Card>
 
-        <Card 
-          className={`cursor-pointer hover:shadow-md transition-shadow ${activeShiftFilter === 'unassigned' ? 'ring-2 ring-gray-500' : ''}`}
-          onClick={() => setActiveShiftFilter('unassigned')}
+        <Card
+          className={`cursor-pointer hover:shadow-md transition-shadow ${activeShiftFilter === "unassigned" ? "ring-2 ring-gray-500" : ""}`}
+          onClick={() => setActiveShiftFilter("unassigned")}
         >
           <CardContent className="p-4 flex items-center gap-4">
             <div className="p-3 rounded-full bg-muted">
@@ -168,17 +174,17 @@ export default function TimeShiftView() {
           <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <p className="font-medium">{selectedEmployees.length} employee(s) selected</p>
             <div className="flex gap-2">
-              <Button 
-                size="sm" 
-                onClick={() => handleBulkAssign('morning')}
+              <Button
+                size="sm"
+                onClick={() => handleBulkAssign("morning")}
                 className="bg-yellow-500 hover:bg-yellow-600 text-white"
               >
                 <Sun className="h-4 w-4 mr-2" />
                 Assign Morning
               </Button>
-              <Button 
-                size="sm" 
-                onClick={() => handleBulkAssign('afternoon')}
+              <Button
+                size="sm"
+                onClick={() => handleBulkAssign("afternoon")}
                 className="bg-orange-500 hover:bg-orange-600 text-white"
               >
                 <Sunset className="h-4 w-4 mr-2" />
@@ -227,7 +233,7 @@ export default function TimeShiftView() {
 
                 {filteredEmployees.map((employee) => {
                   const currentShift = shiftMap.get(employee.id);
-                  
+
                   return (
                     <div
                       key={employee.id}
@@ -239,22 +245,25 @@ export default function TimeShiftView() {
                           onCheckedChange={(checked) => handleSelectEmployee(employee.id, !!checked)}
                         />
                         <Avatar className="h-10 w-10">
-                          <AvatarImage src={employee.photo_url || ''} alt={employee.full_name} />
+                          <AvatarImage src={employee.photo_url || ""} alt={employee.full_name} />
                           <AvatarFallback>{getInitials(employee.full_name)}</AvatarFallback>
                         </Avatar>
                         <div>
                           <p className="font-medium">{employee.full_name}</p>
-                          <p className="text-sm text-muted-foreground">{employee.hrms_no} • {employee.department}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {employee.hrms_no} • {employee.department}
+                          </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
                         {currentShift && (
-                          <Badge 
-                            variant="outline" 
-                            className={currentShift === 'morning' 
-                              ? 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-300' 
-                              : 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300'
+                          <Badge
+                            variant="outline"
+                            className={
+                              currentShift === "morning"
+                                ? "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-300"
+                                : "bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300"
                             }
                           >
                             {SHIFTS[currentShift].time}
@@ -264,17 +273,17 @@ export default function TimeShiftView() {
                         <div className="flex gap-1">
                           <Button
                             size="sm"
-                            variant={currentShift === 'morning' ? 'default' : 'outline'}
-                            onClick={() => handleAssignShift(employee.id, 'morning')}
-                            className={currentShift === 'morning' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
+                            variant={currentShift === "morning" ? "default" : "outline"}
+                            onClick={() => handleAssignShift(employee.id, "morning")}
+                            className={currentShift === "morning" ? "bg-yellow-500 hover:bg-yellow-600" : ""}
                           >
                             <Sun className="h-4 w-4" />
                           </Button>
                           <Button
                             size="sm"
-                            variant={currentShift === 'afternoon' ? 'default' : 'outline'}
-                            onClick={() => handleAssignShift(employee.id, 'afternoon')}
-                            className={currentShift === 'afternoon' ? 'bg-orange-500 hover:bg-orange-600' : ''}
+                            variant={currentShift === "afternoon" ? "default" : "outline"}
+                            onClick={() => handleAssignShift(employee.id, "afternoon")}
+                            className={currentShift === "afternoon" ? "bg-orange-500 hover:bg-orange-600" : ""}
                           >
                             <Sunset className="h-4 w-4" />
                           </Button>
@@ -315,7 +324,7 @@ export default function TimeShiftView() {
               <Sunset className="h-8 w-8 text-orange-600" />
               <div>
                 <p className="font-medium text-orange-800 dark:text-orange-300">Afternoon Shift</p>
-                <p className="text-sm text-orange-700 dark:text-orange-400">10:00 AM - 07:00 PM</p>
+                <p className="text-sm text-orange-700 dark:text-orange-400">09:00 AM - 06:00 PM</p>
               </div>
             </div>
           </div>
