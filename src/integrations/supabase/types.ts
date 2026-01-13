@@ -807,6 +807,39 @@ export type Database = {
           },
         ]
       }
+      time_shifts: {
+        Row: {
+          id: string
+          name: string
+          shift_key: string
+          start_time: string
+          end_time: string
+          is_active: boolean | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          shift_key: string
+          start_time: string
+          end_time: string
+          is_active?: boolean | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          shift_key?: string
+          start_time?: string
+          end_time?: string
+          is_active?: boolean | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       employees: {
         Row: {
           allowance: number | null
