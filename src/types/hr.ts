@@ -153,6 +153,7 @@ export interface CompanySettings {
   leave_year_start?: string;
   currency?: string;
   date_format?: string;
+  expiry_notification_days?: number;
   created_at?: string;
   updated_at?: string;
 }

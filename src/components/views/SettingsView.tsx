@@ -39,6 +39,7 @@ export function SettingsView() {
     currency: 'AED',
     date_format: 'DD/MM/YYYY',
     logo_url: '',
+    expiry_notification_days: '30',
   });
 
   useEffect(() => {
@@ -65,6 +66,7 @@ export function SettingsView() {
         currency: settings.currency || 'AED',
         date_format: settings.date_format || 'DD/MM/YYYY',
         logo_url: settings.logo_url || '',
+        expiry_notification_days: settings.expiry_notification_days?.toString() || '30',
       });
     }
   }, [settings]);
@@ -141,6 +143,7 @@ export function SettingsView() {
       currency: form.currency || undefined,
       date_format: form.date_format || undefined,
       logo_url: form.logo_url || null,
+      expiry_notification_days: parseInt(form.expiry_notification_days) || 30,
     });
   };
 
@@ -464,6 +467,34 @@ export function SettingsView() {
                   placeholder="01-01"
                   className="bg-secondary/50 border-border"
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Notification Settings */}
+          <div className="glass-card rounded-2xl border border-border p-6 mt-4">
+            <h2 className="text-sm font-semibold text-foreground mb-4">Notification Settings</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Expiry Notification Threshold (Days)</Label>
+                <Select 
+                  value={form.expiry_notification_days} 
+                  onValueChange={(v) => setForm({ ...form, expiry_notification_days: v })}
+                >
+                  <SelectTrigger className="bg-secondary/50 border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="14">14 days before expiry</SelectItem>
+                    <SelectItem value="30">30 days before expiry</SelectItem>
+                    <SelectItem value="45">45 days before expiry</SelectItem>
+                    <SelectItem value="60">60 days before expiry</SelectItem>
+                    <SelectItem value="90">90 days before expiry</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Show alerts for visas, contracts, and documents expiring within this period
+                </p>
               </div>
             </div>
           </div>

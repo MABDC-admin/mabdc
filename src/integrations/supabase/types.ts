@@ -255,6 +255,7 @@ export type Database = {
           email: string | null
           emirate: string | null
           establishment_id: string | null
+          expiry_notification_days: number | null
           id: string
           leave_year_start: string | null
           logo_url: string | null
@@ -281,6 +282,7 @@ export type Database = {
           email?: string | null
           emirate?: string | null
           establishment_id?: string | null
+          expiry_notification_days?: number | null
           id?: string
           leave_year_start?: string | null
           logo_url?: string | null
@@ -307,6 +309,7 @@ export type Database = {
           email?: string | null
           emirate?: string | null
           establishment_id?: string | null
+          expiry_notification_days?: number | null
           id?: string
           leave_year_start?: string | null
           logo_url?: string | null
