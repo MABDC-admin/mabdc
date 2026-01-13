@@ -26,4 +26,4 @@ FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Add comment for shift types
-COMMENT ON COLUMN public.employee_shifts.shift_type IS 'morning = 08:00-17:00, afternoon = 10:00-19:00';
+COMMENT ON COLUMN public.employee_shifts.shift_type IS 'morning = 08:00-17:00, afternoon = 09:00-18:00';

@@ -12,7 +12,7 @@ import { Clock, Sun, Sunset, Search, Users, RefreshCw } from "lucide-react";
 
 const SHIFTS = {
   morning: { label: "Morning Shift", time: "08:00 - 17:00", icon: Sun },
-  afternoon: { label: "Afternoon Shift", time: "09:00 - 18:00", icon: Sunset },
+  afternoon: { label: "Afternoon Shift", time: "10:00 - 19:00", icon: Sunset },
 } as const;
 
 export default function TimeShiftView() {
@@ -146,7 +146,7 @@ export default function TimeShiftView() {
               <Sunset className="h-6 w-6 text-orange-600" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Afternoon (10:00-19:00)</p>
+              <p className="text-sm text-muted-foreground">Afternoon (09:00-18:00)</p>
               <p className="text-2xl font-bold">{shiftStats.afternoon}</p>
             </div>
           </CardContent>
@@ -324,7 +324,7 @@ export default function TimeShiftView() {
               <Sunset className="h-8 w-8 text-orange-600" />
               <div>
                 <p className="font-medium text-orange-800 dark:text-orange-300">Afternoon Shift</p>
-                <p className="text-sm text-orange-700 dark:text-orange-400">09:00 AM - 06:00 PM</p>
+                <p className="text-sm text-orange-700 dark:text-orange-400">10:00 AM - 07:00 PM</p>
               </div>
             </div>
           </div>
