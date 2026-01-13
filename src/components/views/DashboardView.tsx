@@ -2,6 +2,7 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { useLeave } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { useTodayAttendance, useRealtimeAttendance } from '@/hooks/useAttendance';
+import { useCompanySettings } from '@/hooks/useSettings';
 import { useHRStore } from '@/store/hrStore';
 import { cn } from '@/lib/utils';
 import { Users, FileText, Clock, AlertTriangle, TrendingUp, Calendar, ArrowRight, RefreshCw, LogIn, LogOut, CheckCircle, QrCode, Bell, Zap, Cake, Monitor } from 'lucide-react';
@@ -67,9 +68,13 @@ export function DashboardView() {
   const { data: leave = [], isLoading: leaveLoading } = useLeave();
   const { data: contracts = [], isLoading: contractsLoading } = useContracts();
   const { data: todayAttendance = [] } = useTodayAttendance();
+  const { data: companySettings } = useCompanySettings();
   
   // Enable realtime attendance updates
   useRealtimeAttendance();
+
+  // Get configurable expiry notification threshold (default 30 days)
+  const expiryThreshold = companySettings?.expiry_notification_days || 30;
 
   const activeEmployees = employees.filter(e => e.status === 'Active').length;
   const onLeaveEmployees = employees.filter(e => e.status === 'On Leave').length;
@@ -81,17 +86,17 @@ export function DashboardView() {
   const expiringVisas = employees.filter(e => {
     if (!e.visa_expiration) return false;
     const days = Math.ceil((new Date(e.visa_expiration).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    return days > 0 && days <= 30;
+    return days > 0 && days <= expiryThreshold;
   });
 
-  // Contract expiry calculations
+  // Contract expiry calculations - uses configurable threshold
   const getContractExpiryStatus = (contract: typeof contracts[0]) => {
     if (contract.status === 'Expired' || contract.status === 'Terminated') return 'expired';
     if (!contract.end_date) return 'active';
     const daysUntilExpiry = differenceInDays(parseISO(contract.end_date), new Date());
     if (daysUntilExpiry < 0) return 'expired';
-    if (daysUntilExpiry <= 30) return 'expiring';
-    if (daysUntilExpiry <= 90) return 'nearing';
+    if (daysUntilExpiry <= expiryThreshold) return 'expiring';
+    if (daysUntilExpiry <= expiryThreshold * 2) return 'nearing';
     return 'active';
   };
 
@@ -232,7 +237,7 @@ export function DashboardView() {
         <StatCard 
           label="Visa Alerts" 
           value={expiringVisas.length}
-          subtext="Within 30 days"
+          subtext={`Within ${expiryThreshold} days`}
           subtextColor="text-red-500"
           icon={<AlertTriangle className="w-5 h-5" />}
           onClick={() => setCurrentView('employees')}
@@ -287,13 +292,13 @@ export function DashboardView() {
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
                 <CheckCircle className="w-10 h-10 mb-2 text-primary opacity-50" />
                 <p className="text-sm font-medium">All visas valid</p>
-                <p className="text-xs opacity-70">No expiring visas in the next 30 days</p>
+                <p className="text-xs opacity-70">No expiring visas in the next {expiryThreshold} days</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {expiringVisas.slice(0, 10).map((emp) => {
                   const days = Math.ceil((new Date(emp.visa_expiration!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-                  const urgency = days <= 7 ? 'critical' : days <= 30 ? 'warning' : 'caution';
+                  const urgency = days <= 7 ? 'critical' : days <= expiryThreshold ? 'warning' : 'caution';
                   return (
                     <div 
                       key={emp.id} 
