@@ -162,18 +162,18 @@ export function DashboardView() {
       {/* Contract Expiry Alerts Banner */}
       {contractAlertsCount > 0 && (
         <div 
-          className="glass-card rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 cursor-pointer hover:bg-amber-500/10 transition-colors"
+          className="glass-card rounded-2xl border border-red-500/40 bg-red-500/5 p-4 cursor-pointer hover:bg-red-500/10 transition-colors animate-pulse-alert"
           onClick={() => setCurrentView('contracts')}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                <Bell className="w-5 h-5 text-amber-400" />
+              <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center animate-pulse">
+                <Bell className="w-5 h-5 text-red-500" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-foreground">Contract Expiry Alerts</h3>
+                <h3 className="text-sm font-semibold text-red-500">Contract Expiry Alerts</h3>
                 <p className="text-xs text-muted-foreground">
-                  {expiringContracts} contracts expiring soon, {nearingExpiryContracts} nearing expiry
+                  <span className="text-red-500 font-medium">{expiringContracts}</span> contracts expiring soon, <span className="text-red-400">{nearingExpiryContracts}</span> nearing expiry
                 </p>
               </div>
             </div>
@@ -181,7 +181,7 @@ export function DashboardView() {
               size="sm" 
               variant="outline" 
               onClick={(e) => { e.stopPropagation(); setCurrentView('contracts'); }}
-              className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+              className="border-red-500/40 text-red-500 hover:bg-red-500/10 hover:text-red-400"
             >
               <Zap className="w-4 h-4 mr-1" />
               View
@@ -249,17 +249,33 @@ export function DashboardView() {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Visa Expiry Alerts - Expanded */}
-        <div className="glass-card rounded-2xl border border-border p-5 lg:col-span-2">
+        {/* Visa Expiry Alerts - Expanded with Red Pulse Animation */}
+        <div className={cn(
+          "glass-card rounded-2xl border p-5 lg:col-span-2 transition-all",
+          expiringVisas.length > 0 
+            ? "border-red-500/50 bg-red-500/5 animate-glow-pulse" 
+            : "border-border"
+        )}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500" />
+            <h2 className={cn(
+              "text-sm font-semibold flex items-center gap-2",
+              expiringVisas.length > 0 ? "text-red-500" : "text-foreground"
+            )}>
+              <AlertTriangle className={cn(
+                "w-4 h-4",
+                expiringVisas.length > 0 ? "text-red-500 animate-pulse" : "text-amber-500"
+              )} />
               Visa Expiry Alerts
             </h2>
             <Button 
               variant="ghost" 
               size="sm" 
-              className="text-xs text-amber-500 hover:text-amber-400 gap-1"
+              className={cn(
+                "text-xs gap-1",
+                expiringVisas.length > 0 
+                  ? "text-red-500 hover:text-red-400 hover:bg-red-500/10" 
+                  : "text-amber-500 hover:text-amber-400"
+              )}
               onClick={() => setCurrentView('renewal')}
             >
               {expiringVisas.length} expiring
@@ -282,12 +298,12 @@ export function DashboardView() {
                     <div 
                       key={emp.id} 
                       className={cn(
-                        "flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors",
+                        "flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all",
                         urgency === 'critical' 
-                          ? "bg-destructive/10 border-destructive/30 hover:bg-destructive/20" 
+                          ? "bg-red-500/15 border-red-500/40 hover:bg-red-500/25 animate-pulse-alert" 
                           : urgency === 'warning'
-                          ? "bg-orange-500/10 border-orange-500/30 hover:bg-orange-500/20"
-                          : "bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20"
+                          ? "bg-red-500/10 border-red-500/30 hover:bg-red-500/20"
+                          : "bg-red-400/10 border-red-400/30 hover:bg-red-400/20"
                       )}
                       onClick={() => setCurrentView('employees')}
                     >
@@ -297,9 +313,9 @@ export function DashboardView() {
                         ) : (
                           <div className={cn(
                             "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold",
-                            urgency === 'critical' ? "bg-destructive/20 text-destructive" : 
-                            urgency === 'warning' ? "bg-orange-500/20 text-orange-500" : 
-                            "bg-amber-500/20 text-amber-500"
+                            urgency === 'critical' ? "bg-red-500/30 text-red-500" : 
+                            urgency === 'warning' ? "bg-red-500/20 text-red-500" : 
+                            "bg-red-400/20 text-red-400"
                           )}>
                             {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
                           </div>
@@ -312,9 +328,9 @@ export function DashboardView() {
                       <div className="text-right flex-shrink-0">
                         <p className={cn(
                           "text-lg font-bold",
-                          urgency === 'critical' ? "text-destructive" : 
-                          urgency === 'warning' ? "text-orange-500" : 
-                          "text-amber-500"
+                          urgency === 'critical' ? "text-red-500" : 
+                          urgency === 'warning' ? "text-red-500" : 
+                          "text-red-400"
                         )}>
                           {days}
                         </p>
