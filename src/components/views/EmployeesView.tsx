@@ -10,12 +10,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
 import { AddEmployeeModal } from '@/components/modals/AddEmployeeModal';
-import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning, FilePlus, MessageCircle, UserMinus } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning, FilePlus, MessageCircle, UserMinus, Calculator, DollarSign, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/hr';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { differenceInDays, differenceInYears, parseISO, format } from 'date-fns';
+import { calculateGratuity } from '@/utils/gratuityCalculation';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -646,34 +647,39 @@ export function EmployeesView() {
 
       {/* Deactivate Employee Dialog */}
       <Dialog open={!!deactivateEmployeeId} onOpenChange={() => setDeactivateEmployeeId(null)}>
-        <DialogContent className="glass-card border-border">
+        <DialogContent className="glass-card border-border max-w-lg">
           <DialogHeader>
-            <DialogTitle>Deactivate Employee</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <UserMinus className="w-5 h-5 text-amber-500" />
+              Deactivate Employee
+            </DialogTitle>
             <DialogDescription>
               Mark this employee as resigned or terminated. Their data will be preserved in the archive.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={deactivationStatus} onValueChange={(v) => setDeactivationStatus(v as 'Resigned' | 'Terminated')}>
-                <SelectTrigger className="bg-secondary/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Resigned">Resigned</SelectItem>
-                  <SelectItem value="Terminated">Terminated</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Last Working Day</Label>
-              <Input
-                type="date"
-                value={lastWorkingDay}
-                onChange={(e) => setLastWorkingDay(e.target.value)}
-                className="bg-secondary/50"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={deactivationStatus} onValueChange={(v) => setDeactivationStatus(v as 'Resigned' | 'Terminated')}>
+                  <SelectTrigger className="bg-secondary/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Resigned">Resigned</SelectItem>
+                    <SelectItem value="Terminated">Terminated</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Last Working Day</Label>
+                <Input
+                  type="date"
+                  value={lastWorkingDay}
+                  onChange={(e) => setLastWorkingDay(e.target.value)}
+                  className="bg-secondary/50"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Reason</Label>
@@ -681,9 +687,112 @@ export function EmployeesView() {
                 value={deactivationReason}
                 onChange={(e) => setDeactivationReason(e.target.value)}
                 placeholder="Enter reason for deactivation..."
-                className="bg-secondary/50 min-h-[80px]"
+                className="bg-secondary/50 min-h-[60px]"
               />
             </div>
+
+            {/* EOS Preview Section */}
+            {deactivateEmployeeId && (() => {
+              const employee = employees.find(e => e.id === deactivateEmployeeId);
+              if (!employee) return null;
+              
+              const basicSalary = employee.basic_salary || 0;
+              const allowance = employee.allowance || 0;
+              const totalSalary = basicSalary + allowance;
+              const joiningDate = employee.joining_date;
+              
+              if (!joiningDate) {
+                return (
+                  <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/30">
+                    <div className="flex items-center gap-2 text-destructive">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span className="text-sm font-medium">Missing joining date - cannot calculate EOS</span>
+                    </div>
+                  </div>
+                );
+              }
+              
+              const eosCalc = calculateGratuity(joiningDate, lastWorkingDay, basicSalary);
+              
+              return (
+                <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Calculator className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-semibold text-foreground">End of Service (EOS) Preview</span>
+                  </div>
+                  
+                  {/* Employee Info */}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Employee:</span>
+                      <span className="font-medium text-foreground">{employee.full_name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">HRMS No:</span>
+                      <span className="font-mono text-foreground">{employee.hrms_no}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Joining Date:</span>
+                      <span className="text-foreground">{format(parseISO(joiningDate), 'dd MMM yyyy')}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Last Working Day:</span>
+                      <span className="text-foreground">{format(parseISO(lastWorkingDay), 'dd MMM yyyy')}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="border-t border-primary/20 pt-3 mt-3">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Years of Service:</span>
+                        <span className="font-medium text-foreground">{eosCalc.yearsOfService} years</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Basic Salary:</span>
+                        <span className="text-foreground">AED {basicSalary.toLocaleString()}</span>
+                      </div>
+                      {allowance > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Allowances:</span>
+                          <span className="text-foreground">AED {allowance.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Eligibility:</span>
+                        <span className={cn(
+                          "font-medium",
+                          eosCalc.isEligible ? "text-green-600" : "text-amber-600"
+                        )}>
+                          {eosCalc.isEligible ? "Eligible" : "Not Eligible (< 1 year)"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Gratuity Amount */}
+                  <div className="bg-primary/10 rounded-lg p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-5 h-5 text-primary" />
+                      <span className="text-sm font-medium text-foreground">Estimated Gratuity</span>
+                    </div>
+                    <span className="text-xl font-bold text-primary">
+                      AED {eosCalc.gratuityAmount.toLocaleString()}
+                    </span>
+                  </div>
+                  
+                  {!eosCalc.isEligible && (
+                    <div className="flex items-center gap-2 text-xs text-amber-600">
+                      <AlertTriangle className="w-3 h-3" />
+                      <span>Employee has less than 1 year of service - no gratuity entitlement per UAE Labour Law</span>
+                    </div>
+                  )}
+                  
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    * Calculated per UAE Labour Law: 21 days/year for first 5 years, 30 days/year thereafter
+                  </p>
+                </div>
+              );
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeactivateEmployeeId(null)}>
@@ -695,7 +804,7 @@ export function EmployeesView() {
               className="bg-amber-600 hover:bg-amber-700 text-white"
             >
               <UserMinus className="w-4 h-4 mr-2" />
-              Deactivate
+              {deactivateEmployee.isPending ? 'Processing...' : 'Deactivate & Create EOS'}
             </Button>
           </DialogFooter>
         </DialogContent>
