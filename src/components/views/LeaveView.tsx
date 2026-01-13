@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useLeave, useLeaveTypes, usePublicHolidays, useUpdateLeaveStatus, useAddLeave, useAddPublicHoliday, useAllocateLeave, useBulkAllocateLeave, useAllLeaveBalances, useLeaveBalances, useUpdateLeaveBalance, useDeleteLeaveBalance } from '@/hooks/useLeave';
+import { useProcessLeaveAccrual, useLeaveAccrualLog, calculateAccrualRate } from '@/hooks/useLeaveAccrual';
 import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Check, X, Clock, RefreshCw, Plus, Calendar, FileText, AlertCircle, CalendarDays, Users, Wallet, LayoutGrid, Pencil, CalendarX2, Trash2 } from 'lucide-react';
+import { Check, X, Clock, RefreshCw, Plus, Calendar, FileText, AlertCircle, CalendarDays, Users, Wallet, LayoutGrid, Pencil, CalendarX2, Trash2, Sparkles, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -28,12 +29,15 @@ export function LeaveView() {
   const bulkAllocate = useBulkAllocateLeave();
   const updateBalance = useUpdateLeaveBalance();
   const deleteBalance = useDeleteLeaveBalance();
+  const processAccrual = useProcessLeaveAccrual();
+  const { data: accrualLog = [] } = useLeaveAccrualLog(new Date().getFullYear());
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
   const [isAllocateModalOpen, setIsAllocateModalOpen] = useState(false);
   const [isBulkAllocateModalOpen, setIsBulkAllocateModalOpen] = useState(false);
   const [isEditBalanceModalOpen, setIsEditBalanceModalOpen] = useState(false);
+  const [isAccrualHistoryOpen, setIsAccrualHistoryOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('requests');
   const [filterEmployee, setFilterEmployee] = useState<string>('all');
 
@@ -529,13 +533,45 @@ export function LeaveView() {
                 <h2 className="text-sm font-semibold text-foreground">Leave Allocation - {currentYear}</h2>
                 <p className="text-xs text-muted-foreground">Assign leave entitlements to employees</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => processAccrual.mutate({})}
+                  disabled={processAccrual.isPending}
+                  className="border-primary text-primary hover:bg-primary/10"
+                >
+                  <Sparkles className={cn("w-4 h-4 mr-1", processAccrual.isPending && "animate-spin")} />
+                  {processAccrual.isPending ? 'Processing...' : 'Auto Accrue'}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setIsAccrualHistoryOpen(true)} className="border-border">
+                  <History className="w-4 h-4 mr-1" /> History
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => setIsAllocateModalOpen(true)} className="border-border">
                   <Plus className="w-4 h-4 mr-1" /> Individual
                 </Button>
                 <Button size="sm" onClick={() => setIsBulkAllocateModalOpen(true)} className="bg-primary hover:bg-primary/90">
                   <Users className="w-4 h-4 mr-1" /> Bulk Allocate
                 </Button>
+              </div>
+            </div>
+
+            {/* Auto-Accrual Info Card */}
+            <div className="mb-4 p-3 rounded-xl bg-primary/5 border border-primary/20">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-xs font-semibold text-foreground">Automatic Leave Accrual</h3>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Leave is automatically calculated based on employee tenure: <strong>2 days/month</strong> for the first 6 months, 
+                    then <strong>2.5 days/month</strong> after 6 months of service.
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Click "Auto Accrue" to process this month's accrual for all active employees.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -1130,6 +1166,61 @@ export function LeaveView() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Accrual History Modal */}
+      <Dialog open={isAccrualHistoryOpen} onOpenChange={setIsAccrualHistoryOpen}>
+        <DialogContent className="max-w-2xl glass-card border-border max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <History className="w-5 h-5 text-primary" />
+              Leave Accrual History - {currentYear}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {accrualLog.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                <p className="text-sm font-medium">No accrual history yet</p>
+                <p className="text-xs mt-1">Click "Auto Accrue" to process monthly leave accrual</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {accrualLog.map((entry) => {
+                  const emp = employees.find(e => e.id === entry.employee_id);
+                  return (
+                    <div key={entry.id} className="p-3 rounded-lg bg-secondary/30 border border-border">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg avatar-gradient flex items-center justify-center text-xs font-bold text-primary-foreground">
+                            {emp?.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '??'}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{emp?.full_name || 'Unknown'}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {entry.accrual_month}/{entry.accrual_year} • {entry.months_of_service} months service
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-primary">+{entry.days_accrued} days</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            Rate: {entry.accrual_rate} days/mo
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div className="pt-4 border-t border-border">
+            <Button variant="outline" onClick={() => setIsAccrualHistoryOpen(false)} className="w-full border-border">
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
