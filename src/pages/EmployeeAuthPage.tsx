@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { CompanyBrandingHeader } from '@/components/CompanyBrandingHeader';
 import { PWAInstallBanner } from '@/components/PWAInstallBanner';
+import { PWAUpdatePrompt } from '@/components/PWAUpdatePrompt';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -138,6 +139,9 @@ export default function EmployeeAuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
       <div className="w-full max-w-md space-y-4">
+        {/* PWA Update Prompt */}
+        <PWAUpdatePrompt />
+        
         {/* PWA Install Banner */}
         <PWAInstallBanner />
         
