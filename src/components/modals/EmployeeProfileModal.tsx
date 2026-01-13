@@ -23,7 +23,7 @@ import uaeVisa from '@/assets/uae-visa.png';
 import passportIcon from '@/assets/passport-icon.png';
 import contractIcon from '@/assets/contract-icon.png';
 import photoPlaceholder from '@/assets/photo-placeholder.png';
-import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase, MessageCircle, Link2, Copy } from 'lucide-react';
+import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase, MessageCircle, Link2, Copy, HeartPulse } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { toast } from 'sonner';
 import { GenerateEmployeeAccountButton } from '@/components/employee/GenerateEmployeeAccountButton';
@@ -922,8 +922,8 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                 <div className="glass-card rounded-2xl border border-border p-5">
                   <h3 className="text-lg font-semibold text-foreground mb-6 text-center">EMPLOYEE DOCUMENTS</h3>
                   
-                  {/* Document Cards Grid - with Work Permit */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                  {/* Document Cards Grid - 2 rows layout */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3 mb-6">
                     {/* Photo Card */}
                     <div className="relative group">
                       <input type="file" id="photo-upload-doc" accept="image/*" onChange={async (e) => {
@@ -1066,25 +1066,56 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                     <div className="relative group">
                       <input type="file" id="workpermit-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Work Permit')} className="hidden" />
                       <label htmlFor="workpermit-upload" className="block cursor-pointer">
-                        <div className="relative p-4 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-orange-500/5 to-amber-500/5 hover:border-orange-500/50 transition-all">
+                        <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-orange-500/5 to-amber-500/5 hover:border-orange-500/50 transition-all">
                           <div className="flex flex-col items-center">
                             {documents.find(d => d.category === 'Work Permit') ? (
                               <>
-                                <div className="w-16 h-16 rounded-lg bg-orange-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Work Permit'), e)}>
-                                  <Briefcase className="w-8 h-8 text-orange-500" />
+                                <div className="w-12 h-12 rounded-lg bg-orange-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Work Permit'), e)}>
+                                  <Briefcase className="w-6 h-6 text-orange-500" />
                                 </div>
                                 <p className="text-xs font-medium text-foreground">Work Permit</p>
                                 <div className="flex gap-1 mt-1">
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-6 px-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Work Permit'), e)}><Eye className="w-3 h-3" /></Button>
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-6 px-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('workpermit-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Work Permit'), e)}><Eye className="w-3 h-3" /></Button>
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('workpermit-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
                                 </div>
                               </>
                             ) : (
                               <>
-                                <div className="w-16 h-16 rounded-lg bg-orange-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                                  <Briefcase className="w-8 h-8 text-orange-400" />
+                                <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                  <Briefcase className="w-6 h-6 text-orange-400" />
                                 </div>
                                 <p className="text-xs font-medium text-foreground">Work Permit</p>
+                                <p className="text-[10px] text-muted-foreground">Upload</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Medical Insurance */}
+                    <div className="relative group">
+                      <input type="file" id="medical-insurance-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Medical Insurance')} className="hidden" />
+                      <label htmlFor="medical-insurance-upload" className="block cursor-pointer">
+                        <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-rose-500/5 to-pink-500/5 hover:border-rose-500/50 transition-all">
+                          <div className="flex flex-col items-center">
+                            {documents.find(d => d.category === 'Medical Insurance') ? (
+                              <>
+                                <div className="w-12 h-12 rounded-lg bg-rose-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Medical Insurance'), e)}>
+                                  <HeartPulse className="w-6 h-6 text-rose-500" />
+                                </div>
+                                <p className="text-xs font-medium text-foreground">Medical Insurance</p>
+                                <div className="flex gap-1 mt-1">
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Medical Insurance'), e)}><Eye className="w-3 h-3" /></Button>
+                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('medical-insurance-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="w-12 h-12 rounded-lg bg-rose-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                  <HeartPulse className="w-6 h-6 text-rose-400" />
+                                </div>
+                                <p className="text-xs font-medium text-foreground">Medical Insurance</p>
                                 <p className="text-[10px] text-muted-foreground">Upload</p>
                               </>
                             )}
@@ -1096,21 +1127,21 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                   
                   {/* Other Documents Upload */}
                   <div 
-                    className="file-drop-area p-6 text-center mb-6 border-2 border-dashed border-border rounded-xl hover:border-primary/50 transition-colors cursor-pointer"
+                    className="file-drop-area p-3 text-center mb-4 border-2 border-dashed border-border rounded-xl hover:border-primary/50 transition-colors cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-                    <p className="text-base font-semibold text-foreground mb-1">Other Documents</p>
-                    <p className="text-sm text-muted-foreground">Drag & drop or click to browse</p>
+                    <Upload className="w-6 h-6 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm font-medium text-foreground">Other Documents</p>
+                    <p className="text-xs text-muted-foreground">Drag & drop or click to browse</p>
                     <input ref={fileInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.pdf,.xlsx,.xls,.doc,.docx" onChange={(e) => handleFileUpload(e)} className="hidden" />
                   </div>
 
                   {/* Uploaded Documents Thumbnail Grid */}
-                  {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit'].includes(d.category || '') && !d.is_renewed).length > 0 && (
+                  {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit', 'Medical Insurance'].includes(d.category || '') && !d.is_renewed).length > 0 && (
                     <div className="space-y-3">
                       <p className="text-sm font-medium text-foreground">Other Uploaded Documents</p>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                        {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit'].includes(d.category || '') && !d.is_renewed).map((doc) => {
+                        {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit', 'Medical Insurance'].includes(d.category || '') && !d.is_renewed).map((doc) => {
                           const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
                           const isPdf = /\.pdf$/i.test(doc.file_url);
                           const hasExpiry = doc.expiry_date;
