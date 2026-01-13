@@ -955,190 +955,326 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                     </div>
 
                     {/* Emirates ID */}
-                    <div className="relative group">
-                      <input type="file" id="eid-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Emirates ID')} className="hidden" />
-                      <label htmlFor="eid-upload" className="block cursor-pointer">
-                        <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-primary/5 to-accent/5 hover:border-primary/50 transition-all">
-                          <div className="flex flex-col items-center">
-                            {documents.find(d => d.category === 'Emirates ID') ? (
-                              <>
-                                <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Emirates ID'), e)}>
-                                  <CreditCard className="w-6 h-6 text-primary" />
-                                </div>
-                                <p className="text-xs font-medium text-foreground">Emirates ID</p>
-                                <div className="flex gap-1 mt-1">
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Emirates ID'), e)}><Eye className="w-3 h-3" /></Button>
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('eid-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                                  <CreditCard className="w-6 h-6 text-primary/70" />
-                                </div>
-                                <p className="text-xs font-medium text-foreground">Emirates ID</p>
-                                <p className="text-[10px] text-muted-foreground">Upload</p>
-                              </>
-                            )}
-                          </div>
+                    {(() => {
+                      const eidDoc = documents.find(d => d.category === 'Emirates ID' && !d.is_renewed);
+                      const isImage = eidDoc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(eidDoc.file_url);
+                      return (
+                        <div className="relative group">
+                          <input type="file" id="eid-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Emirates ID')} className="hidden" />
+                          <label htmlFor="eid-upload" className="block cursor-pointer">
+                            <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-primary/5 to-accent/5 hover:border-primary/50 transition-all">
+                              <div className="flex flex-col items-center">
+                                {eidDoc ? (
+                                  <>
+                                    {isImage ? (
+                                      <img 
+                                        src={eidDoc.file_url} 
+                                        alt="Emirates ID" 
+                                        className="w-14 h-14 rounded-lg object-cover mb-2 cursor-pointer hover:scale-105 transition-transform"
+                                        onClick={(e) => handleDocumentClick(eidDoc, e)}
+                                      />
+                                    ) : (
+                                      <div className="w-14 h-14 rounded-lg bg-primary/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(eidDoc, e)}>
+                                        <CreditCard className="w-7 h-7 text-primary" />
+                                      </div>
+                                    )}
+                                    <p className="text-xs font-medium text-foreground">Emirates ID</p>
+                                    <div className="flex gap-1 mt-1">
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(eidDoc, e)}><Eye className="w-3 h-3" /></Button>
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('eid-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                      <CreditCard className="w-7 h-7 text-primary/70" />
+                                    </div>
+                                    <p className="text-xs font-medium text-foreground">Emirates ID</p>
+                                    <p className="text-[10px] text-muted-foreground">Upload</p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </label>
                         </div>
-                      </label>
-                    </div>
+                      );
+                    })()}
 
                     {/* Visa */}
-                    <div className="relative group">
-                      <input type="file" id="visa-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Visa')} className="hidden" />
-                      <label htmlFor="visa-upload" className="block cursor-pointer">
-                        <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-accent/5 to-primary/5 hover:border-accent/50 transition-all">
-                          <div className="flex flex-col items-center">
-                            {documents.find(d => d.category === 'Visa') ? (
-                              <>
-                                <div className="w-12 h-12 rounded-lg bg-accent/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Visa'), e)}>
-                                  <Plane className="w-6 h-6 text-accent-foreground" />
-                                </div>
-                                <p className="text-xs font-medium text-foreground">Visa</p>
-                                <div className="flex gap-1 mt-1">
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Visa'), e)}><Eye className="w-3 h-3" /></Button>
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('visa-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                                  <Plane className="w-6 h-6 text-accent-foreground/70" />
-                                </div>
-                                <p className="text-xs font-medium text-foreground">Visa</p>
-                                <p className="text-[10px] text-muted-foreground">Upload</p>
-                              </>
-                            )}
-                          </div>
+                    {(() => {
+                      const visaDoc = documents.find(d => d.category === 'Visa' && !d.is_renewed);
+                      const isImage = visaDoc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(visaDoc.file_url);
+                      return (
+                        <div className="relative group">
+                          <input type="file" id="visa-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Visa')} className="hidden" />
+                          <label htmlFor="visa-upload" className="block cursor-pointer">
+                            <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-accent/5 to-primary/5 hover:border-accent/50 transition-all">
+                              <div className="flex flex-col items-center">
+                                {visaDoc ? (
+                                  <>
+                                    {isImage ? (
+                                      <img 
+                                        src={visaDoc.file_url} 
+                                        alt="Visa" 
+                                        className="w-14 h-14 rounded-lg object-cover mb-2 cursor-pointer hover:scale-105 transition-transform"
+                                        onClick={(e) => handleDocumentClick(visaDoc, e)}
+                                      />
+                                    ) : (
+                                      <div className="w-14 h-14 rounded-lg bg-accent/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(visaDoc, e)}>
+                                        <Plane className="w-7 h-7 text-accent-foreground" />
+                                      </div>
+                                    )}
+                                    <p className="text-xs font-medium text-foreground">Visa</p>
+                                    <div className="flex gap-1 mt-1">
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(visaDoc, e)}><Eye className="w-3 h-3" /></Button>
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('visa-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="w-14 h-14 rounded-lg bg-accent/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                      <Plane className="w-7 h-7 text-accent-foreground/70" />
+                                    </div>
+                                    <p className="text-xs font-medium text-foreground">Visa</p>
+                                    <p className="text-[10px] text-muted-foreground">Upload</p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </label>
                         </div>
-                      </label>
-                    </div>
+                      );
+                    })()}
 
                     {/* Passport */}
-                    <div className="relative group">
-                      <input type="file" id="passport-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Passport')} className="hidden" />
-                      <label htmlFor="passport-upload" className="block cursor-pointer">
-                        <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-blue-500/5 to-indigo-500/5 hover:border-blue-500/50 transition-all">
-                          <div className="flex flex-col items-center">
-                            {documents.find(d => d.category === 'Passport') ? (
-                              <>
-                                <div className="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Passport'), e)}>
-                                  <BookOpen className="w-6 h-6 text-blue-500" />
-                                </div>
-                                <p className="text-xs font-medium text-foreground">Passport</p>
-                                <div className="flex gap-1 mt-1">
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Passport'), e)}><Eye className="w-3 h-3" /></Button>
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('passport-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                                  <BookOpen className="w-6 h-6 text-blue-400" />
-                                </div>
-                                <p className="text-xs font-medium text-foreground">Passport</p>
-                                <p className="text-[10px] text-muted-foreground">Upload</p>
-                              </>
-                            )}
-                          </div>
+                    {(() => {
+                      const passportDoc = documents.find(d => d.category === 'Passport' && !d.is_renewed);
+                      const isImage = passportDoc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(passportDoc.file_url);
+                      return (
+                        <div className="relative group">
+                          <input type="file" id="passport-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Passport')} className="hidden" />
+                          <label htmlFor="passport-upload" className="block cursor-pointer">
+                            <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-blue-500/5 to-indigo-500/5 hover:border-blue-500/50 transition-all">
+                              <div className="flex flex-col items-center">
+                                {passportDoc ? (
+                                  <>
+                                    {isImage ? (
+                                      <img 
+                                        src={passportDoc.file_url} 
+                                        alt="Passport" 
+                                        className="w-14 h-14 rounded-lg object-cover mb-2 cursor-pointer hover:scale-105 transition-transform"
+                                        onClick={(e) => handleDocumentClick(passportDoc, e)}
+                                      />
+                                    ) : (
+                                      <div className="w-14 h-14 rounded-lg bg-blue-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(passportDoc, e)}>
+                                        <BookOpen className="w-7 h-7 text-blue-500" />
+                                      </div>
+                                    )}
+                                    <p className="text-xs font-medium text-foreground">Passport</p>
+                                    <div className="flex gap-1 mt-1">
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(passportDoc, e)}><Eye className="w-3 h-3" /></Button>
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('passport-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="w-14 h-14 rounded-lg bg-blue-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                      <BookOpen className="w-7 h-7 text-blue-400" />
+                                    </div>
+                                    <p className="text-xs font-medium text-foreground">Passport</p>
+                                    <p className="text-[10px] text-muted-foreground">Upload</p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </label>
                         </div>
-                      </label>
-                    </div>
+                      );
+                    })()}
 
                     {/* Contract */}
-                    <div className="relative group">
-                      <input type="file" id="contract-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Contract')} className="hidden" />
-                      <label htmlFor="contract-upload" className="block cursor-pointer">
-                        <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-green-500/5 to-emerald-500/5 hover:border-green-500/50 transition-all">
-                          <div className="flex flex-col items-center">
-                            {documents.find(d => d.category === 'Contract') ? (
-                              <>
-                                <div className="w-12 h-12 rounded-lg bg-green-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Contract'), e)}>
-                                  <FileCheck className="w-6 h-6 text-green-500" />
-                                </div>
-                                <p className="text-xs font-medium text-foreground">Contract</p>
-                                <div className="flex gap-1 mt-1">
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Contract'), e)}><Eye className="w-3 h-3" /></Button>
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('contract-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                                  <FileCheck className="w-6 h-6 text-green-400" />
-                                </div>
-                                <p className="text-xs font-medium text-foreground">Contract</p>
-                                <p className="text-[10px] text-muted-foreground">Upload</p>
-                              </>
-                            )}
-                          </div>
+                    {(() => {
+                      const contractDoc = documents.find(d => d.category === 'Contract' && !d.is_renewed);
+                      const isImage = contractDoc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(contractDoc.file_url);
+                      return (
+                        <div className="relative group">
+                          <input type="file" id="contract-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Contract')} className="hidden" />
+                          <label htmlFor="contract-upload" className="block cursor-pointer">
+                            <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-green-500/5 to-emerald-500/5 hover:border-green-500/50 transition-all">
+                              <div className="flex flex-col items-center">
+                                {contractDoc ? (
+                                  <>
+                                    {isImage ? (
+                                      <img 
+                                        src={contractDoc.file_url} 
+                                        alt="Contract" 
+                                        className="w-14 h-14 rounded-lg object-cover mb-2 cursor-pointer hover:scale-105 transition-transform"
+                                        onClick={(e) => handleDocumentClick(contractDoc, e)}
+                                      />
+                                    ) : (
+                                      <div className="w-14 h-14 rounded-lg bg-green-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(contractDoc, e)}>
+                                        <FileCheck className="w-7 h-7 text-green-500" />
+                                      </div>
+                                    )}
+                                    <p className="text-xs font-medium text-foreground">Contract</p>
+                                    <div className="flex gap-1 mt-1">
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(contractDoc, e)}><Eye className="w-3 h-3" /></Button>
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('contract-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="w-14 h-14 rounded-lg bg-green-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                      <FileCheck className="w-7 h-7 text-green-400" />
+                                    </div>
+                                    <p className="text-xs font-medium text-foreground">Contract</p>
+                                    <p className="text-[10px] text-muted-foreground">Upload</p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </label>
                         </div>
-                      </label>
-                    </div>
+                      );
+                    })()}
 
                     {/* Work Permit */}
-                    <div className="relative group">
-                      <input type="file" id="workpermit-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Work Permit')} className="hidden" />
-                      <label htmlFor="workpermit-upload" className="block cursor-pointer">
-                        <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-orange-500/5 to-amber-500/5 hover:border-orange-500/50 transition-all">
-                          <div className="flex flex-col items-center">
-                            {documents.find(d => d.category === 'Work Permit') ? (
-                              <>
-                                <div className="w-12 h-12 rounded-lg bg-orange-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Work Permit'), e)}>
-                                  <Briefcase className="w-6 h-6 text-orange-500" />
-                                </div>
-                                <p className="text-xs font-medium text-foreground">Work Permit</p>
-                                <div className="flex gap-1 mt-1">
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Work Permit'), e)}><Eye className="w-3 h-3" /></Button>
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('workpermit-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                                  <Briefcase className="w-6 h-6 text-orange-400" />
-                                </div>
-                                <p className="text-xs font-medium text-foreground">Work Permit</p>
-                                <p className="text-[10px] text-muted-foreground">Upload</p>
-                              </>
-                            )}
-                          </div>
+                    {(() => {
+                      const workPermitDoc = documents.find(d => d.category === 'Work Permit' && !d.is_renewed);
+                      const isImage = workPermitDoc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(workPermitDoc.file_url);
+                      return (
+                        <div className="relative group">
+                          <input type="file" id="workpermit-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Work Permit')} className="hidden" />
+                          <label htmlFor="workpermit-upload" className="block cursor-pointer">
+                            <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-orange-500/5 to-amber-500/5 hover:border-orange-500/50 transition-all">
+                              <div className="flex flex-col items-center">
+                                {workPermitDoc ? (
+                                  <>
+                                    {isImage ? (
+                                      <img 
+                                        src={workPermitDoc.file_url} 
+                                        alt="Work Permit" 
+                                        className="w-14 h-14 rounded-lg object-cover mb-2 cursor-pointer hover:scale-105 transition-transform"
+                                        onClick={(e) => handleDocumentClick(workPermitDoc, e)}
+                                      />
+                                    ) : (
+                                      <div className="w-14 h-14 rounded-lg bg-orange-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(workPermitDoc, e)}>
+                                        <Briefcase className="w-7 h-7 text-orange-500" />
+                                      </div>
+                                    )}
+                                    <p className="text-xs font-medium text-foreground">Work Permit</p>
+                                    <div className="flex gap-1 mt-1">
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(workPermitDoc, e)}><Eye className="w-3 h-3" /></Button>
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('workpermit-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="w-14 h-14 rounded-lg bg-orange-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                      <Briefcase className="w-7 h-7 text-orange-400" />
+                                    </div>
+                                    <p className="text-xs font-medium text-foreground">Work Permit</p>
+                                    <p className="text-[10px] text-muted-foreground">Upload</p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </label>
                         </div>
-                      </label>
-                    </div>
+                      );
+                    })()}
 
                     {/* Medical Insurance */}
-                    <div className="relative group">
-                      <input type="file" id="medical-insurance-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Medical Insurance')} className="hidden" />
-                      <label htmlFor="medical-insurance-upload" className="block cursor-pointer">
-                        <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-rose-500/5 to-pink-500/5 hover:border-rose-500/50 transition-all">
-                          <div className="flex flex-col items-center">
-                            {documents.find(d => d.category === 'Medical Insurance') ? (
-                              <>
-                                <div className="w-12 h-12 rounded-lg bg-rose-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Medical Insurance'), e)}>
-                                  <HeartPulse className="w-6 h-6 text-rose-500" />
-                                </div>
-                                <p className="text-xs font-medium text-foreground">Medical Insurance</p>
-                                <div className="flex gap-1 mt-1">
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(documents.find(d => d.category === 'Medical Insurance'), e)}><Eye className="w-3 h-3" /></Button>
-                                  <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('medical-insurance-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="w-12 h-12 rounded-lg bg-rose-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                                  <HeartPulse className="w-6 h-6 text-rose-400" />
-                                </div>
-                                <p className="text-xs font-medium text-foreground">Medical Insurance</p>
-                                <p className="text-[10px] text-muted-foreground">Upload</p>
-                              </>
-                            )}
-                          </div>
+                    {(() => {
+                      const medicalDoc = documents.find(d => d.category === 'Medical Insurance' && !d.is_renewed);
+                      const isImage = medicalDoc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(medicalDoc.file_url);
+                      return (
+                        <div className="relative group">
+                          <input type="file" id="medical-insurance-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Medical Insurance')} className="hidden" />
+                          <label htmlFor="medical-insurance-upload" className="block cursor-pointer">
+                            <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-rose-500/5 to-pink-500/5 hover:border-rose-500/50 transition-all">
+                              <div className="flex flex-col items-center">
+                                {medicalDoc ? (
+                                  <>
+                                    {isImage ? (
+                                      <img 
+                                        src={medicalDoc.file_url} 
+                                        alt="Medical Insurance" 
+                                        className="w-14 h-14 rounded-lg object-cover mb-2 cursor-pointer hover:scale-105 transition-transform"
+                                        onClick={(e) => handleDocumentClick(medicalDoc, e)}
+                                      />
+                                    ) : (
+                                      <div className="w-14 h-14 rounded-lg bg-rose-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(medicalDoc, e)}>
+                                        <HeartPulse className="w-7 h-7 text-rose-500" />
+                                      </div>
+                                    )}
+                                    <p className="text-xs font-medium text-foreground">Medical Insurance</p>
+                                    <div className="flex gap-1 mt-1">
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(medicalDoc, e)}><Eye className="w-3 h-3" /></Button>
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('medical-insurance-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="w-14 h-14 rounded-lg bg-rose-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                      <HeartPulse className="w-7 h-7 text-rose-400" />
+                                    </div>
+                                    <p className="text-xs font-medium text-foreground">Medical Insurance</p>
+                                    <p className="text-[10px] text-muted-foreground">Upload</p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </label>
                         </div>
-                      </label>
-                    </div>
+                      );
+                    })()}
+
+                    {/* ILOE (Immigration Letter of Employment) */}
+                    {(() => {
+                      const iloeDoc = documents.find(d => d.category === 'ILOE' && !d.is_renewed);
+                      const isImage = iloeDoc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(iloeDoc.file_url);
+                      return (
+                        <div className="relative group">
+                          <input type="file" id="iloe-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'ILOE')} className="hidden" />
+                          <label htmlFor="iloe-upload" className="block cursor-pointer">
+                            <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-cyan-500/5 to-teal-500/5 hover:border-cyan-500/50 transition-all">
+                              <div className="flex flex-col items-center">
+                                {iloeDoc ? (
+                                  <>
+                                    {isImage ? (
+                                      <img 
+                                        src={iloeDoc.file_url} 
+                                        alt="ILOE" 
+                                        className="w-14 h-14 rounded-lg object-cover mb-2 cursor-pointer hover:scale-105 transition-transform"
+                                        onClick={(e) => handleDocumentClick(iloeDoc, e)}
+                                      />
+                                    ) : (
+                                      <div className="w-14 h-14 rounded-lg bg-cyan-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(iloeDoc, e)}>
+                                        <FileText className="w-7 h-7 text-cyan-500" />
+                                      </div>
+                                    )}
+                                    <p className="text-xs font-medium text-foreground">ILOE</p>
+                                    <div className="flex gap-1 mt-1">
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(iloeDoc, e)}><Eye className="w-3 h-3" /></Button>
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('iloe-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="w-14 h-14 rounded-lg bg-cyan-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                      <FileText className="w-7 h-7 text-cyan-400" />
+                                    </div>
+                                    <p className="text-xs font-medium text-foreground">ILOE</p>
+                                    <p className="text-[10px] text-muted-foreground">Upload</p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </label>
+                        </div>
+                      );
+                    })()}
                   </div>
                   
                   {/* Other Documents Upload */}
