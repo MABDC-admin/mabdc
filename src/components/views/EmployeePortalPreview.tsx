@@ -57,12 +57,15 @@ export function EmployeePortalPreview() {
   const leaveRecords = allLeave.filter(l => l.employee_id === selectedEmployeeId);
   const employeeContract = contracts.find(c => c.employee_id === selectedEmployeeId && c.status === 'Active');
 
-  // Calculate total available leave
-  const totalLeaveBalance = useMemo(() => {
-    return leaveBalances.reduce((acc, balance) => {
-      const available = (balance.entitled_days + balance.carried_forward_days) - balance.used_days - balance.pending_days;
-      return acc + Math.max(0, available);
-    }, 0);
+  // Calculate Annual Leave balance only (linked to employee via leave_balances table)
+  const annualLeaveBalance = useMemo(() => {
+    const annualLeave = leaveBalances.find(lb => 
+      lb.leave_types?.name === 'Annual Leave'
+    );
+    if (!annualLeave) return 0;
+    const available = (annualLeave.entitled_days + annualLeave.carried_forward_days) - 
+                      annualLeave.used_days - annualLeave.pending_days;
+    return Math.max(0, available);
   }, [leaveBalances]);
 
   const tabs = [
@@ -228,11 +231,11 @@ export function EmployeePortalPreview() {
                 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-muted-foreground">Leave Balance</CardTitle>
+                    <CardTitle className="text-sm text-muted-foreground">Annual Leave Balance</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-2xl font-bold text-primary">
-                      {leaveBalances.length > 0 ? `${totalLeaveBalance} days` : 'Not allocated'}
+                      {leaveBalances.length > 0 ? `${annualLeaveBalance} days` : 'Not allocated'}
                     </p>
                   </CardContent>
                 </Card>
