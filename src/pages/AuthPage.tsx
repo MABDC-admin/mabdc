@@ -38,13 +38,14 @@ export default function AuthPage() {
   const [searchParams] = useSearchParams();
   const portalType = searchParams.get('portal') || 'admin';
   const redirectTo = searchParams.get('redirect') || (portalType === 'admin' ? '/admin' : '/');
-  const isPasswordReset = searchParams.get('reset') === 'true';
+  const isPasswordResetParam = searchParams.get('reset') === 'true';
   
   const { user, isLoading: authLoading, signIn, signUp, resetPassword, updatePassword, isAdmin, isHR } = useAuth();
   
   const [activeTab, setActiveTab] = useState('login');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -63,16 +64,32 @@ export default function AuthPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
-  // Redirect if already authenticated with correct role
+  // Detect password recovery from URL hash (Supabase adds #access_token=...&type=recovery)
   useEffect(() => {
-    if (user && !authLoading && !isPasswordReset) {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get('type');
+    if (type === 'recovery') {
+      setIsPasswordRecovery(true);
+    }
+  }, []);
+
+  // Also check the reset param
+  useEffect(() => {
+    if (isPasswordResetParam) {
+      setIsPasswordRecovery(true);
+    }
+  }, [isPasswordResetParam]);
+
+  // Redirect if already authenticated with correct role (but not during password recovery)
+  useEffect(() => {
+    if (user && !authLoading && !isPasswordRecovery) {
       if (portalType === 'admin' && isAdmin()) {
         navigate(redirectTo);
       } else if (portalType === 'hr' && (isHR() || isAdmin())) {
         navigate(redirectTo);
       }
     }
-  }, [user, authLoading, isAdmin, isHR, navigate, portalType, redirectTo, isPasswordReset]);
+  }, [user, authLoading, isAdmin, isHR, navigate, portalType, redirectTo, isPasswordRecovery]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,7 +216,7 @@ export default function AuthPage() {
   const showSignup = portalType === 'admin';
 
   // Password reset form (after clicking email link)
-  if (isPasswordReset && user) {
+  if (isPasswordRecovery && user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
         <Card className="w-full max-w-md border-border/50 shadow-2xl">
