@@ -37,12 +37,14 @@ export function useDeactivateEmployee() {
       reason,
       lastWorkingDay,
       customGratuity,
+      gratuityAdjustmentReason,
     }: {
       employeeId: string;
       status: 'Resigned' | 'Terminated';
       reason: string;
       lastWorkingDay: string;
       customGratuity?: number;
+      gratuityAdjustmentReason?: string;
     }) => {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
@@ -86,7 +88,11 @@ export function useDeactivateEmployee() {
         // Use custom gratuity if provided, otherwise use calculated amount
         const finalGratuity = customGratuity !== undefined ? customGratuity : gratuityAmount;
         
-        // Create EOS record
+        // Create EOS record with adjustment reason if provided
+        const eosReason = customGratuity !== undefined 
+          ? `${status}: ${reason} | Gratuity Adjustment: ${gratuityAdjustmentReason || 'No reason provided'}`
+          : `${status}: ${reason}`;
+        
         const { error: eosError } = await supabase
           .from('eos_records')
           .insert({
@@ -94,7 +100,7 @@ export function useDeactivateEmployee() {
             years_of_service: yearsOfService,
             basic_salary: basicSalary,
             gratuity_amount: finalGratuity,
-            reason: `${status}: ${reason}${customGratuity !== undefined ? ' (Manually adjusted)' : ''}`,
+            reason: eosReason,
             paid: false,
           });
         
