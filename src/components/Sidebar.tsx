@@ -17,7 +17,6 @@ import {
   LogOut,
   FolderOpen,
   ChevronDown,
-  ChevronRight,
   UserCheck,
   AlertCircle,
   Timer,
@@ -190,48 +189,61 @@ export function Sidebar() {
                       {item.icon}
                       <span>{item.label}</span>
                     </div>
-                    {expandedMenus.includes(item.id) ? (
-                      <ChevronDown className="w-4 h-4" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4" />
-                    )}
+                    <ChevronDown 
+                      className={cn(
+                        "w-4 h-4 transition-transform duration-300 ease-out",
+                        expandedMenus.includes(item.id) ? "rotate-0" : "-rotate-90"
+                      )} 
+                    />
                   </button>
                   
-                  {/* Submenu items */}
-                  {expandedMenus.includes(item.id) && (
-                    <div className="ml-4 pl-4 border-l border-border space-y-1 mt-1">
-                      {item.subItems.map((subItem) => {
-                        const badgeCount = subItem.id === 'attendance-appeals' ? pendingAppealsCount : 0;
-                        return (
-                          <button
-                            key={subItem.id}
-                            onClick={() => {
-                              if (subItem.id === 'smart-upload') {
-                                navigate('/smart-upload');
-                              } else {
-                                setCurrentView(subItem.id);
-                              }
-                              setIsMobileOpen(false);
-                            }}
-                            className={cn(
-                              "nav-item w-full text-left text-muted-foreground text-sm py-2 flex items-center justify-between",
-                              currentView === subItem.id && "active text-primary"
-                            )}
-                          >
-                            <div className="flex items-center gap-2">
-                              {subItem.icon}
-                              <span>{subItem.label}</span>
-                            </div>
-                            {badgeCount > 0 && (
-                              <Badge variant="destructive" className="animate-pulse text-[10px] px-1.5 py-0 h-5">
-                                {badgeCount}
-                              </Badge>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                  {/* Submenu items with animation */}
+                  <div 
+                    className={cn(
+                      "ml-4 pl-4 border-l border-border space-y-1 mt-1 overflow-hidden transition-all duration-300 ease-out",
+                      expandedMenus.includes(item.id) 
+                        ? "max-h-96 opacity-100" 
+                        : "max-h-0 opacity-0"
+                    )}
+                  >
+                    {item.subItems.map((subItem, index) => {
+                      const badgeCount = subItem.id === 'attendance-appeals' ? pendingAppealsCount : 0;
+                      return (
+                        <button
+                          key={subItem.id}
+                          onClick={() => {
+                            if (subItem.id === 'smart-upload') {
+                              navigate('/smart-upload');
+                            } else {
+                              setCurrentView(subItem.id);
+                            }
+                            setIsMobileOpen(false);
+                          }}
+                          className={cn(
+                            "nav-item w-full text-left text-muted-foreground text-sm py-2 flex items-center justify-between",
+                            "transform transition-all duration-200 ease-out",
+                            expandedMenus.includes(item.id) 
+                              ? "translate-x-0 opacity-100" 
+                              : "-translate-x-2 opacity-0",
+                            currentView === subItem.id && "active text-primary"
+                          )}
+                          style={{ 
+                            transitionDelay: expandedMenus.includes(item.id) ? `${index * 50}ms` : '0ms' 
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            {subItem.icon}
+                            <span>{subItem.label}</span>
+                          </div>
+                          {badgeCount > 0 && (
+                            <Badge variant="destructive" className="animate-pulse text-[10px] px-1.5 py-0 h-5">
+                              {badgeCount}
+                            </Badge>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </>
               ) : (
                 <button
