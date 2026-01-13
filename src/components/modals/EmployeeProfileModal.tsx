@@ -1153,11 +1153,11 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                   </div>
 
                   {/* Uploaded Documents Thumbnail Grid */}
-                  {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit', 'Medical Insurance'].includes(d.category || '') && !d.is_renewed).length > 0 && (
+                  {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit', 'Medical Insurance', 'ILOE'].includes(d.category || '') && !d.is_renewed).length > 0 && (
                     <div className="space-y-3">
                       <p className="text-sm font-medium text-foreground">Other Uploaded Documents</p>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                        {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit', 'Medical Insurance'].includes(d.category || '') && !d.is_renewed).map((doc) => {
+                        {documents.filter(d => !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit', 'Medical Insurance', 'ILOE'].includes(d.category || '') && !d.is_renewed).map((doc) => {
                           const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
                           const isPdf = /\.pdf$/i.test(doc.file_url);
                           const hasExpiry = doc.expiry_date;
@@ -1218,7 +1218,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                               )}
                               
                               {/* Category Badge */}
-                              {doc.category && !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit'].includes(doc.category) && (
+                              {doc.category && !['Photo', 'Emirates ID', 'Visa', 'Passport', 'Contract', 'Work Permit', 'Medical Insurance', 'ILOE'].includes(doc.category) && (
                                 <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-primary/80 text-primary-foreground text-[9px] font-medium truncate max-w-[80px]">
                                   {doc.category}
                                 </div>
