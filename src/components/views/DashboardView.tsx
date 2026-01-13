@@ -248,17 +248,25 @@ export function DashboardView() {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Visa Expiry Alerts */}
-        <div className="glass-card rounded-2xl border border-border p-5">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* Visa Expiry Alerts - Expanded */}
+        <div className="glass-card rounded-2xl border border-border p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-500" />
               Visa Expiry Alerts
             </h2>
-            <span className="text-xs text-amber-500 font-medium">{expiringVisas.length} expiring</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-xs text-amber-500 hover:text-amber-400 gap-1"
+              onClick={() => setCurrentView('renewal')}
+            >
+              {expiringVisas.length} expiring
+              <ArrowRight className="w-3 h-3" />
+            </Button>
           </div>
-          <div className="h-[200px] overflow-y-auto soft-scroll">
+          <div className="h-[280px] overflow-y-auto soft-scroll">
             {expiringVisas.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
                 <CheckCircle className="w-10 h-10 mb-2 text-primary opacity-50" />
@@ -266,16 +274,19 @@ export function DashboardView() {
                 <p className="text-xs opacity-70">No expiring visas in the next 60 days</p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {expiringVisas.slice(0, 6).map((emp) => {
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {expiringVisas.slice(0, 10).map((emp) => {
                   const days = Math.ceil((new Date(emp.visa_expiration!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                  const urgency = days <= 7 ? 'critical' : days <= 30 ? 'warning' : 'caution';
                   return (
                     <div 
                       key={emp.id} 
                       className={cn(
                         "flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors",
-                        days <= 30 
+                        urgency === 'critical' 
                           ? "bg-destructive/10 border-destructive/30 hover:bg-destructive/20" 
+                          : urgency === 'warning'
+                          ? "bg-orange-500/10 border-orange-500/30 hover:bg-orange-500/20"
                           : "bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20"
                       )}
                       onClick={() => setCurrentView('employees')}
@@ -286,24 +297,28 @@ export function DashboardView() {
                         ) : (
                           <div className={cn(
                             "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold",
-                            days <= 30 ? "bg-destructive/20 text-destructive" : "bg-amber-500/20 text-amber-500"
+                            urgency === 'critical' ? "bg-destructive/20 text-destructive" : 
+                            urgency === 'warning' ? "bg-orange-500/20 text-orange-500" : 
+                            "bg-amber-500/20 text-amber-500"
                           )}>
                             {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
                           </div>
                         )}
-                        <div>
-                          <p className="text-sm font-medium text-foreground">{emp.full_name}</p>
-                          <p className="text-[10px] text-muted-foreground">{emp.hrms_no} • Visa: {emp.visa_no}</p>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{emp.full_name}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{emp.hrms_no} • Exp: {format(parseISO(emp.visa_expiration!), 'dd MMM yyyy')}</p>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex-shrink-0">
                         <p className={cn(
                           "text-lg font-bold",
-                          days <= 30 ? "text-destructive" : "text-amber-500"
+                          urgency === 'critical' ? "text-destructive" : 
+                          urgency === 'warning' ? "text-orange-500" : 
+                          "text-amber-500"
                         )}>
                           {days}
                         </p>
-                        <p className="text-[10px] text-muted-foreground">days left</p>
+                        <p className="text-[10px] text-muted-foreground">days</p>
                       </div>
                     </div>
                   );
@@ -318,11 +333,11 @@ export function DashboardView() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-500" />
-              Today's Late Employees
+              Today's Late
             </h2>
             <span className="text-xs text-amber-500 font-medium">{lateToday} late</span>
           </div>
-          <div className="h-[200px] overflow-y-auto soft-scroll">
+          <div className="h-[280px] overflow-y-auto soft-scroll">
             {todayAttendance.filter(a => a.status === 'Late').length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
                 <CheckCircle className="w-10 h-10 mb-2 text-primary opacity-50" />
@@ -356,60 +371,57 @@ export function DashboardView() {
           </div>
         </div>
 
-        {/* Upcoming Birthdays */}
-        <div className="glass-card rounded-2xl border border-border p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Cake className="w-4 h-4 text-pink-500" />
-              Upcoming Birthdays
+        {/* Upcoming Birthdays - Compact */}
+        <div className="glass-card rounded-2xl border border-border p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <Cake className="w-3.5 h-3.5 text-pink-500" />
+              Birthdays
             </h2>
-            <span className="text-xs text-pink-500 font-medium">{upcomingBirthdays.length} this week</span>
+            <span className="text-[10px] text-pink-500 font-medium">{upcomingBirthdays.length}</span>
           </div>
-          <div className="h-[200px] overflow-y-auto soft-scroll">
+          <div className="h-[260px] overflow-y-auto soft-scroll">
             {upcomingBirthdays.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-                <Cake className="w-10 h-10 mb-2 text-pink-500 opacity-50" />
-                <p className="text-sm font-medium">No birthdays soon</p>
-                <p className="text-xs opacity-70">No birthdays in the next 7 days</p>
+                <Cake className="w-8 h-8 mb-2 text-pink-500 opacity-50" />
+                <p className="text-xs font-medium">No birthdays</p>
+                <p className="text-[10px] opacity-70">Next 7 days</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {upcomingBirthdays.map((emp) => (
                   <div 
                     key={emp.id} 
                     className={cn(
-                      "flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors",
+                      "flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors",
                       emp.daysUntil === 0 
                         ? "bg-pink-500/20 border-pink-500/40 hover:bg-pink-500/30" 
                         : "bg-pink-500/10 border-pink-500/20 hover:bg-pink-500/20"
                     )}
                     onClick={() => setCurrentView('employees')}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       {emp.photo_url ? (
-                        <img src={emp.photo_url} alt={emp.full_name} className="w-8 h-8 rounded-lg object-cover" />
+                        <img src={emp.photo_url} alt={emp.full_name} className="w-6 h-6 rounded-md object-cover" />
                       ) : (
-                        <div className="w-8 h-8 rounded-lg bg-pink-500/20 flex items-center justify-center text-xs font-bold text-pink-500">
+                        <div className="w-6 h-6 rounded-md bg-pink-500/20 flex items-center justify-center text-[10px] font-bold text-pink-500">
                           {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
                         </div>
                       )}
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{emp.full_name}</p>
-                        <p className="text-[10px] text-muted-foreground">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">{emp.full_name}</p>
+                        <p className="text-[9px] text-muted-foreground">
                           {format(emp.birthdayDate, 'MMM dd')}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       {emp.daysUntil === 0 ? (
-                        <span className="text-xs px-2 py-1 rounded-full bg-pink-500 text-white font-medium">
-                          🎂 Today!
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-pink-500 text-white font-medium">
+                          🎂
                         </span>
                       ) : (
-                        <>
-                          <p className="text-lg font-bold text-pink-500">{emp.daysUntil}</p>
-                          <p className="text-[10px] text-muted-foreground">days</p>
-                        </>
+                        <p className="text-sm font-bold text-pink-500">{emp.daysUntil}d</p>
                       )}
                     </div>
                   </div>
@@ -495,109 +507,63 @@ export function DashboardView() {
         )}
       </div>
 
-      {/* Bottom Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Recent Employees */}
-        <div className="glass-card rounded-2xl border border-border p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground">Recent Employees</h2>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="text-xs text-primary hover:text-primary/80"
-              onClick={() => setCurrentView('employees')}
-            >
-              View All
-              <ArrowRight className="w-3 h-3 ml-1" />
-            </Button>
-          </div>
-          <div className="space-y-3">
-            {recentEmployees.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-xs">No employees found</p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-3"
-                  onClick={() => setCurrentView('employees')}
-                >
-                  Add Employee
-                </Button>
-              </div>
-            ) : (
-              recentEmployees.map((emp) => (
-                <div key={emp.id} className="p-3 rounded-xl bg-secondary/30 border border-border hover:border-primary/30 transition-colors cursor-pointer group">
-                  <div className="flex items-center gap-3">
-                    {emp.photo_url ? (
-                      <img src={emp.photo_url} alt={emp.full_name} className="w-10 h-10 rounded-lg object-cover" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-lg avatar-gradient flex items-center justify-center text-sm font-bold text-primary-foreground">
-                        {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">{emp.full_name}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {emp.job_position} • {emp.department}
-                      </p>
-                    </div>
-                    <span className={cn(
-                      "text-[10px] px-2 py-1 rounded-full font-medium",
-                      emp.status === 'Active' 
-                        ? "bg-primary/10 text-primary border border-primary/30"
-                        : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
-                    )}>
-                      {emp.status || 'Active'}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+      {/* Bottom Card - Recent Employees */}
+      <div className="glass-card rounded-2xl border border-border p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-foreground">Recent Employees</h2>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-xs text-primary hover:text-primary/80"
+            onClick={() => setCurrentView('employees')}
+          >
+            View All
+            <ArrowRight className="w-3 h-3 ml-1" />
+          </Button>
         </div>
-
-        {/* Visa Expiry Alerts */}
-        <div className="glass-card rounded-2xl border border-border p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400" />
-              Visa Expiry Alerts
-            </h2>
-            <span className="text-xs text-amber-400 font-medium">{expiringVisas.length} expiring</span>
-          </div>
-          <div className="space-y-3">
-            {expiringVisas.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-xs">No visa expiry alerts</p>
-                <p className="text-[10px] mt-1 opacity-70">All visas are valid for more than 60 days</p>
-              </div>
-            ) : (
-              expiringVisas.map((emp) => {
-                const days = Math.ceil((new Date(emp.visa_expiration!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-                return (
-                  <div key={emp.id} className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-amber-200">{emp.full_name}</p>
-                        <p className="text-xs text-foreground mt-1">HRMS: {emp.hrms_no}</p>
-                      </div>
-                      <div className="text-right">
-                        <span className={cn(
-                          "text-lg font-bold",
-                          days <= 30 ? "text-destructive" : "text-amber-400"
-                        )}>
-                          {days}
-                        </span>
-                        <p className="text-[10px] text-muted-foreground">days left</p>
-                      </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {recentEmployees.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground col-span-full">
+              <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-xs">No employees found</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="mt-3"
+                onClick={() => setCurrentView('employees')}
+              >
+                Add Employee
+              </Button>
+            </div>
+          ) : (
+            recentEmployees.map((emp) => (
+              <div key={emp.id} className="p-3 rounded-xl bg-secondary/30 border border-border hover:border-primary/30 transition-colors cursor-pointer group">
+                <div className="flex items-center gap-3">
+                  {emp.photo_url ? (
+                    <img src={emp.photo_url} alt={emp.full_name} className="w-10 h-10 rounded-lg object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg avatar-gradient flex items-center justify-center text-sm font-bold text-primary-foreground">
+                      {emp.full_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
                     </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">{emp.full_name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {emp.job_position} • {emp.department}
+                    </p>
                   </div>
-                );
-              })
-            )}
-          </div>
+                  <span className={cn(
+                    "text-[10px] px-2 py-1 rounded-full font-medium",
+                    emp.status === 'Active' 
+                      ? "bg-primary/10 text-primary border border-primary/30"
+                      : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                  )}>
+                    {emp.status || 'Active'}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
