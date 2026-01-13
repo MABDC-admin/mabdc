@@ -100,6 +100,7 @@ export function EmployeesView() {
   const [lastWorkingDay, setLastWorkingDay] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [customGratuity, setCustomGratuity] = useState<number | null>(null);
   const [isGratuityEditing, setIsGratuityEditing] = useState(false);
+  const [gratuityAdjustmentReason, setGratuityAdjustmentReason] = useState('');
 
   // Get employees with pending leave requests
   const employeesWithPendingLeave = new Set(
@@ -128,6 +129,13 @@ export function EmployeesView() {
   };
 
   const handleDeactivate = () => {
+    // Check if gratuity was modified and require adjustment reason
+    const isGratuityModified = customGratuity !== null;
+    if (isGratuityModified && !gratuityAdjustmentReason.trim()) {
+      toast.error('Please provide a reason for the gratuity modification');
+      return;
+    }
+    
     if (deactivateEmployeeId && deactivationReason && lastWorkingDay) {
       deactivateEmployee.mutate({
         employeeId: deactivateEmployeeId,
@@ -135,6 +143,7 @@ export function EmployeesView() {
         reason: deactivationReason,
         lastWorkingDay,
         customGratuity: customGratuity !== null ? customGratuity : undefined,
+        gratuityAdjustmentReason: gratuityAdjustmentReason.trim() || undefined,
       });
       setDeactivateEmployeeId(null);
       setDeactivationReason('');
@@ -142,6 +151,7 @@ export function EmployeesView() {
       setLastWorkingDay(format(new Date(), 'yyyy-MM-dd'));
       setCustomGratuity(null);
       setIsGratuityEditing(false);
+      setGratuityAdjustmentReason('');
     }
   };
 
@@ -815,7 +825,7 @@ export function EmployeesView() {
                     </div>
                     
                     {isGratuityEditing ? (
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-muted-foreground">AED</span>
                           <Input
@@ -838,6 +848,24 @@ export function EmployeesView() {
                               ({customGratuity > eosCalc.gratuityAmount ? '+' : ''}{(customGratuity - eosCalc.gratuityAmount).toLocaleString()})
                             </span>
                           )}
+                        </div>
+                        
+                        {/* Required reason for gratuity modification */}
+                        <div className="space-y-1.5 pt-2 border-t border-border">
+                          <Label className="text-xs font-medium text-destructive flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            Reason for Modification *
+                          </Label>
+                          <Textarea
+                            value={gratuityAdjustmentReason}
+                            onChange={(e) => setGratuityAdjustmentReason(e.target.value)}
+                            placeholder="Please provide a justification for adjusting the gratuity amount..."
+                            className="min-h-[60px] text-sm resize-none"
+                            required
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            This reason will be recorded in the EOS record for audit purposes.
+                          </p>
                         </div>
                       </div>
                     ) : (
