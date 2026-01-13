@@ -10,6 +10,7 @@ export function useEmployees() {
       const { data, error } = await supabase
         .from('employees')
         .select('*')
+        .not('status', 'in', '("Resigned","Terminated")')
         .order('created_at', { ascending: false });
       
       if (error) throw error;

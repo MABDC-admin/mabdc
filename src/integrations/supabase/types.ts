@@ -814,6 +814,9 @@ export type Database = {
           contract_type: string | null
           country_of_birth: string | null
           created_at: string
+          deactivated_at: string | null
+          deactivated_by: string | null
+          deactivation_reason: string | null
           department: string
           emirates_id: string | null
           emirates_id_expiry: string | null
@@ -826,6 +829,7 @@ export type Database = {
           id: string
           job_position: string
           joining_date: string
+          last_working_day: string | null
           leave_balance: number | null
           manager: string | null
           nationality: string | null
@@ -853,6 +857,9 @@ export type Database = {
           contract_type?: string | null
           country_of_birth?: string | null
           created_at?: string
+          deactivated_at?: string | null
+          deactivated_by?: string | null
+          deactivation_reason?: string | null
           department: string
           emirates_id?: string | null
           emirates_id_expiry?: string | null
@@ -865,6 +872,7 @@ export type Database = {
           id?: string
           job_position: string
           joining_date: string
+          last_working_day?: string | null
           leave_balance?: number | null
           manager?: string | null
           nationality?: string | null
@@ -892,6 +900,9 @@ export type Database = {
           contract_type?: string | null
           country_of_birth?: string | null
           created_at?: string
+          deactivated_at?: string | null
+          deactivated_by?: string | null
+          deactivation_reason?: string | null
           department?: string
           emirates_id?: string | null
           emirates_id_expiry?: string | null
@@ -904,6 +915,7 @@ export type Database = {
           id?: string
           job_position?: string
           joining_date?: string
+          last_working_day?: string | null
           leave_balance?: number | null
           manager?: string | null
           nationality?: string | null
