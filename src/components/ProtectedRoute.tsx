@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,11 +21,13 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const navigate = useNavigate();
   const { user, isLoading, hasRole, isAdmin } = useAuth();
+  const isRedirecting = useRef(false);
 
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && !isRedirecting.current) {
       if (!user) {
         // Not logged in, redirect to auth
+        isRedirecting.current = true;
         const authUrl = redirectTo || `/auth?portal=${portal}&redirect=${encodeURIComponent(window.location.pathname)}`;
         navigate(authUrl);
         return;
@@ -36,6 +38,7 @@ export function ProtectedRoute({
         const hasRequiredRole = requiredRoles.some(role => hasRole(role)) || isAdmin();
         if (!hasRequiredRole) {
           // Sign out and redirect to login with access denied error
+          isRedirecting.current = true;
           supabase.auth.signOut().then(() => {
             const authUrl = `/auth?portal=${portal}&redirect=${encodeURIComponent(window.location.pathname)}&error=access_denied`;
             navigate(authUrl);
@@ -56,7 +59,7 @@ export function ProtectedRoute({
     );
   }
 
-  if (!user) {
+  if (!user || isRedirecting.current) {
     return null; // Will redirect in useEffect
   }
 
