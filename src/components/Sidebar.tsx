@@ -24,7 +24,8 @@ import {
   Eye,
   Gamepad2,
   Trophy,
-  Sparkles
+  Sparkles,
+  UserMinus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHRStore } from '@/store/hrStore';
@@ -61,6 +62,7 @@ const navItems: NavItem[] = [
     icon: <Users className="w-5 h-5" />,
     subItems: [
       { id: 'employees', label: 'All Employees', icon: <Users className="w-4 h-4" /> },
+      { id: 'deactivated', label: 'Deactivated', icon: <UserMinus className="w-4 h-4" /> },
       { id: 'time-shift', label: 'Time Shift', icon: <Timer className="w-4 h-4" /> },
       { id: 'time-clock', label: 'Time Clock', icon: <Clock className="w-4 h-4" /> },
       { id: 'e-portal', label: 'E-Portal', icon: <Eye className="w-4 h-4" /> }

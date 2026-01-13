@@ -1,6 +1,7 @@
 import { Sidebar } from '@/components/Sidebar';
 import { DashboardView } from '@/components/views/DashboardView';
 import { EmployeesView } from '@/components/views/EmployeesView';
+import { DeactivatedEmployeesView } from '@/components/views/DeactivatedEmployeesView';
 import TimeShiftView from '@/components/views/TimeShiftView';
 import TimeClockView from '@/components/views/TimeClockView';
 import { EmployeePortalPreview } from '@/components/views/EmployeePortalPreview';
@@ -33,6 +34,8 @@ const Index = () => {
         return <GamificationView />;
       case 'employees':
         return <EmployeesView />;
+      case 'deactivated':
+        return <DeactivatedEmployeesView />;
       case 'time-shift':
         return <TimeShiftView />;
       case 'time-clock':

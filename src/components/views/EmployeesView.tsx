@@ -1,18 +1,21 @@
 import { useState, useMemo } from 'react';
 import { useEmployees, useDeleteEmployee } from '@/hooks/useEmployees';
+import { useDeactivateEmployee } from '@/hooks/useDeactivatedEmployees';
 import { useLeave, useAllLeaveBalances, useLeaveTypes } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { useHRStore } from '@/store/hrStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
 import { AddEmployeeModal } from '@/components/modals/AddEmployeeModal';
-import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning, FilePlus, MessageCircle } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning, FilePlus, MessageCircle, UserMinus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/hr';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { differenceInDays, differenceInYears, parseISO } from 'date-fns';
+import { differenceInDays, differenceInYears, parseISO, format } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +31,21 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export function EmployeesView() {
   const { data: employees = [], isLoading, refetch } = useEmployees();
@@ -35,6 +53,7 @@ export function EmployeesView() {
   const { data: contracts = [] } = useContracts();
   const { data: allLeaveBalances = [] } = useAllLeaveBalances();
   const { data: leaveTypes = [] } = useLeaveTypes();
+  const deactivateEmployee = useDeactivateEmployee();
 
   // Find Annual Leave type ID
   const annualLeaveType = useMemo(() => {
@@ -72,6 +91,12 @@ export function EmployeesView() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
+  // Deactivation state
+  const [deactivateEmployeeId, setDeactivateEmployeeId] = useState<string | null>(null);
+  const [deactivationStatus, setDeactivationStatus] = useState<'Resigned' | 'Terminated'>('Resigned');
+  const [deactivationReason, setDeactivationReason] = useState('');
+  const [lastWorkingDay, setLastWorkingDay] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   // Get employees with pending leave requests
   const employeesWithPendingLeave = new Set(
@@ -97,6 +122,27 @@ export function EmployeesView() {
       deleteEmployee.mutate(deleteId);
       setDeleteId(null);
     }
+  };
+
+  const handleDeactivate = () => {
+    if (deactivateEmployeeId && deactivationReason && lastWorkingDay) {
+      deactivateEmployee.mutate({
+        employeeId: deactivateEmployeeId,
+        status: deactivationStatus,
+        reason: deactivationReason,
+        lastWorkingDay,
+      });
+      setDeactivateEmployeeId(null);
+      setDeactivationReason('');
+      setDeactivationStatus('Resigned');
+      setLastWorkingDay(format(new Date(), 'yyyy-MM-dd'));
+    }
+  };
+
+  const openDeactivateDialog = (employeeId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeactivateEmployeeId(employeeId);
+    setLastWorkingDay(format(new Date(), 'yyyy-MM-dd'));
   };
 
   const getInitials = (name: string) => {
@@ -287,6 +333,19 @@ export function EmployeesView() {
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Copy portal link</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="secondary"
+                          size="icon"
+                          className="h-7 w-7 hover:bg-amber-500/20 hover:text-amber-600"
+                          onClick={(e) => openDeactivateDialog(emp.id, e)}
+                        >
+                          <UserMinus className="w-3 h-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Deactivate employee</TooltipContent>
                     </Tooltip>
                     <Button 
                       variant="secondary"
@@ -584,6 +643,63 @@ export function EmployeesView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Deactivate Employee Dialog */}
+      <Dialog open={!!deactivateEmployeeId} onOpenChange={() => setDeactivateEmployeeId(null)}>
+        <DialogContent className="glass-card border-border">
+          <DialogHeader>
+            <DialogTitle>Deactivate Employee</DialogTitle>
+            <DialogDescription>
+              Mark this employee as resigned or terminated. Their data will be preserved in the archive.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={deactivationStatus} onValueChange={(v) => setDeactivationStatus(v as 'Resigned' | 'Terminated')}>
+                <SelectTrigger className="bg-secondary/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Resigned">Resigned</SelectItem>
+                  <SelectItem value="Terminated">Terminated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Last Working Day</Label>
+              <Input
+                type="date"
+                value={lastWorkingDay}
+                onChange={(e) => setLastWorkingDay(e.target.value)}
+                className="bg-secondary/50"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Reason</Label>
+              <Textarea
+                value={deactivationReason}
+                onChange={(e) => setDeactivationReason(e.target.value)}
+                placeholder="Enter reason for deactivation..."
+                className="bg-secondary/50 min-h-[80px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeactivateEmployeeId(null)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleDeactivate}
+              disabled={!deactivationReason || deactivateEmployee.isPending}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              <UserMinus className="w-4 h-4 mr-2" />
+              Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
