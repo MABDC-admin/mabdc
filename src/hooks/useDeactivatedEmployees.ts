@@ -36,11 +36,13 @@ export function useDeactivateEmployee() {
       status,
       reason,
       lastWorkingDay,
+      customGratuity,
     }: {
       employeeId: string;
       status: 'Resigned' | 'Terminated';
       reason: string;
       lastWorkingDay: string;
+      customGratuity?: number;
     }) => {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
@@ -75,11 +77,14 @@ export function useDeactivateEmployee() {
       const joiningDate = employee.joining_date;
       
       if (joiningDate && basicSalary > 0) {
-        const { yearsOfService, gratuityAmount, isEligible } = calculateGratuity(
+        const { yearsOfService, gratuityAmount } = calculateGratuity(
           joiningDate,
           lastWorkingDay,
           basicSalary
         );
+        
+        // Use custom gratuity if provided, otherwise use calculated amount
+        const finalGratuity = customGratuity !== undefined ? customGratuity : gratuityAmount;
         
         // Create EOS record
         const { error: eosError } = await supabase
@@ -88,8 +93,8 @@ export function useDeactivateEmployee() {
             employee_id: employeeId,
             years_of_service: yearsOfService,
             basic_salary: basicSalary,
-            gratuity_amount: gratuityAmount,
-            reason: `${status}: ${reason}`,
+            gratuity_amount: finalGratuity,
+            reason: `${status}: ${reason}${customGratuity !== undefined ? ' (Manually adjusted)' : ''}`,
             paid: false,
           });
         
