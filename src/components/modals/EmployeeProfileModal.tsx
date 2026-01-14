@@ -867,17 +867,24 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
 
             {/* Leave Tab */}
             {activeTab === 'leave' && (
-              <div className="space-y-6 animate-fade-in">
+                <div className="space-y-6 animate-fade-in">
                 <div className="glass-card rounded-2xl border border-border p-5">
                   <h3 className="text-lg font-semibold text-foreground mb-4">LEAVE HISTORY</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Annual entitlement</p>
-                      <p className="text-lg font-semibold text-foreground">30 days / year</p>
+                      <p className="text-lg font-semibold text-foreground">
+                        {(() => {
+                          const annualLeaveBalance = leaveBalances.find(
+                            b => b.leave_types?.name === 'Annual Leave' || b.leave_types?.code === 'AL'
+                          );
+                          return annualLeaveBalance?.entitled_days || 30;
+                        })()} days / year
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Current balance</p>
-                      <p className="text-lg font-semibold text-foreground">{currentEmployee.leave_balance || 0} days</p>
+                      <p className="text-lg font-semibold text-foreground">{totalLeaveBalance} days</p>
                     </div>
                   </div>
                   
