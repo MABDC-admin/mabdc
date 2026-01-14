@@ -40,8 +40,11 @@ export default defineConfig({
   build: {
     outDir: 'dist-kiosk',
     rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'index-kiosk.html')
+      input: path.resolve(__dirname, 'index-kiosk.html'),
+      output: {
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     }
   },

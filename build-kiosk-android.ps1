@@ -9,6 +9,11 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+# Rename index file for Capacitor
+if (Test-Path "dist-kiosk\index-kiosk.html") {
+    Rename-Item "dist-kiosk\index-kiosk.html" "index.html" -Force
+}
+
 # Step 2: Copy capacitor config
 Write-Host "`n[2/4] Configuring Capacitor..." -ForegroundColor Cyan
 Copy-Item "capacitor.config.kiosk.ts" "capacitor.config.ts" -Force
