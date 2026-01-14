@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useLeave } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
@@ -10,6 +11,8 @@ import { useNavigate } from 'react-router-dom';
 import { differenceInDays, parseISO, format, isAfter, isBefore, addDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
+import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
+import type { Employee } from '@/types/hr';
 
 interface StatCardProps {
   label: string;
@@ -63,12 +66,15 @@ const CHART_COLORS = ['hsl(152, 100%, 30%)', 'hsl(210, 100%, 35%)', 'hsl(45, 100
 
 export function DashboardView() {
   const navigate = useNavigate();
-  const { setCurrentView } = useHRStore();
+  const { setCurrentView, setCurrentEmployee } = useHRStore();
   const { data: employees = [], isLoading: employeesLoading, refetch: refetchEmployees } = useEmployees();
   const { data: leave = [], isLoading: leaveLoading } = useLeave();
   const { data: contracts = [], isLoading: contractsLoading } = useContracts();
   const { data: todayAttendance = [] } = useTodayAttendance();
   const { data: companySettings } = useCompanySettings();
+  
+  // State for employee profile modal
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   
   // Enable realtime attendance updates
   useRealtimeAttendance();
@@ -310,7 +316,10 @@ export function DashboardView() {
                           ? "bg-red-500/10 border-red-500/30 hover:bg-red-500/20"
                           : "bg-red-400/10 border-red-400/30 hover:bg-red-400/20"
                       )}
-                      onClick={() => setCurrentView('employees')}
+                      onClick={() => {
+                        setCurrentEmployee(emp as Employee);
+                        setIsProfileOpen(true);
+                      }}
                     >
                       <div className="flex items-center gap-3">
                         {emp.photo_url ? (
@@ -626,6 +635,12 @@ export function DashboardView() {
           </Button>
         </div>
       </div>
+
+      {/* Employee Profile Modal */}
+      <EmployeeProfileModal 
+        isOpen={isProfileOpen} 
+        onClose={() => setIsProfileOpen(false)} 
+      />
     </div>
   );
 }
