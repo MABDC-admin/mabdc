@@ -11,8 +11,16 @@ node_modules
 dist
 dist-employee
 dist-kiosk
+dist-admin
 dist-ssr
 *.local
+
+# Capacitor Android projects
+android
+android-admin
+android-employee
+android-kiosk
+ios
 
 # Editor directories and files
 .vscode/*

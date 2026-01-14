@@ -28,8 +28,9 @@ if ($LASTEXITCODE -ne 0) {
 
 # Step 4: Open in Android Studio
 Write-Host "`n[4/4] Opening in Android Studio..." -ForegroundColor Cyan
-npx cap open android
+npx cap open android --config capacitor.config.kiosk.ts
 
 Write-Host "`nAttendance Kiosk is ready to build in Android Studio!" -ForegroundColor Green
 Write-Host "App ID: com.mabdc.hrms.kiosk" -ForegroundColor Yellow
 Write-Host "App Name: MABDC Attendance Kiosk" -ForegroundColor Yellow
+Write-Host "APK will be in: android-kiosk/app/build/outputs/apk/debug/" -ForegroundColor Yellow

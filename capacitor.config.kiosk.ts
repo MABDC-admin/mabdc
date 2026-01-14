@@ -4,15 +4,16 @@ const config: CapacitorConfig = {
   appId: 'com.mabdc.hrms.kiosk',
   appName: 'MABDC Attendance Kiosk',
   webDir: 'dist-kiosk',
-  server: {
-    androidScheme: 'https',
-    cleartext: true
-  },
   android: {
+    path: 'android-kiosk',
     buildOptions: {
       keystorePath: undefined,
       keystoreAlias: undefined,
     }
+  },
+  server: {
+    androidScheme: 'https',
+    cleartext: true
   },
   plugins: {
     PushNotifications: {

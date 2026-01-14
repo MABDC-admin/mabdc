@@ -1,13 +1,25 @@
 # MABDC HRMS Mobile Apps
 
-This project includes **two separate mobile applications** built with Capacitor:
+This project includes **three separate, independent mobile applications** built with Capacitor. Each app has its own unique package ID and can be installed side-by-side on the same device without replacing each other.
 
 ## 📱 Available Apps
 
-### 1. **Employee Portal App**
+### 1. **HRMS Admin App**
+- **Package ID**: `com.mabdc.hrms.admin`
+- **App Name**: MABDC HRMS Admin
+- **Purpose**: Administrative HR management for HR staff and managers
+- **Features**: 
+  - Full HR dashboard access
+  - Employee management
+  - Leave approvals
+  - Payroll management
+  - Reports and analytics
+  - System settings
+
+### 2. **Employee Portal App**
 - **Package ID**: `com.mabdc.hrms.employee`
 - **App Name**: MABDC Employee Portal
-- **Purpose**: Employee self-service portal for accessing HR information, submitting requests, and managing personal profiles
+- **Purpose**: Employee self-service portal for accessing HR information
 - **Features**: 
   - Employee login with biometric authentication
   - Personal information management
@@ -16,7 +28,7 @@ This project includes **two separate mobile applications** built with Capacitor:
   - Document access
   - Password reset
 
-### 2. **Attendance Kiosk App**
+### 3. **Attendance Kiosk App**
 - **Package ID**: `com.mabdc.hrms.kiosk`
 - **App Name**: MABDC Attendance Kiosk
 - **Purpose**: Quick attendance check-in/check-out functionality
@@ -35,6 +47,30 @@ This project includes **two separate mobile applications** built with Capacitor:
 - Node.js & npm installed
 - Android Studio installed (for Android builds)
 - Xcode installed (for iOS builds - Mac only)
+
+### **HRMS Admin Android Build**
+
+#### Option 1: Using PowerShell Script (Recommended)
+```powershell
+.\build-admin-android.ps1
+```
+
+#### Option 2: Manual Steps
+```bash
+# 1. Build the web app
+npm run build:admin
+
+# 2. Copy admin config
+Copy-Item "capacitor.config.admin.ts" "capacitor.config.ts" -Force
+
+# 3. Sync with Android
+npx cap sync android
+
+# 4. Open in Android Studio
+npx cap open android --config capacitor.config.admin.ts
+
+# 5. In Android Studio: Build > Build Bundle(s) / APK(s) > Build APK(s)
+```
 
 ### **Employee Portal Android Build**
 
@@ -88,6 +124,15 @@ npx cap open android
 
 ## 🛠️ Development Commands
 
+### HRMS Admin
+```bash
+# Run dev server (port 8084)
+npm run dev:admin
+
+# Build for production
+npm run build:admin
+```
+
 ### Employee Portal
 ```bash
 # Run dev server (port 8082)
@@ -119,9 +164,11 @@ npm run build
 
 ## 📦 Output Locations
 
-- **Employee Portal APK**: `android/app/build/outputs/apk/debug/app-debug.apk`
-- **Kiosk APK**: Same location (rebuild after switching configs)
+- **Admin APK**: `android-admin/app/build/outputs/apk/debug/app-debug.apk`
+- **Employee Portal APK**: `android-employee/app/build/outputs/apk/debug/app-debug.apk`
+- **Kiosk APK**: `android-kiosk/app/build/outputs/apk/debug/app-debug.apk`
 - **Web Build**:
+  - Admin: `dist-admin/`
   - Employee: `dist-employee/`
   - Kiosk: `dist-kiosk/`
   - Main: `dist/`
@@ -131,13 +178,17 @@ npm run build
 ## 🔧 Configuration Files
 
 | File | Purpose |
-|------|---------|
+|------|---------||
+| `capacitor.config.admin.ts` | Admin App Capacitor config |
 | `capacitor.config.employee.ts` | Employee Portal Capacitor config |
 | `capacitor.config.kiosk.ts` | Kiosk Capacitor config |
+| `vite.config.admin.ts` | Admin App Vite build config |
 | `vite.config.employee.ts` | Employee Portal Vite build config |
 | `vite.config.kiosk.ts` | Kiosk Vite build config |
+| `index-admin.html` | Admin App HTML entry |
 | `index-employee.html` | Employee Portal HTML entry |
 | `index-kiosk.html` | Kiosk HTML entry |
+| `src/main-admin.tsx` | Admin App React entry |
 | `src/main-employee.tsx` | Employee Portal React entry |
 | `src/main-kiosk.tsx` | Kiosk React entry |
 
@@ -145,10 +196,14 @@ npm run build
 
 ## 📱 Installing APKs on Android Devices
 
-1. Transfer the APK file to your Android device
-2. Enable "Install from Unknown Sources" in Settings
-3. Open the APK file and install
-4. The app will appear in your app drawer
+1. Build all three apps using their respective build scripts
+2. Transfer the APK files to your Android device
+3. Enable "Install from Unknown Sources" in Settings
+4. Open each APK file and install
+5. All three apps will appear in your app drawer as separate applications
+6. Each app can be installed, updated, and uninstalled independently
+
+**Important**: Each app has a unique package ID, so they will NOT overwrite each other when installed.
 
 ---
 
