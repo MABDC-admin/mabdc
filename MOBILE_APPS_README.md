@@ -160,6 +160,64 @@ Both apps maintain full security:
 - ✅ Form validation
 - ✅ Secure Supabase backend integration
 - ✅ HTTPS communication
+- ✅ Camera permissions for QR scanning and face recognition
+- ✅ Push notification support for real-time updates
+
+---
+
+## 📲 Push Notifications Setup
+
+### Firebase Configuration (Required for Android Push Notifications)
+
+1. **Create Firebase Project**
+   - Go to [Firebase Console](https://console.firebase.google.com/)
+   - Create a new project or select existing
+   - Add Android app with package ID:
+     - Employee Portal: `com.mabdc.hrms.employee`
+     - Kiosk: `com.mabdc.hrms.kiosk`
+
+2. **Download google-services.json**
+   - Download the `google-services.json` file from Firebase
+   - Place it in: `android/app/google-services.json`
+   - This file is required for FCM (Firebase Cloud Messaging)
+
+3. **Configure Supabase**
+   - Get your FCM Server Key from Firebase Console
+   - Configure it in your Supabase Edge Functions for sending notifications
+
+### Testing Push Notifications
+
+1. Install the app on a physical device
+2. Grant notification permissions when prompted
+3. Check Logcat for FCM token registration
+4. Send test notification from Firebase Console
+
+**Note**: Push notifications require:
+- Physical Android device (not emulator)
+- Google Play Services installed
+- Internet connection
+- `google-services.json` properly configured
+
+---
+
+## 📷 Camera Permissions
+
+Both apps now include camera permissions for:
+- **QR Code Scanning**: Quick attendance check-in
+- **Face Recognition**: Biometric authentication
+- **Document Upload**: Photo capture for document submission
+
+### Testing Camera Features
+
+1. Install app on device with camera
+2. Grant camera permission when prompted
+3. Navigate to attendance scanner or face enrollment
+4. Camera should activate automatically
+
+**Permissions Included**:
+- `android.permission.CAMERA`
+- `android.hardware.camera` (optional)
+- `android.hardware.camera.autofocus` (optional)
 
 ---
 
