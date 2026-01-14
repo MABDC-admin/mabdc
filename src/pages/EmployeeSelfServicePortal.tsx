@@ -10,6 +10,8 @@ import { usePerformance } from '@/hooks/usePerformance';
 import { useDiscipline } from '@/hooks/useDiscipline';
 import { useEmployeeGamification, useEmployeeBadges } from '@/hooks/useGamification';
 import { useEmployeeDocuments } from '@/hooks/useDocuments';
+import { useCapacitorNotifications } from '@/hooks/useCapacitorNotifications';
+import { useNativeBiometric } from '@/hooks/useNativeBiometric';
 import { EmployeeAttendanceCalendar } from '@/components/attendance/EmployeeAttendanceCalendar';
 import { EmployeeGamificationCard } from '@/components/gamification/EmployeeGamificationCard';
 import { LeaveRequestModal } from '@/components/modals/LeaveRequestModal';
@@ -29,6 +31,7 @@ import { ImagePreviewModal } from '@/components/modals/ImagePreviewModal';
 import { PasskeyManagement } from '@/components/PasskeyManagement';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { NotificationBell } from '@/components/NotificationBell';
+import { HRAssistantChat } from '@/components/admin/HRAssistantChat';
 import { toast } from 'sonner';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
@@ -59,6 +62,18 @@ export default function EmployeeSelfServicePortal() {
   const [activeTab, setActiveTab] = useState('overview');
   const [showLeaveModal, setShowLeaveModal] = useState(false);
     const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+
+  // Initialize push notifications for native app
+  const { isSupported: isPushSupported, isRegistered: isPushRegistered, fcmToken } = useCapacitorNotifications({ autoInitialize: true });
+  
+  // Initialize native biometric authentication
+  const { 
+    isAvailable: isBiometricAvailable, 
+    biometryType, 
+    registerBiometric, 
+    clearBiometric,
+    isRegistered: isBiometricRegistered 
+  } = useNativeBiometric();
 
   // Enable realtime subscriptions for instant updates (WebSocket - no polling)
   useRealtimeAttendance();
@@ -963,8 +978,150 @@ export default function EmployeeSelfServicePortal() {
           </TabsContent>
 
           <TabsContent value="security" className="mt-6 space-y-6">
-            <PasskeyManagement />
-            <NotificationSettings />
+            {/* Native Biometric Authentication */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5" />
+                  Biometric Login
+                </CardTitle>
+                <CardDescription>
+                  Use fingerprint or face recognition to quickly sign in
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!isBiometricAvailable ? (
+                  <div className="flex items-start gap-3 p-4 bg-muted rounded-lg">
+                    <AlertTriangle className="w-5 h-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="font-medium text-sm">Not Supported</p>
+                      <p className="text-sm text-muted-foreground">
+                        Biometric authentication is not available on this device or browser
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <Shield className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-sm text-green-900 dark:text-green-100">
+                            Available
+                          </p>
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            {biometryType === 1 && 'Fingerprint authentication available'}
+                            {biometryType === 2 && 'Face recognition available'}
+                            {biometryType === 3 && 'Iris scanner available'}
+                            {(!biometryType || biometryType === 0) && 'Biometric authentication available'}
+                          </p>
+                        </div>
+                      </div>
+                      {user && isBiometricRegistered(user.email || '') ? (
+                        <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700">
+                          Registered
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">Not Registered</Badge>
+                      )}
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      {user && !isBiometricRegistered(user.email || '') ? (
+                        <Button 
+                          onClick={async () => {
+                            const success = await registerBiometric(user.email || '');
+                            if (success) {
+                              toast.success('You can now sign in with biometrics!');
+                            }
+                          }}
+                          className="flex-1"
+                        >
+                          Register Biometric Login
+                        </Button>
+                      ) : (
+                        <Button 
+                          onClick={() => {
+                            clearBiometric();
+                            toast.info('Biometric login has been disabled');
+                          }}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          Disable Biometric Login
+                        </Button>
+                      )}
+                    </div>
+                    
+                    <p className="text-xs text-muted-foreground">
+                      After registering, you can use biometrics to sign in instead of typing your password.
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Push Notifications */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="w-5 h-5" />
+                  Push Notifications
+                </CardTitle>
+                <CardDescription>
+                  Receive instant notifications for important updates
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!isPushSupported ? (
+                  <div className="flex items-start gap-3 p-4 bg-muted rounded-lg">
+                    <AlertTriangle className="w-5 h-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="font-medium text-sm">Not Supported</p>
+                      <p className="text-sm text-muted-foreground">
+                        Push notifications are not available on this device or browser
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-sm text-green-900 dark:text-green-100">
+                            Supported
+                          </p>
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            Push notifications are enabled on this device
+                          </p>
+                        </div>
+                      </div>
+                      {isPushRegistered ? (
+                        <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700">
+                          Active
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700">
+                          Pending
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    {fcmToken && (
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Device Token (FCM):</p>
+                        <p className="text-xs font-mono break-all">{fcmToken.substring(0, 60)}...</p>
+                      </div>
+                    )}
+                    
+                    <p className="text-xs text-muted-foreground">
+                      You will receive notifications for leave approvals, attendance reminders, and important announcements.
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
@@ -984,6 +1141,9 @@ export default function EmployeeSelfServicePortal() {
         employeeId={employee.id}
         employeeName={employee.full_name}
       />
+
+      {/* HR Assistant Chat - Floating */}
+      <HRAssistantChat />
     </div>
   );
 }

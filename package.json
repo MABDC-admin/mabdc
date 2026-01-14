@@ -23,6 +23,7 @@
     "cap:kiosk:android": "cap open android --config capacitor.config.kiosk.ts"
   },
   "dependencies": {
+    "@aparajita/capacitor-biometric-auth": "^9.1.2",
     "@capacitor/android": "^8.0.1",
     "@capacitor/camera": "^8.0.0",
     "@capacitor/cli": "^8.0.1",

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useWebAuthn } from '@/hooks/useWebAuthn';
+import { useNativeBiometric } from '@/hooks/useNativeBiometric';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +28,7 @@ export default function EmployeeAuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, isLoading, signIn, hasRole } = useAuth();
-  const { isSupported: isBiometricSupported, isLoading: isBiometricLoading, authenticateWithPasskey } = useWebAuthn();
+  const { isAvailable: isBiometricSupported, isLoading: isBiometricLoading, authenticate: authenticateWithBiometric } = useNativeBiometric();
   
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [resetEmail, setResetEmail] = useState('');
@@ -92,9 +92,10 @@ export default function EmployeeAuthPage() {
 
     setIsSubmitting(true);
     try {
-      const success = await authenticateWithPasskey(biometricEmail);
+      const success = await authenticateWithBiometric(biometricEmail);
       if (success) {
         localStorage.setItem('biometric_email', biometricEmail);
+        toast.success('Welcome back!');
         // Navigation will happen automatically via auth state change
       }
     } finally {

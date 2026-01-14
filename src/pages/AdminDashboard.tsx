@@ -23,6 +23,7 @@ import { AdminAppealsSection } from '@/components/admin/AdminAppealsSection';
 import { AdminContractsSection } from '@/components/admin/AdminContractsSection';
 import { AdminUserAccountsSection } from '@/components/admin/AdminUserAccountsSection';
 import { AdminAnnouncementsSection } from '@/components/admin/AdminAnnouncementsSection';
+import { HRAssistantChat } from '@/components/admin/HRAssistantChat';
 import { useAnnouncements } from '@/hooks/useAnnouncements';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -237,6 +238,9 @@ export default function AdminDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* HR Assistant Chat - Floating */}
+      <HRAssistantChat />
     </div>
   );
 }
