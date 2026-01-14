@@ -17,14 +17,20 @@ import SmartDocumentUpload from "./pages/SmartDocumentUpload";
 import EmployeeAuthPage from "./pages/EmployeeAuthPage";
 import EmployeeSelfServicePortal from "./pages/EmployeeSelfServicePortal";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { LockScreen } from "./components/LockScreen";
+import { useAppLock } from "./hooks/useAppLock";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () => {
+  const { isLocked, unlockWithCode } = useAppLock();
+
+  return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      {isLocked && <LockScreen onUnlock={unlockWithCode} />}
       <BrowserRouter>
         <Routes>
           {/* Public routes */}
@@ -83,6 +89,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;

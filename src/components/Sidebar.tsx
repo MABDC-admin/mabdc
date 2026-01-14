@@ -24,7 +24,9 @@ import {
   Gamepad2,
   Trophy,
   Sparkles,
-  UserMinus
+  UserMinus,
+  Lock,
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHRStore } from '@/store/hrStore';
@@ -35,8 +37,10 @@ import { ThemeSelector } from './ThemeSelector';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { useAttendanceAppeals } from '@/hooks/useAttendanceAppeals';
+import { useAppLock } from '@/hooks/useAppLock';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { LockSettingsModal } from './LockSettingsModal';
 
 interface NavItem {
   id: ViewType;
@@ -102,8 +106,10 @@ export function Sidebar() {
   const { currentView, setCurrentView } = useHRStore();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['attendance', 'employees', 'dashboard', 'contracts']);
+  const [showLockSettings, setShowLockSettings] = useState(false);
   const { signOut, user } = useAuth();
   const { data: appeals = [] } = useAttendanceAppeals();
+  const { hasCode, lockApp, setLockCode, changeLockCode, removeLockCode } = useAppLock();
   const navigate = useNavigate();
   
   // Get pending appeals count
@@ -172,7 +178,27 @@ export function Sidebar() {
 
           {/* Sign Out Button */}
           {user && (
-            <div className="px-4">
+            <div className="px-4 space-y-2">
+              {/* Lock/Settings Buttons Row */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => hasCode ? lockApp() : setShowLockSettings(true)}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-medium border border-primary/20 hover:border-primary/30"
+                  title={hasCode ? 'Lock Application' : 'Set Lock Code'}
+                >
+                  {hasCode ? <Lock className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+                  {hasCode ? 'Lock' : 'Setup'}
+                </button>
+                <button
+                  onClick={() => setShowLockSettings(true)}
+                  className="px-3 py-2.5 rounded-xl bg-muted/50 hover:bg-muted transition-colors border border-border"
+                  title="Lock Settings"
+                >
+                  <Settings className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </div>
+              
+              {/* Sign Out Button */}
               <button
                 onClick={handleLogout}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors text-sm font-medium border border-destructive/20 hover:border-destructive/30"
@@ -331,6 +357,16 @@ export function Sidebar() {
           </div>
         </div>
       </aside>
+
+      {/* Lock Settings Modal */}
+      <LockSettingsModal
+        open={showLockSettings}
+        onOpenChange={setShowLockSettings}
+        hasCode={hasCode}
+        onSetCode={setLockCode}
+        onChangeCode={changeLockCode}
+        onRemoveCode={removeLockCode}
+      />
     </>
   );
 }
