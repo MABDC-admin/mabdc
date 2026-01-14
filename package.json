@@ -8,9 +8,20 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:employee": "vite --config vite.config.employee.ts",
+    "build:employee": "vite build --config vite.config.employee.ts",
+    "dev:kiosk": "vite --config vite.config.kiosk.ts",
+    "build:kiosk": "vite build --config vite.config.kiosk.ts",
+    "cap:employee:sync": "npm run build:employee && cap sync --config capacitor.config.employee.ts",
+    "cap:employee:android": "cap open android --config capacitor.config.employee.ts",
+    "cap:kiosk:sync": "npm run build:kiosk && cap sync --config capacitor.config.kiosk.ts",
+    "cap:kiosk:android": "cap open android --config capacitor.config.kiosk.ts"
   },
   "dependencies": {
+    "@capacitor/android": "^8.0.1",
+    "@capacitor/cli": "^8.0.1",
+    "@capacitor/core": "^8.0.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@hookform/resolvers": "^3.10.0",
