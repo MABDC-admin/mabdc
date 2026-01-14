@@ -19,10 +19,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<EmployeeAuthPage />} />
-            <Route path="/portal" element={<EmployeeSelfServicePortal />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<Navigate to="/employee-auth" replace />} />
+            <Route path="/employee-auth" element={<EmployeeAuthPage />} />
+            <Route path="/employee-portal" element={<EmployeeSelfServicePortal />} />
+            <Route path="/login" element={<Navigate to="/employee-auth" replace />} />
+            <Route path="/portal" element={<Navigate to="/employee-portal" replace />} />
+            <Route path="*" element={<Navigate to="/employee-auth" replace />} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>

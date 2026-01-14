@@ -6,29 +6,99 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Web Push library for Deno
-async function sendWebPush(
-  subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
-  payload: string,
-  vapidPublicKey: string,
-  vapidPrivateKey: string
-): Promise<Response> {
-  const encoder = new TextEncoder();
+// Notification icons based on type
+const getNotificationIcon = (type: string): string => {
+  const icons: Record<string, string> = {
+    leave_approval: "✅",
+    leave_rejection: "❌",
+    attendance_reminder: "⏰",
+    announcement: "📢",
+    document_expiry: "⚠️",
+    attendance_appeal: "📋",
+    general: "🔔",
+  };
+  return icons[type] || "🔔";
+};
+
+// Send FCM notification for native apps
+async function sendFCMNotification(
+  token: string,
+  title: string,
+  body: string,
+  type: string,
+  data: Record<string, any>
+): Promise<boolean> {
+  const FCM_SERVER_KEY = Deno.env.get("FCM_SERVER_KEY");
   
-  // For simplicity, we'll use fetch with the endpoint directly
-  // In production, you'd want proper VAPID signing
-  const response = await fetch(subscription.endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/octet-stream",
-      "Content-Encoding": "aes128gcm",
-      "TTL": "86400",
-      "Authorization": `vapid t=${vapidPublicKey}`,
-    },
-    body: payload,
-  });
-  
-  return response;
+  if (!FCM_SERVER_KEY) {
+    console.log("FCM_SERVER_KEY not configured, skipping FCM notification");
+    return false;
+  }
+
+  try {
+    const icon = getNotificationIcon(type);
+    
+    const message = {
+      to: token,
+      notification: {
+        title: `${icon} ${title}`,
+        body: body,
+        sound: "default",
+        badge: "1",
+        priority: "high",
+        icon: "@mipmap/ic_launcher",
+        color: "#3B82F6",
+      },
+      data: {
+        type,
+        ...data,
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
+      },
+      android: {
+        priority: "high",
+        notification: {
+          sound: "default",
+          channel_id: "hrms_notifications",
+          visibility: "public", // Show on lock screen
+          priority: "high",
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            alert: {
+              title: `${icon} ${title}`,
+              body: body,
+            },
+            sound: "default",
+            badge: 1,
+          },
+        },
+      },
+    };
+
+    const response = await fetch("https://fcm.googleapis.com/fcm/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `key=${FCM_SERVER_KEY}`,
+      },
+      body: JSON.stringify(message),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`FCM error: ${response.status}`, errorText);
+      return false;
+    }
+
+    const result = await response.json();
+    console.log("FCM notification sent:", result);
+    return result.success === 1;
+  } catch (error) {
+    console.error("Error sending FCM notification:", error);
+    return false;
+  }
 }
 
 serve(async (req) => {
@@ -147,56 +217,73 @@ serve(async (req) => {
     }
 
     // Send push notifications
-    const payload = JSON.stringify({
-      title,
-      body,
-      icon: "/icons/icon-192x192.svg",
-      badge: "/icons/icon-192x192.svg",
-      data: { type, ...data },
-    });
-
     let successCount = 0;
     let failCount = 0;
     const failedEndpoints: string[] = [];
 
     for (const sub of subscriptions || []) {
       try {
-        const subscription = {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth,
-          },
-        };
-
-        // Simple push using fetch - in production use web-push library
-        const response = await fetch(sub.endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "text/plain",
-            "TTL": "86400",
-          },
-          body: payload,
-        });
-
-        if (response.ok || response.status === 201) {
-          successCount++;
-          // Update last_used_at
-          await supabase
-            .from("push_subscriptions")
-            .update({ last_used_at: new Date().toISOString() })
-            .eq("id", sub.id);
-        } else if (response.status === 404 || response.status === 410) {
-          // Subscription expired or invalid, remove it
-          await supabase
-            .from("push_subscriptions")
-            .delete()
-            .eq("id", sub.id);
-          failedEndpoints.push(sub.endpoint);
-          failCount++;
+        // Check if this is an FCM token (starts with specific patterns)
+        const isFCMToken = sub.endpoint.length > 100 && !sub.endpoint.startsWith('http');
+        
+        if (isFCMToken) {
+          // Native app - use FCM
+          const success = await sendFCMNotification(
+            sub.endpoint,
+            title,
+            body,
+            type,
+            data || {}
+          );
+          
+          if (success) {
+            successCount++;
+            // Update last_used_at
+            await supabase
+              .from("push_subscriptions")
+              .update({ last_used_at: new Date().toISOString() })
+              .eq("id", sub.id);
+          } else {
+            failCount++;
+          }
         } else {
-          console.error(`Push failed for ${sub.endpoint}: ${response.status}`);
-          failCount++;
+          // Web app - use standard web push (basic implementation)
+          const payload = JSON.stringify({
+            title,
+            body,
+            icon: "/icons/icon-192x192.svg",
+            badge: "/icons/icon-192x192.svg",
+            data: { type, ...data },
+          });
+
+          const response = await fetch(sub.endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/plain",
+              "TTL": "86400",
+            },
+            body: payload,
+          });
+
+          if (response.ok || response.status === 201) {
+            successCount++;
+            // Update last_used_at
+            await supabase
+              .from("push_subscriptions")
+              .update({ last_used_at: new Date().toISOString() })
+              .eq("id", sub.id);
+          } else if (response.status === 404 || response.status === 410) {
+            // Subscription expired or invalid, remove it
+            await supabase
+              .from("push_subscriptions")
+              .delete()
+              .eq("id", sub.id);
+            failedEndpoints.push(sub.endpoint);
+            failCount++;
+          } else {
+            console.error(`Push failed for ${sub.endpoint}: ${response.status}`);
+            failCount++;
+          }
         }
       } catch (error) {
         console.error(`Error sending push to ${sub.endpoint}:`, error);

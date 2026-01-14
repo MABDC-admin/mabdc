@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useEffect } from 'react';
 
 interface LeaveRecord {
   id: string;
@@ -742,4 +743,59 @@ export function useDeleteLeaveBalance() {
       toast.error(`Failed to delete allocation: ${error.message}`);
     },
   });
+}
+
+/**
+ * Real-time leave updates using Supabase Realtime
+ * Automatically syncs leave records when HR approves/rejects requests
+ * Eliminates need for polling or manual refresh
+ */
+export function useRealtimeLeave() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('leave-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'leave_records'
+        },
+        (payload) => {
+          console.log('📅 Real-time leave update:', payload);
+          
+          // Invalidate leave queries to trigger refetch
+          queryClient.invalidateQueries({ queryKey: ['leave'] });
+          queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
+          
+          // Show toast for status changes
+          if (payload.eventType === 'UPDATE') {
+            const newData = payload.new as LeaveRecord;
+            const oldData = payload.old as LeaveRecord;
+            
+            // Check if status changed
+            if (oldData.status !== newData.status) {
+              if (newData.status === 'Approved') {
+                toast.success('Leave request approved!', {
+                  description: `Your ${newData.leave_type} request has been approved.`,
+                });
+              } else if (newData.status === 'Rejected') {
+                toast.error('Leave request rejected', {
+                  description: newData.rejection_reason || 'Your leave request was not approved.',
+                });
+              }
+            }
+          } else if (payload.eventType === 'INSERT') {
+            toast.info('New leave request submitted');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 }

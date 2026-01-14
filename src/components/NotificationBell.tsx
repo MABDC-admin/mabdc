@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { usePushNotifications, useRealtimeNotifications } from '@/hooks/usePushNotifications';
 import { useCapacitorNotifications } from '@/hooks/useCapacitorNotifications';
 import { Capacitor } from '@capacitor/core';
 import { Button } from '@/components/ui/button';
@@ -43,18 +43,20 @@ export function NotificationBell() {
     markAllAsRead 
   } = usePushNotifications();
   
-  // Initialize Capacitor notifications on native platforms
-  const capacitorNotifications = useCapacitorNotifications();
+  // Enable real-time notification updates (WebSocket - no polling)
+  useRealtimeNotifications();
+  
+  // Don't auto-initialize Capacitor notifications in NotificationBell
+  // to prevent conflicts with the main app initialization.
+  // Notifications will be initialized in NotificationSettings when user explicitly enables them.
+  const capacitorNotifications = useCapacitorNotifications({ autoInitialize: false });
   
   const [isOpen, setIsOpen] = useState(false);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
 
+  // Initial fetch on mount only - realtime subscription handles updates
   useEffect(() => {
     fetchNotifications();
-    
-    // Refresh notifications every minute
-    const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
   }, [fetchNotifications]);
 
   // Log native notification status

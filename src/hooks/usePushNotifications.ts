@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Json } from '@/integrations/supabase/types';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Notification {
   id: string;
@@ -388,4 +389,100 @@ function getDeviceName(): string {
   if (/Linux/i.test(userAgent)) return 'Linux PC';
   
   return 'Unknown Device';
+}
+
+/**
+ * Real-time notification updates using Supabase Realtime
+ * Automatically syncs notifications when created, updated, or deleted
+ * Eliminates need for polling or manual refresh
+ */
+export function useRealtimeNotifications() {
+  const queryClient = useQueryClient();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const setupRealtimeSubscription = async () => {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) return;
+
+      const userId = session.session.user.id;
+
+      // Subscribe to notifications table changes for current user
+      channel = supabase
+        .channel(`notifications-${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // Listen to INSERT, UPDATE, DELETE
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`
+          },
+          (payload) => {
+            console.log('🔔 Real-time notification update:', payload);
+
+            // Handle different events
+            if (payload.eventType === 'INSERT') {
+              const newNotification = payload.new as Notification;
+              toast.info(newNotification.title, {
+                description: newNotification.body,
+                duration: 5000,
+              });
+              // Invalidate queries to fetch latest notifications
+              queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            } else if (payload.eventType === 'UPDATE') {
+              // Notification marked as read or updated
+              queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            } else if (payload.eventType === 'DELETE') {
+              // Notification deleted
+              queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            }
+          }
+        )
+        .subscribe();
+
+      console.log('✅ Real-time notifications subscribed');
+    };
+
+    setupRealtimeSubscription();
+
+    // Cleanup on unmount
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+        console.log('🔌 Real-time notifications unsubscribed');
+      }
+    };
+  }, [queryClient]);
+
+  // Fetch unread count on mount and after updates
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) return;
+
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', session.session.user.id)
+        .eq('read', false);
+
+      setUnreadCount(count || 0);
+    };
+
+    fetchUnreadCount();
+
+    // Re-fetch when notifications query is invalidated
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event?.query.queryKey[0] === 'notifications') {
+        fetchUnreadCount();
+      }
+    });
+
+    return () => unsubscribe();
+  }, [queryClient]);
+
+  return { unreadCount };
 }

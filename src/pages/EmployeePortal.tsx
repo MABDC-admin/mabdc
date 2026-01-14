@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAttendance, useRealtimeAttendance } from '@/hooks/useAttendance';
-import { useLeave, useAddLeave, useLeaveTypes, useLeaveBalances } from '@/hooks/useLeave';
+import { useLeave, useAddLeave, useLeaveTypes, useLeaveBalances, useRealtimeLeave } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { useEmployeeHRLetters } from '@/hooks/useHRLetters';
 import { useEmployeePerformance, useEmployeeCorrectiveActions } from '@/hooks/usePerformance';
@@ -17,7 +17,7 @@ import {
   User, Calendar, FileText, Clock, CheckCircle, XCircle, 
   AlertTriangle, Download, Plus, ArrowLeft, Briefcase, Mail,
   Eye, CreditCard, Home, Car, UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby, Pencil, Save, X, Star, Scale, MessageCircle, Trophy,
-  BookOpen, Plane, HeartPulse, Loader2, Image as ImageIcon
+  BookOpen, Plane, HeartPulse, Loader2, Image as ImageIcon, Bell
 } from 'lucide-react';
 import { ImagePreviewModal } from '@/components/modals/ImagePreviewModal';
 import { useEmployeeDocuments } from '@/hooks/useDocuments';
@@ -76,10 +76,11 @@ export default function EmployeePortal() {
     fetchEmployee();
   }, [employeeId]);
 
-  // Enable realtime subscription for attendance updates (WebSocket - no polling)
+  // Enable realtime subscriptions for instant updates (WebSocket - no polling)
   useRealtimeAttendance();
+  useRealtimeLeave();
 
-  // Hooks for data - attendance uses realtime, leave uses standard fetch
+  // Hooks for data - attendance and leave use realtime, others use standard fetch
   const { data: allAttendance = [] } = useAttendance();
   const { data: allLeave = [] } = useLeave();
   const { data: contracts = [] } = useContracts();
@@ -210,271 +211,114 @@ export default function EmployeePortal() {
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/5">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            {employee.photo_url ? (
-              <img src={employee.photo_url} alt={employee.full_name} className="w-14 h-14 rounded-full object-cover" />
-            ) : (
-              <div className="w-14 h-14 rounded-full avatar-gradient flex items-center justify-center text-lg font-bold text-primary-foreground">
-                {getInitials(employee.full_name)}
+    <div className="min-h-screen japanese-bg pb-20">
+      {/* Wooden Top Frame Header */}
+      <header className="wooden-top-bar sticky top-0 z-20">
+        <div className="max-w-6xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            {/* Profile Section */}
+            <div className="flex items-center gap-3">
+              {employee.photo_url ? (
+                <div className="w-14 h-14 rounded-full border-3 border-white shadow-lg overflow-hidden">
+                  <img src={employee.photo_url} alt={employee.full_name} className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="w-14 h-14 rounded-full border-3 border-white shadow-lg avatar-gradient flex items-center justify-center text-lg font-bold text-white">
+                  {getInitials(employee.full_name)}
+                </div>
+              )}
+              <div>
+                <h1 className="text-lg font-bold text-[#2d2416]">{employee.full_name}</h1>
+                <p className="text-sm text-[#5d4a36]">{employee.job_position}</p>
               </div>
-            )}
-            <div>
-              <h1 className="text-xl font-bold text-foreground">{employee.full_name}</h1>
-              <p className="text-sm text-muted-foreground">{employee.job_position} • {employee.department}</p>
             </div>
-            <div className="ml-auto">
-              <span className={cn(
-                "px-3 py-1 rounded-full text-xs font-medium",
-                employee.status === 'Active' 
-                  ? "bg-primary/20 text-primary" 
-                  : "bg-amber-500/20 text-amber-500"
-              )}>
-                {employee.status || 'Active'}
-              </span>
+            
+            {/* Actions */}
+            <div className="flex items-center gap-3">
+              <button className="p-2 rounded-full hover:bg-white/30 transition-colors">
+                <Bell className="w-5 h-5 text-[#5d4a36]" />
+              </button>
+              <button className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/30 hover:bg-white/50 transition-colors">
+                <ArrowLeft className="w-4 h-4 text-[#5d4a36]" />
+                <span className="text-sm font-medium text-[#2d2416]">Sign Out</span>
+              </button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Tab Navigation */}
-      <nav className="bg-card border-b border-border">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="flex gap-1 overflow-x-auto">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap",
-                  activeTab === tab.id
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </nav>
-
       {/* Content */}
       <main className="max-w-6xl mx-auto px-4 py-6">
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground">HRMS No.</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-foreground">{employee.hrms_no}</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground">Leave Balance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-primary">
-                  {leaveBalances.length > 0 ? `${totalLeaveBalance} days` : 'Not allocated'}
-                </p>
-                {leaveBalances.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {leaveBalances.slice(0, 3).map((balance) => {
-                      const available = (balance.entitled_days + balance.carried_forward_days) - balance.used_days - balance.pending_days;
-                      const leaveTypeName = (balance as any).leave_types?.name || 'Leave';
-                      return (
-                        <div key={balance.id} className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">{leaveTypeName}</span>
-                          <span className={cn("font-medium", available <= 0 ? "text-destructive" : "text-foreground")}>
-                            {Math.max(0, available)}/{balance.entitled_days}
-                          </span>
-                        </div>
-                      );
-                    })}
+          <div className="space-y-6 animate-fade-in">
+            {/* Stats Cards - Japanese Style */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Leave Balance Card */}
+              <div className="cream-card cream-card-hover p-4">
+                <div className="flex items-start gap-3">
+                  <div className="stat-icon-bg">
+                    <Calendar className="w-6 h-6 text-purple-600" />
                   </div>
-                )}
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground">This Month Attendance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-foreground">
-                  {attendance.filter(a => a.status === 'Present' || a.status === 'Late').length} days
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground">Pending Requests</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-amber-500">
-                  {leaveRecords.filter(l => l.status === 'Pending').length}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-sm text-muted-foreground">QUICK ACTIONS</CardTitle>
-              </CardHeader>
-              <CardContent className="flex gap-3">
-                <Dialog open={isLeaveModalOpen} onOpenChange={setIsLeaveModalOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-primary hover:bg-primary/90">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Request Leave
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Request Leave</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleLeaveSubmit} className="space-y-4 mt-4">
-                      <div>
-                        <label className="text-xs text-muted-foreground">Leave Type</label>
-                        <Select value={leaveForm.leave_type} onValueChange={(v) => setLeaveForm({ ...leaveForm, leave_type: v })}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {leaveTypes.length > 0 ? leaveTypes.map((type) => (
-                              <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
-                            )) : (
-                              <>
-                                <SelectItem value="Annual">Annual Leave</SelectItem>
-                                <SelectItem value="Sick">Sick Leave</SelectItem>
-                                <SelectItem value="Maternity">Maternity Leave</SelectItem>
-                                <SelectItem value="Emergency">Emergency Leave</SelectItem>
-                                <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
-                              </>
-                            )}
-                          </SelectContent>
-                        </Select>
-                        {selectedBalance && (
-                          <div className="mt-2 p-2 rounded-lg bg-secondary/50 border border-border">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">{leaveForm.leave_type} Leave Balance:</span>
-                              <span className={cn("font-bold", availableDays <= 0 ? "text-destructive" : "text-primary")}>
-                                {Math.max(0, availableDays)} / {selectedBalance.entitled_days + selectedBalance.carried_forward_days} days
-                              </span>
-                            </div>
-                            <div className="flex gap-2 mt-1 text-[10px] text-muted-foreground">
-                              <span>Used: {selectedBalance.used_days}</span>
-                              <span>•</span>
-                              <span>Pending: {selectedBalance.pending_days}</span>
-                            </div>
-                          </div>
-                        )}
-                        {!selectedBalance && selectedLeaveType && (
-                          <p className="text-xs text-amber-500 mt-1">No {leaveForm.leave_type} leave allocated. Contact HR.</p>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs text-muted-foreground">Start Date</label>
-                          <Input type="date" value={leaveForm.start_date} onChange={(e) => setLeaveForm({ ...leaveForm, start_date: e.target.value })} required />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">End Date</label>
-                          <Input type="date" value={leaveForm.end_date} onChange={(e) => setLeaveForm({ ...leaveForm, end_date: e.target.value })} required />
-                        </div>
-                      </div>
-                      {requestedDays > 0 && (
-                        <div className={cn(
-                          "p-3 rounded-lg border",
-                          hasInsufficientBalance ? "bg-destructive/10 border-destructive/30" : "bg-primary/10 border-primary/30"
-                        )}>
-                          <p className={cn("text-sm font-medium", hasInsufficientBalance ? "text-destructive" : "text-primary")}>
-                            Duration: {requestedDays} day(s)
-                          </p>
-                        </div>
-                      )}
-                      {hasInsufficientBalance && (
-                        <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
-                          <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                          <div className="text-sm text-destructive">
-                            <p className="font-medium">Insufficient leave balance</p>
-                            <p className="text-xs mt-0.5">Please contact HR for assistance.</p>
-                          </div>
-                        </div>
-                      )}
-                      <div>
-                        <label className="text-xs text-muted-foreground">Reason</label>
-                        <Textarea value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} placeholder="Enter reason..." />
-                      </div>
-                      <Button type="submit" className="w-full" disabled={addLeave.isPending || hasInsufficientBalance}>
-                        {addLeave.isPending ? 'Submitting...' : 'Submit Request'}
-                      </Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-                <Button variant="outline" onClick={() => setActiveTab('attendance')}>
-                  <Clock className="w-4 h-4 mr-2" />
-                  View Attendance
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-sm text-muted-foreground">CONTRACT STATUS</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {employeeContract ? (
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-primary" />
-                    <div>
-                      <p className="font-medium text-foreground">{employeeContract.contract_type} Contract</p>
-                      <p className="text-xs text-muted-foreground">MOHRE: {employeeContract.mohre_contract_no}</p>
-                    </div>
+                  <div className="flex-1">
+                    <p className="text-4xl font-bold text-purple-600">
+                      {leaveBalances.length > 0 ? totalLeaveBalance : '0'}
+                    </p>
+                    <p className="text-sm text-[#5d4a36] mt-1">Annual Leave Balance</p>
                   </div>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <AlertTriangle className="w-5 h-5 text-amber-500" />
-                    <p className="text-muted-foreground">No active contract found</p>
+                </div>
+              </div>
+
+              {/* Days This Month Card */}
+              <div className="cream-card cream-card-hover p-4">
+                <div className="flex items-start gap-3">
+                  <div className="stat-icon-bg">
+                    <Clock className="w-6 h-6 text-green-600" />
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                  <div className="flex-1">
+                    <p className="text-4xl font-bold text-[#2d2416]">0</p>
+                    <p className="text-sm text-[#5d4a36] mt-1">Days This Month</p>
+                  </div>
+                </div>
+              </div>
 
-        {/* Attendance Tab */}
-        {activeTab === 'attendance' && (
-          <div className="animate-fade-in">
-            <EmployeeAttendanceCalendar
-              employeeId={employeeId}
-              employeeName={employee.full_name}
-              hrmsNo={employee.hrms_no}
-              showEmployeeSelector={false}
-              showBackButton={false}
-              isEmployeePortal={true}
-            />
-          </div>
-        )}
+              {/* Pending Requests Card */}
+              <div className="cream-card cream-card-hover p-4">
+                <div className="flex items-start gap-3">
+                  <div className="stat-icon-bg">
+                    <FileText className="w-6 h-6 text-amber-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-4xl font-bold text-[#2d2416]">
+                      {leaveRecords.filter(l => l.status === 'Pending').length}
+                    </p>
+                    <p className="text-sm text-[#5d4a36] mt-1">Pending Requests</p>
+                  </div>
+                </div>
+              </div>
 
-        {/* Leave Tab */}
-        {activeTab === 'leave' && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold">Leave Requests</h2>
+              {/* Total Points Card */}
+              <div className="cream-card cream-card-hover p-4">
+                <div className="flex items-start gap-3">
+                  <div className="stat-icon-bg">
+                    <Trophy className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-4xl font-bold text-[#2d2416]">0</p>
+                    <p className="text-sm text-[#5d4a36] mt-1">Total Points</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Request Leave Button - Purple Gradient */}
+            <div>
               <Dialog open={isLeaveModalOpen} onOpenChange={setIsLeaveModalOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Request
-                  </Button>
+                  <button className="purple-gradient-btn text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 text-base">
+                    <Plus className="w-5 h-5" />
+                    Request Leave
+                  </button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
@@ -498,26 +342,26 @@ export default function EmployeePortal() {
                             </>
                           )}
                         </SelectContent>
-                        </Select>
-                        {selectedBalance && (
-                          <div className="mt-2 p-2 rounded-lg bg-secondary/50 border border-border">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">{leaveForm.leave_type} Leave Balance:</span>
-                              <span className={cn("font-bold", availableDays <= 0 ? "text-destructive" : "text-primary")}>
-                                {Math.max(0, availableDays)} / {selectedBalance.entitled_days + selectedBalance.carried_forward_days} days
-                              </span>
-                            </div>
-                            <div className="flex gap-2 mt-1 text-[10px] text-muted-foreground">
-                              <span>Used: {selectedBalance.used_days}</span>
-                              <span>•</span>
-                              <span>Pending: {selectedBalance.pending_days}</span>
-                            </div>
+                      </Select>
+                      {selectedBalance && (
+                        <div className="mt-2 p-2 rounded-lg bg-secondary/50 border border-border">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">{leaveForm.leave_type} Leave Balance:</span>
+                            <span className={cn("font-bold", availableDays <= 0 ? "text-destructive" : "text-primary")}>
+                              {Math.max(0, availableDays)} / {selectedBalance.entitled_days + selectedBalance.carried_forward_days} days
+                            </span>
                           </div>
-                        )}
-                        {!selectedBalance && selectedLeaveType && (
-                          <p className="text-xs text-amber-500 mt-1">No {leaveForm.leave_type} leave allocated. Contact HR.</p>
-                        )}
-                      </div>
+                          <div className="flex gap-2 mt-1 text-[10px] text-muted-foreground">
+                            <span>Used: {selectedBalance.used_days}</span>
+                            <span>•</span>
+                            <span>Pending: {selectedBalance.pending_days}</span>
+                          </div>
+                        </div>
+                      )}
+                      {!selectedBalance && selectedLeaveType && (
+                        <p className="text-xs text-amber-500 mt-1">No {leaveForm.leave_type} leave allocated. Contact HR.</p>
+                      )}
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-xs text-muted-foreground">Start Date</label>
@@ -558,36 +402,160 @@ export default function EmployeePortal() {
                 </DialogContent>
               </Dialog>
             </div>
+          </div>
+        )}
 
-            <Card>
-              <CardContent className="p-0">
-                {leaveRecords.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">No leave requests found</p>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {leaveRecords.map((record) => (
-                      <div key={record.id} className="flex items-center justify-between p-4">
-                        <div>
-                          <p className="font-medium">{record.leave_type} Leave</p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(parseISO(record.start_date), 'dd MMM')} - {format(parseISO(record.end_date), 'dd MMM yyyy')}
-                            <span className="ml-2">({record.days_count} days)</span>
-                          </p>
+        {/* Attendance Tab */}
+        {activeTab === 'attendance' && (
+          <div className="animate-fade-in">
+            <EmployeeAttendanceCalendar
+              employeeId={employeeId}
+              employeeName={employee.full_name}
+              hrmsNo={employee.hrms_no}
+              showEmployeeSelector={false}
+              showBackButton={false}
+              isEmployeePortal={true}
+            />
+          </div>
+        )}
+
+        {/* Leave Tab */}
+        {activeTab === 'leave' && (
+          <div className="space-y-6 animate-fade-in japanese-scenic min-h-[70vh] rounded-2xl p-6">
+            {/* Leave History Header */}
+            <div>
+              <h2 className="text-2xl font-bold text-[#2d2416] mb-1">Leave History</h2>
+              <p className="text-sm text-[#5d4a36]">Your leave requests and balance</p>
+            </div>
+
+            {/* Leave Records */}
+            {leaveRecords.length === 0 ? (
+              <div className="cream-card p-8 text-center">
+                <Calendar className="w-12 h-12 mx-auto mb-3 text-[#8b6f47] opacity-40" />
+                <p className="text-muted-foreground">No leave requests found</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {leaveRecords.map((record) => (
+                  <div key={record.id} className="leave-history-card">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-[#2d2416]">{record.leave_type} Leave</h3>
+                          <span className={cn(
+                            record.status === 'Approved' && "approved-badge",
+                            record.status === 'Pending' && "pending-badge",
+                            record.status === 'Rejected' && "rejected-badge"
+                          )}>
+                            {record.status}
+                          </span>
                         </div>
-                        <span className={cn(
-                          "px-3 py-1 rounded-full text-xs font-medium",
-                          record.status === 'Approved' && "bg-primary/20 text-primary",
-                          record.status === 'Pending' && "bg-amber-500/20 text-amber-500",
-                          record.status === 'Rejected' && "bg-destructive/20 text-destructive"
-                        )}>
-                          {record.status}
-                        </span>
+                        <p className="text-sm text-[#5d4a36]">
+                          {format(parseISO(record.start_date), 'dd MMM yyyy')} – {format(parseISO(record.end_date), 'dd MMM yyyy')}
+                        </p>
+                        {record.reason && (
+                          <p className="text-xs text-[#5d4a36] mt-1 italic">{record.reason}</p>
+                        )}
                       </div>
-                    ))}
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-[#2d2416]">{record.days_count}</p>
+                        <p className="text-xs text-[#5d4a36]">days</p>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                ))}
+              </div>
+            )}
+
+            {/* Request Leave Button */}
+            <Dialog open={isLeaveModalOpen} onOpenChange={setIsLeaveModalOpen}>
+              <DialogTrigger asChild>
+                <button className="purple-gradient-btn text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 text-base w-full justify-center">
+                  <Plus className="w-5 h-5" />
+                  Request Leave
+                </button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Request Leave</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleLeaveSubmit} className="space-y-4 mt-4">
+                  <div>
+                    <label className="text-xs text-muted-foreground">Leave Type</label>
+                    <Select value={leaveForm.leave_type} onValueChange={(v) => setLeaveForm({ ...leaveForm, leave_type: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {leaveTypes.length > 0 ? leaveTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
+                        )) : (
+                          <>
+                            <SelectItem value="Annual">Annual Leave</SelectItem>
+                            <SelectItem value="Sick">Sick Leave</SelectItem>
+                            <SelectItem value="Maternity">Maternity Leave</SelectItem>
+                            <SelectItem value="Emergency">Emergency Leave</SelectItem>
+                            <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                      </Select>
+                      {selectedBalance && (
+                        <div className="mt-2 p-2 rounded-lg bg-secondary/50 border border-border">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">{leaveForm.leave_type} Leave Balance:</span>
+                            <span className={cn("font-bold", availableDays <= 0 ? "text-destructive" : "text-primary")}>
+                              {Math.max(0, availableDays)} / {selectedBalance.entitled_days + selectedBalance.carried_forward_days} days
+                            </span>
+                          </div>
+                          <div className="flex gap-2 mt-1 text-[10px] text-muted-foreground">
+                            <span>Used: {selectedBalance.used_days}</span>
+                            <span>•</span>
+                            <span>Pending: {selectedBalance.pending_days}</span>
+                          </div>
+                        </div>
+                      )}
+                      {!selectedBalance && selectedLeaveType && (
+                        <p className="text-xs text-amber-500 mt-1">No {leaveForm.leave_type} leave allocated. Contact HR.</p>
+                      )}
+                    </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Start Date</label>
+                      <Input type="date" value={leaveForm.start_date} onChange={(e) => setLeaveForm({ ...leaveForm, start_date: e.target.value })} required />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">End Date</label>
+                      <Input type="date" value={leaveForm.end_date} onChange={(e) => setLeaveForm({ ...leaveForm, end_date: e.target.value })} required />
+                    </div>
+                  </div>
+                  {requestedDays > 0 && (
+                    <div className={cn(
+                      "p-3 rounded-lg border",
+                      hasInsufficientBalance ? "bg-destructive/10 border-destructive/30" : "bg-primary/10 border-primary/30"
+                    )}>
+                      <p className={cn("text-sm font-medium", hasInsufficientBalance ? "text-destructive" : "text-primary")}>
+                        Duration: {requestedDays} day(s)
+                      </p>
+                    </div>
+                  )}
+                  {hasInsufficientBalance && (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+                      <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                      <div className="text-sm text-destructive">
+                        <p className="font-medium">Insufficient leave balance</p>
+                        <p className="text-xs mt-0.5">Please contact HR for assistance.</p>
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs text-muted-foreground">Reason</label>
+                    <Textarea value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} placeholder="Enter reason..." />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={addLeave.isPending || hasInsufficientBalance}>
+                    {addLeave.isPending ? 'Submitting...' : 'Submit Request'}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 
@@ -829,17 +797,12 @@ export default function EmployeePortal() {
 
         {/* Personal Info Tab */}
         {activeTab === 'personal' && (
-          <div className="animate-fade-in space-y-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <UserCircle className="w-5 h-5" />
-                  Personal Information
-                </CardTitle>
+          <div className="animate-fade-in space-y-4">
+            <div className="cream-card p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-[#2d2416]">Personal Information</h2>
                 {!isEditingPersonal ? (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
+                  <button 
                     onClick={() => {
                       setPersonalInfo({
                         gender: employee.gender || '',
@@ -855,23 +818,22 @@ export default function EmployeePortal() {
                       });
                       setIsEditingPersonal(true);
                     }}
+                    className="px-4 py-2 rounded-lg bg-white hover:bg-gray-50 transition-colors border border-[#e8dcc8] text-[#2d2416] font-medium text-sm flex items-center gap-2"
                   >
-                    <Pencil className="w-4 h-4 mr-1" />
+                    <Pencil className="w-4 h-4" />
                     Edit
-                  </Button>
+                  </button>
                 ) : (
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
+                    <button 
                       onClick={() => setIsEditingPersonal(false)}
                       disabled={savingPersonal}
+                      className="px-4 py-2 rounded-lg bg-white hover:bg-gray-50 transition-colors border border-[#e8dcc8] text-[#5d4a36] font-medium text-sm flex items-center gap-2"
                     >
-                      <X className="w-4 h-4 mr-1" />
+                      <X className="w-4 h-4" />
                       Cancel
-                    </Button>
-                    <Button 
-                      size="sm"
+                    </button>
+                    <button 
                       onClick={async () => {
                         if (!employeeId) return;
                         setSavingPersonal(true);
@@ -905,179 +867,179 @@ export default function EmployeePortal() {
                         }
                       }}
                       disabled={savingPersonal}
+                      className="purple-gradient-btn px-4 py-2 rounded-lg text-white font-medium text-sm flex items-center gap-2"
                     >
-                      <Save className="w-4 h-4 mr-1" />
+                      <Save className="w-4 h-4" />
                       {savingPersonal ? 'Saving...' : 'Save'}
-                    </Button>
+                    </button>
                   </div>
                 )}
-              </CardHeader>
-              <CardContent>
-                {isEditingPersonal ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-xs text-muted-foreground uppercase">Gender</label>
-                        <Select value={personalInfo.gender} onValueChange={(v) => setPersonalInfo({ ...personalInfo, gender: v })}>
-                          <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Male">Male</SelectItem>
-                            <SelectItem value="Female">Female</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground uppercase">Birthday</label>
-                        <Input type="date" value={personalInfo.birthday} onChange={(e) => setPersonalInfo({ ...personalInfo, birthday: e.target.value })} />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground uppercase">Personal Email</label>
-                        <Input type="email" value={personalInfo.personal_email} onChange={(e) => setPersonalInfo({ ...personalInfo, personal_email: e.target.value })} placeholder="personal@email.com" />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground uppercase">Personal Phone</label>
-                        <Input type="tel" value={personalInfo.personal_phone} onChange={(e) => setPersonalInfo({ ...personalInfo, personal_phone: e.target.value })} placeholder="+971 XX XXX XXXX" />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground uppercase">Home Address</label>
-                        <Textarea value={personalInfo.home_address} onChange={(e) => setPersonalInfo({ ...personalInfo, home_address: e.target.value })} placeholder="Enter home address" rows={2} />
-                      </div>
+              </div>
+
+              {isEditingPersonal ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs text-[#5d4a36] uppercase font-medium">Gender</label>
+                      <Select value={personalInfo.gender} onValueChange={(v) => setPersonalInfo({ ...personalInfo, gender: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Male">Male</SelectItem>
+                          <SelectItem value="Female">Female</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-xs text-muted-foreground uppercase">Place of Birth</label>
-                        <Input value={personalInfo.place_of_birth} onChange={(e) => setPersonalInfo({ ...personalInfo, place_of_birth: e.target.value })} placeholder="City" />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground uppercase">Country of Birth</label>
-                        <Input value={personalInfo.country_of_birth} onChange={(e) => setPersonalInfo({ ...personalInfo, country_of_birth: e.target.value })} placeholder="Country" />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground uppercase">Family Status</label>
-                        <Select value={personalInfo.family_status} onValueChange={(v) => setPersonalInfo({ ...personalInfo, family_status: v })}>
-                          <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Single">Single</SelectItem>
-                            <SelectItem value="Married">Married</SelectItem>
-                            <SelectItem value="Divorced">Divorced</SelectItem>
-                            <SelectItem value="Widowed">Widowed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground uppercase">Number of Children</label>
-                        <Input type="number" min="0" value={personalInfo.number_of_children} onChange={(e) => setPersonalInfo({ ...personalInfo, number_of_children: parseInt(e.target.value) || 0 })} />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground uppercase">Nationality</label>
-                        <Input value={personalInfo.nationality} onChange={(e) => setPersonalInfo({ ...personalInfo, nationality: e.target.value })} placeholder="Nationality" />
-                      </div>
+                    <div>
+                      <label className="text-xs text-[#5d4a36] uppercase font-medium">Birthday</label>
+                      <Input type="date" value={personalInfo.birthday} onChange={(e) => setPersonalInfo({ ...personalInfo, birthday: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#5d4a36] uppercase font-medium">Personal Email</label>
+                      <Input type="email" value={personalInfo.personal_email} onChange={(e) => setPersonalInfo({ ...personalInfo, personal_email: e.target.value })} placeholder="personal@email.com" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#5d4a36] uppercase font-medium">Personal Phone</label>
+                      <Input type="tel" value={personalInfo.personal_phone} onChange={(e) => setPersonalInfo({ ...personalInfo, personal_phone: e.target.value })} placeholder="+971 XX XXX XXXX" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#5d4a36] uppercase font-medium">Home Address</label>
+                      <Textarea value={personalInfo.home_address} onChange={(e) => setPersonalInfo({ ...personalInfo, home_address: e.target.value })} placeholder="Enter home address" rows={2} />
                     </div>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Left Column */}
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                        <User className="w-5 h-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase">Gender</p>
-                          <p className="font-medium">{employee.gender || 'Not specified'}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                        <Cake className="w-5 h-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase">Birthday</p>
-                          <p className="font-medium">
-                            {employee.birthday ? format(parseISO(employee.birthday), 'dd MMMM yyyy') : 'Not specified'}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                        <Mail className="w-5 h-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase">Personal Email</p>
-                          <p className="font-medium">{employee.personal_email || 'Not specified'}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                        <Phone className="w-5 h-5 text-muted-foreground" />
-                        <div className="flex-1">
-                          <p className="text-xs text-muted-foreground uppercase">Personal Phone</p>
-                          <p className="font-medium flex items-center gap-2">
-                            {employee.personal_phone || 'Not specified'}
-                            {employee.personal_phone && (
-                              <button 
-                                onClick={() => window.open(`https://wa.me/${employee.personal_phone?.replace(/\D/g, '')}`, '_blank')}
-                                className="text-emerald-500 hover:text-emerald-600 transition-colors"
-                                title="Send WhatsApp message"
-                              >
-                                <MessageCircle className="w-4 h-4" />
-                              </button>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                        <MapPin className="w-5 h-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase">Home Address</p>
-                          <p className="font-medium">{employee.home_address || 'Not specified'}</p>
-                        </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs text-[#5d4a36] uppercase font-medium">Place of Birth</label>
+                      <Input value={personalInfo.place_of_birth} onChange={(e) => setPersonalInfo({ ...personalInfo, place_of_birth: e.target.value })} placeholder="City" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#5d4a36] uppercase font-medium">Country of Birth</label>
+                      <Input value={personalInfo.country_of_birth} onChange={(e) => setPersonalInfo({ ...personalInfo, country_of_birth: e.target.value })} placeholder="Country" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#5d4a36] uppercase font-medium">Family Status</label>
+                      <Select value={personalInfo.family_status} onValueChange={(v) => setPersonalInfo({ ...personalInfo, family_status: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Single">Single</SelectItem>
+                          <SelectItem value="Married">Married</SelectItem>
+                          <SelectItem value="Divorced">Divorced</SelectItem>
+                          <SelectItem value="Widowed">Widowed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#5d4a36] uppercase font-medium">Number of Children</label>
+                      <Input type="number" min="0" value={personalInfo.number_of_children} onChange={(e) => setPersonalInfo({ ...personalInfo, number_of_children: parseInt(e.target.value) || 0 })} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#5d4a36] uppercase font-medium">Nationality</label>
+                      <Input value={personalInfo.nationality} onChange={(e) => setPersonalInfo({ ...personalInfo, nationality: e.target.value })} placeholder="Nationality" />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Left Column */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/60 border border-[#e8dcc8]">
+                      <User className="w-5 h-5 text-[#8b6f47]" />
+                      <div>
+                        <p className="text-xs text-[#5d4a36] uppercase font-medium">Gender</p>
+                        <p className="font-semibold text-[#2d2416]">{employee.gender || 'Not specified'}</p>
                       </div>
                     </div>
                     
-                    {/* Right Column */}
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                        <Globe className="w-5 h-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase">Place of Birth</p>
-                          <p className="font-medium">{employee.place_of_birth || 'Not specified'}</p>
-                        </div>
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/60 border border-[#e8dcc8]">
+                      <Cake className="w-5 h-5 text-[#8b6f47]" />
+                      <div>
+                        <p className="text-xs text-[#5d4a36] uppercase font-medium">Birthday</p>
+                        <p className="font-semibold text-[#2d2416]">
+                          {employee.birthday ? format(parseISO(employee.birthday), 'dd MMMM yyyy') : 'Not specified'}
+                        </p>
                       </div>
-                      
-                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                        <Globe className="w-5 h-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase">Country of Birth</p>
-                          <p className="font-medium">{employee.country_of_birth || 'Not specified'}</p>
-                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/60 border border-[#e8dcc8]">
+                      <Mail className="w-5 h-5 text-[#8b6f47]" />
+                      <div>
+                        <p className="text-xs text-[#5d4a36] uppercase font-medium">Personal Email</p>
+                        <p className="font-semibold text-[#2d2416]">{employee.personal_email || 'Not specified'}</p>
                       </div>
-                      
-                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                        <Heart className="w-5 h-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase">Family Status</p>
-                          <p className="font-medium">{employee.family_status || 'Not specified'}</p>
-                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/60 border border-[#e8dcc8]">
+                      <Phone className="w-5 h-5 text-[#8b6f47]" />
+                      <div className="flex-1">
+                        <p className="text-xs text-[#5d4a36] uppercase font-medium">Personal Phone</p>
+                        <p className="font-semibold text-[#2d2416] flex items-center gap-2">
+                          {employee.personal_phone || 'Not specified'}
+                          {employee.personal_phone && (
+                            <button 
+                              onClick={() => window.open(`https://wa.me/${employee.personal_phone?.replace(/\D/g, '')}`, '_blank')}
+                              className="text-emerald-500 hover:text-emerald-600 transition-colors"
+                              title="Send WhatsApp message"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </button>
+                          )}
+                        </p>
                       </div>
-                      
-                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                        <Baby className="w-5 h-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase">Number of Children</p>
-                          <p className="font-medium">{employee.number_of_children ?? 0}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
-                        <Globe className="w-5 h-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase">Nationality</p>
-                          <p className="font-medium">{employee.nationality || 'Not specified'}</p>
-                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/60 border border-[#e8dcc8]">
+                      <MapPin className="w-5 h-5 text-[#8b6f47]" />
+                      <div>
+                        <p className="text-xs text-[#5d4a36] uppercase font-medium">Home Address</p>
+                        <p className="font-semibold text-[#2d2416]">{employee.home_address || 'Not specified'}</p>
                       </div>
                     </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                  
+                  {/* Right Column */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/60 border border-[#e8dcc8]">
+                      <Globe className="w-5 h-5 text-[#8b6f47]" />
+                      <div>
+                        <p className="text-xs text-[#5d4a36] uppercase font-medium">Place of Birth</p>
+                        <p className="font-semibold text-[#2d2416]">{employee.place_of_birth || 'Not specified'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/60 border border-[#e8dcc8]">
+                      <Globe className="w-5 h-5 text-[#8b6f47]" />
+                      <div>
+                        <p className="text-xs text-[#5d4a36] uppercase font-medium">Country of Birth</p>
+                        <p className="font-semibold text-[#2d2416]">{employee.country_of_birth || 'Not specified'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/60 border border-[#e8dcc8]">
+                      <Heart className="w-5 h-5 text-[#8b6f47]" />
+                      <div>
+                        <p className="text-xs text-[#5d4a36] uppercase font-medium">Family Status</p>
+                        <p className="font-semibold text-[#2d2416]">{employee.family_status || 'Not specified'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/60 border border-[#e8dcc8]">
+                      <Baby className="w-5 h-5 text-[#8b6f47]" />
+                      <div>
+                        <p className="text-xs text-[#5d4a36] uppercase font-medium">Number of Children</p>
+                        <p className="font-semibold text-[#2d2416]">{employee.number_of_children ?? 0}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/60 border border-[#e8dcc8]">
+                      <Globe className="w-5 h-5 text-[#8b6f47]" />
+                      <div>
+                        <p className="text-xs text-[#5d4a36] uppercase font-medium">Nationality</p>
+                        <p className="font-semibold text-[#2d2416]">{employee.nationality || 'Not specified'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1779,6 +1741,35 @@ export default function EmployeePortal() {
         imageUrl={previewImage?.url || ''}
         title={previewImage?.title}
       />
+
+      {/* Bottom Navigation Bar - Japanese Style */}
+      <nav className="fixed bottom-0 left-0 right-0 bottom-nav-bar z-30">
+        <div className="max-w-6xl mx-auto px-2 py-2">
+          <div className="flex items-center justify-around">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "nav-icon-btn",
+                  activeTab === tab.id && "active"
+                )}
+              >
+                <tab.icon className={cn(
+                  "w-6 h-6",
+                  activeTab === tab.id ? "text-white" : "text-[#5d4a36]"
+                )} />
+                <span className={cn(
+                  "text-xs font-medium",
+                  activeTab === tab.id ? "text-white" : "text-[#2d2416]"
+                )}>
+                  {tab.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </nav>
     </div>
   );
 }

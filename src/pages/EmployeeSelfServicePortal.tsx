@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useAttendance, useRealtimeAttendance } from '@/hooks/useAttendance';
-import { useLeave, useLeaveTypes, useLeaveBalances } from '@/hooks/useLeave';
+import { useLeave, useLeaveTypes, useLeaveBalances, useRealtimeLeave } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { useEmployeeHRLetters } from '@/hooks/useHRLetters';
 import { usePerformance } from '@/hooks/usePerformance';
@@ -53,17 +53,18 @@ interface Employee {
 
 export default function EmployeeSelfServicePortal() {
   const navigate = useNavigate();
-  const { user, isLoading: authLoading, signOut, hasRole } = useAuth();
+  const { user, isLoading: authLoading, signOut, hasRole, roles } = useAuth();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [showLeaveModal, setShowLeaveModal] = useState(false);
     const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
-  // Enable realtime subscription for attendance updates (WebSocket - no polling)
+  // Enable realtime subscriptions for instant updates (WebSocket - no polling)
   useRealtimeAttendance();
+  useRealtimeLeave();
 
-  // Data hooks - attendance uses realtime, others use standard fetch
+  // Data hooks - attendance and leave use realtime, others use standard fetch
   const attendanceQuery = useAttendance();
   const leaveQuery = useLeave();
   const contractsQuery = useContracts();
@@ -107,17 +108,29 @@ export default function EmployeeSelfServicePortal() {
       }
     };
 
+    // CRITICAL: Wait for both auth AND roles to finish loading before checking
+    // This prevents redirect loops when roles are still being fetched
     if (!authLoading && user) {
-      if (!hasRole('employee')) {
+      // Check if roles have been loaded by checking if roles array has data
+      // OR if we've confirmed there are no roles (length is 0 but auth finished)
+      const rolesLoaded = roles.length > 0;
+      
+      // Only redirect if we're SURE roles are loaded and user doesn't have employee role
+      if (rolesLoaded && !hasRole('employee')) {
         toast.error('Access denied. Employee role required.');
         navigate('/employee-auth');
         return;
       }
-      fetchEmployee();
+      
+      // Only fetch employee data if we have the employee role
+      // This ensures we don't try to fetch before role verification
+      if (hasRole('employee') && !employee) {
+        fetchEmployee();
+      }
     } else if (!authLoading && !user) {
       navigate('/employee-auth');
     }
-  }, [user, authLoading, hasRole, navigate]);
+  }, [user, authLoading, roles, hasRole, navigate, employee]);
 
   // Filter data for this employee
   const employeeAttendance = useMemo(() => 

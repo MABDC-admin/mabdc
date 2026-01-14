@@ -4,23 +4,43 @@ import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export function useCapacitorNotifications() {
+// Get emoji based on notification type
+function getTypeEmoji(type: string): string {
+  const emojis: Record<string, string> = {
+    leave_approval: '✅',
+    leave_rejection: '❌',
+    attendance_reminder: '⏰',
+    announcement: '📢',
+    document_expiry: '⚠️',
+    attendance_appeal: '📋',
+    general: '🔔',
+  };
+  return emojis[type] || '🔔';
+}
+
+export function useCapacitorNotifications(options: { autoInitialize?: boolean } = {}) {
+  const { autoInitialize = true } = options;
   const [isSupported, setIsSupported] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [fcmToken, setFcmToken] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     // Check if running on native platform
     const supported = Capacitor.isNativePlatform();
     setIsSupported(supported);
 
-    if (supported) {
+    // Only auto-initialize if explicitly enabled
+    if (supported && !isInitialized && autoInitialize) {
       initializePushNotifications();
     }
-  }, []);
+  }, [isInitialized, autoInitialize]);
 
   const initializePushNotifications = async () => {
     try {
+      // Mark as initialized to prevent re-initialization
+      setIsInitialized(true);
+      
       // Request permission to use push notifications
       let permStatus = await PushNotifications.checkPermissions();
 
@@ -42,8 +62,13 @@ export function useCapacitorNotifications() {
         setFcmToken(token.value);
         setIsRegistered(true);
         
-        // Save token to database
-        await savePushToken(token.value);
+        // Save token to database - wrapped in try-catch to prevent app crashes
+        try {
+          await savePushToken(token.value);
+        } catch (error) {
+          console.error('Error saving push token (non-critical):', error);
+          // Don't show error to user - token is saved in state, can retry later
+        }
       });
 
       // Listen for registration errors
@@ -52,35 +77,74 @@ export function useCapacitorNotifications() {
         toast.error('Failed to register for push notifications');
       });
 
-      // Listen for push notifications received
+      // Listen for push notifications received (when app is in foreground)
       await PushNotifications.addListener(
         'pushNotificationReceived',
         (notification) => {
-          console.log('Push notification received:', notification);
+          console.log('📱 Push notification received (foreground):', notification);
           
-          // Show toast for foreground notifications
-          toast.info(notification.title || 'New Notification', {
+          // Show in-app toast for foreground notifications
+          // Native system notification will also be displayed automatically
+          const notifType = notification.data?.type || 'general';
+          const typeEmoji = getTypeEmoji(notifType);
+          
+          toast.info(`${typeEmoji} ${notification.title || 'New Notification'}`, {
             description: notification.body,
+            duration: 5000,
           });
         }
       );
 
-      // Listen for push notification actions performed
+      // Listen for push notification actions performed (when user taps notification)
       await PushNotifications.addListener(
         'pushNotificationActionPerformed',
         (notification) => {
-          console.log('Push notification action performed:', notification);
+          console.log('👆 Push notification tapped:', notification);
           
-          // Handle notification tap - navigate to relevant screen
+          // Handle notification tap - navigate to relevant screen based on type
           const data = notification.notification.data;
-          if (data && data.url) {
-            window.location.href = data.url;
+          const notifType = data?.type;
+          
+          // Route to appropriate screen based on notification type
+          if (data && notifType) {
+            let targetUrl = '/employee-portal';
+            
+            switch (notifType) {
+              case 'leave_approval':
+              case 'leave_rejection':
+                targetUrl = '/employee-portal?tab=leave';
+                break;
+              case 'attendance_reminder':
+              case 'attendance_appeal':
+                targetUrl = '/employee-portal?tab=attendance';
+                break;
+              case 'document_expiry':
+                targetUrl = '/employee-portal?tab=documents';
+                break;
+              case 'announcement':
+                targetUrl = '/employee-portal?tab=overview';
+                break;
+              case 'contract':
+                targetUrl = '/employee-portal?tab=contract';
+                break;
+              default:
+                targetUrl = '/employee-portal';
+            }
+            
+            // Navigate to the target URL
+            if (data.url) {
+              window.location.href = data.url;
+            } else {
+              window.location.href = targetUrl;
+            }
           }
         }
       );
 
     } catch (error) {
       console.error('Error initializing push notifications:', error);
+      // Reset initialized state on error so it can be retried
+      setIsInitialized(false);
     }
   };
 
@@ -146,12 +210,27 @@ export function useCapacitorNotifications() {
     await PushNotifications.removeAllListeners();
   }, []);
 
+  // Manual initialization method for explicit control
+  const initialize = useCallback(async () => {
+    if (!isSupported) {
+      console.log('Push notifications not supported');
+      return false;
+    }
+    if (isInitialized) {
+      console.log('Already initialized');
+      return true;
+    }
+    await initializePushNotifications();
+    return true;
+  }, [isSupported, isInitialized]);
+
   return {
     isSupported,
     isRegistered,
     fcmToken,
     requestPermissions,
     removeAllListeners,
+    initialize, // Export the manual initialization method
   };
 }
 
