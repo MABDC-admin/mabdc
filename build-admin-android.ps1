@@ -29,7 +29,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # Step 4: Open in Android Studio
 Write-Host "`n[4/5] Opening Android Studio..." -ForegroundColor Cyan
-npx cap open android --config capacitor.config.admin.ts
+Start-Process "$env:LOCALAPPDATA\Programs\Android Studio\bin\studio64.exe" -ArgumentList "$PWD\android-admin"
 
 # Step 5: Display information
 Write-Host "`n[5/5] Build Complete!" -ForegroundColor Green

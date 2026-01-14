@@ -1,11 +1,11 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.mabdc.hrms.kiosk',
-  appName: 'MABDC Attendance Kiosk',
-  webDir: 'dist-kiosk',
+  appId: 'com.mabdc.hrms.admin',
+  appName: 'MABDC HRMS Admin',
+  webDir: 'dist-admin',
   android: {
-    path: 'android-kiosk',
+    path: 'android-admin',
     buildOptions: {
       keystorePath: undefined,
       keystoreAlias: undefined,

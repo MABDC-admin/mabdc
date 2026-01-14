@@ -28,7 +28,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # Step 4: Open in Android Studio
 Write-Host "`n[4/4] Opening in Android Studio..." -ForegroundColor Cyan
-npx cap open android --config capacitor.config.employee.ts
+Start-Process "$env:LOCALAPPDATA\Programs\Android Studio\bin\studio64.exe" -ArgumentList "$PWD\android-employee"
 
 Write-Host "`nEmployee Portal is ready to build in Android Studio!" -ForegroundColor Green
 Write-Host "App ID: com.mabdc.hrms.employee" -ForegroundColor Yellow
