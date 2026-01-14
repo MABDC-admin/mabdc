@@ -13,6 +13,16 @@ const config: CapacitorConfig = {
       keystorePath: undefined,
       keystoreAlias: undefined,
     }
+  },
+  plugins: {
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"]
+    },
+    Camera: {
+      quality: 90,
+      allowEditing: false,
+      resultType: 'uri'
+    }
   }
 };
 

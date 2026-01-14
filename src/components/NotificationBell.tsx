@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useCapacitorNotifications } from '@/hooks/useCapacitorNotifications';
+import { Capacitor } from '@capacitor/core';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -41,6 +43,9 @@ export function NotificationBell() {
     markAllAsRead 
   } = usePushNotifications();
   
+  // Initialize Capacitor notifications on native platforms
+  const capacitorNotifications = useCapacitorNotifications();
+  
   const [isOpen, setIsOpen] = useState(false);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
 
@@ -51,6 +56,15 @@ export function NotificationBell() {
     const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
+
+  // Log native notification status
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      console.log('Native platform detected');
+      console.log('Capacitor notifications registered:', capacitorNotifications.isRegistered);
+      console.log('FCM Token:', capacitorNotifications.fcmToken);
+    }
+  }, [capacitorNotifications.isRegistered, capacitorNotifications.fcmToken]);
 
   const handleMarkAllAsRead = async () => {
     setIsMarkingAll(true);

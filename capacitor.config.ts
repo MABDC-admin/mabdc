@@ -1,9 +1,9 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.mabdc.hrms.employee',
-  appName: 'MABDC Employee Portal',
-  webDir: 'dist-employee',
+  appId: 'com.mabdc.hrms.kiosk',
+  appName: 'MABDC Attendance Kiosk',
+  webDir: 'dist-kiosk',
   server: {
     androidScheme: 'https',
     cleartext: true
@@ -12,6 +12,16 @@ const config: CapacitorConfig = {
     buildOptions: {
       keystorePath: undefined,
       keystoreAlias: undefined,
+    }
+  },
+  plugins: {
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"]
+    },
+    Camera: {
+      quality: 90,
+      allowEditing: false,
+      resultType: 'uri'
     }
   }
 };
