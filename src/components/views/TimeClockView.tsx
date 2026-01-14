@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useAttendanceByDate, useUpdateAttendance, useCreateAttendance } from '@/hooks/useAttendance';
 import { useTimeShifts } from '@/hooks/useTimeShifts';
+import { useShiftOverrides } from '@/hooks/useShiftOverrides';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,9 +28,11 @@ import {
   ArrowUpRight,
   CalendarIcon,
   AlertTriangle,
-  Bell
+  Bell,
+  Settings
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ShiftOverrideDialog } from '@/components/modals/ShiftOverrideDialog';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -83,12 +86,14 @@ export default function TimeClockView() {
   const { data: employees = [], isLoading: loadingEmployees, refetch } = useEmployees();
   const { data: attendance = [], isLoading: loadingAttendance, refetch: refetchAttendance } = useAttendanceByDate(dateString);
   const { data: shifts = [] } = useTimeShifts();
+  const { data: shiftOverrides = [] } = useShiftOverrides(dateString);
   const updateAttendance = useUpdateAttendance();
   const createAttendance = useCreateAttendance();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editDialog, setEditDialog] = useState<{ open: boolean; record: TimeClockRecord | null }>({ open: false, record: null });
+  const [showOverrideDialog, setShowOverrideDialog] = useState(false);
   const [editCheckIn, setEditCheckIn] = useState('');
   const [editCheckOut, setEditCheckOut] = useState('');
   const [editStatus, setEditStatus] = useState<TimeClockStatus>('on_time');
@@ -100,13 +105,27 @@ export default function TimeClockView() {
     return map;
   }, [shifts]);
 
+  // Create a map of shift overrides for quick lookup
+  const overridesMap = useMemo(() => {
+    const map = new Map<string, { start: string; end: string; reason?: string }>();
+    shiftOverrides.forEach(override => {
+      // Convert time format from HH:MM:SS to HH:MM if needed
+      const start = override.shift_start_time.substring(0, 5);
+      const end = override.shift_end_time.substring(0, 5);
+      map.set(override.employee_id, { start, end, reason: override.reason || undefined });
+    });
+    return map;
+  }, [shiftOverrides]);
+
   // Auto-calculate status based on check-in/out times
   useEffect(() => {
     if (!editDialog.record || !autoCalculateStatus) return;
     
     const employeeId = editDialog.record.employeeId;
+    // Check for shift override first, then permanent shift, then default
+    const override = overridesMap.get(employeeId);
     const shiftType = shiftMap.get(employeeId) || 'default';
-    const shiftTimes = SHIFT_TIMES[shiftType] || SHIFT_TIMES.default;
+    const shiftTimes = override ? { start: override.start, end: override.end } : (SHIFT_TIMES[shiftType] || SHIFT_TIMES.default);
     
     let suggestedStatus: TimeClockStatus = 'on_time';
     
@@ -133,7 +152,7 @@ export default function TimeClockView() {
     }
     
     setEditStatus(suggestedStatus);
-  }, [editCheckIn, editCheckOut, editDialog.record, shiftMap, autoCalculateStatus]);
+  }, [editCheckIn, editCheckOut, editDialog.record, shiftMap, overridesMap, autoCalculateStatus]);
 
   const attendanceMap = useMemo(() => {
     const map = new Map<string, { id: string; checkIn?: string; checkOut?: string; dbStatus?: string }>();
@@ -169,7 +188,8 @@ export default function TimeClockView() {
     checkOut: string | undefined, 
     shiftStart: string, 
     shiftEnd: string,
-    forDate: Date
+    forDate: Date,
+    hasOverride?: boolean
   ): TimeClockStatus[] => {
     const statuses: TimeClockStatus[] = [];
     const dateStr = format(forDate, 'yyyy-MM-dd');
@@ -226,14 +246,19 @@ export default function TimeClockView() {
 
   const timeClockRecords = useMemo<TimeClockRecord[]>(() => {
     return employees.map(emp => {
+      // Prioritize shift override, then permanent shift, then default
+      const override = overridesMap.get(emp.id);
       const shiftType = shiftMap.get(emp.id) || 'default';
-      const shiftTimes = SHIFT_TIMES[shiftType] || SHIFT_TIMES.default;
+      const shiftTimes = override ? 
+        { start: override.start, end: override.end } : 
+        (SHIFT_TIMES[shiftType] || SHIFT_TIMES.default);
+      
       const att = attendanceMap.get(emp.id);
       
       // Use saved database status if available, otherwise calculate
       const statuses = att?.dbStatus 
         ? dbStatusToTimeClock(att.dbStatus)
-        : calculateStatus(att?.checkIn, att?.checkOut, shiftTimes.start, shiftTimes.end, selectedDate);
+        : calculateStatus(att?.checkIn, att?.checkOut, shiftTimes.start, shiftTimes.end, selectedDate, !!override);
 
       return {
         employeeId: emp.id,
@@ -249,7 +274,7 @@ export default function TimeClockView() {
         attendanceId: att?.id
       };
     });
-  }, [employees, shiftMap, attendanceMap, selectedDate]);
+  }, [employees, shiftMap, overridesMap, attendanceMap, selectedDate]);
 
   const filteredRecords = useMemo(() => {
     return timeClockRecords.filter(record => {
@@ -427,6 +452,13 @@ export default function TimeClockView() {
               />
             </PopoverContent>
           </Popover>
+          <Button variant="outline" size="sm" onClick={() => setShowOverrideDialog(true)}>
+            <Settings className="h-4 w-4 mr-2" />
+            Manage Overrides
+            {shiftOverrides.length > 0 && (
+              <Badge variant="secondary" className="ml-2">{shiftOverrides.length}</Badge>
+            )}
+          </Button>
           <Button variant="outline" size="sm" onClick={handleRefresh}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
@@ -617,7 +649,14 @@ export default function TimeClockView() {
 
                     {/* Shift */}
                     <div className="col-span-2 text-center text-sm">
-                      {record.shiftStart} - {record.shiftEnd}
+                      <div className="flex flex-col items-center gap-1">
+                        <span>{record.shiftStart} - {record.shiftEnd}</span>
+                        {overridesMap.has(record.employeeId) && (
+                          <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border-blue-300">
+                            Custom Schedule
+                          </Badge>
+                        )}
+                      </div>
                     </div>
 
                     {/* Check In */}
@@ -781,6 +820,13 @@ export default function TimeClockView() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Shift Override Management Dialog */}
+      <ShiftOverrideDialog
+        isOpen={showOverrideDialog}
+        onClose={() => setShowOverrideDialog(false)}
+        selectedDate={dateString}
+      />
     </div>
   );
 }
