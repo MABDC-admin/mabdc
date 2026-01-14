@@ -44,7 +44,7 @@
     --glass-bg: 0 0% 100%;
     --glass-border: 214 32% 91%;
     --stat-gradient: linear-gradient(135deg, hsl(262 83% 58% / 0.08), hsl(339 90% 51% / 0.05));
-    --body-gradient: linear-gradient(135deg, hsl(210 20% 98%), hsl(262 83% 58% / 0.03) 50%, hsl(339 90% 51% / 0.02));
+    --body-gradient: linear-gradient(135deg, hsl(210 20% 98%), hsl(262 83% 58% / 0.06) 30%, hsl(339 90% 51% / 0.04) 70%, hsl(217 91% 60% / 0.03));
 
     /* Shadows */
     --shadow-glow: 0 0 40px hsl(262 83% 58% / 0.1);
@@ -93,7 +93,7 @@
     /* Dark mode gradients */
     --glass-bg: 222 47% 14%;
     --stat-gradient: linear-gradient(135deg, hsl(262 83% 65% / 0.15), hsl(339 90% 60% / 0.1));
-    --body-gradient: linear-gradient(135deg, hsl(222 47% 11%), hsl(262 83% 65% / 0.05) 50%, hsl(339 90% 60% / 0.03));
+    --body-gradient: linear-gradient(135deg, hsl(222 47% 11%), hsl(262 83% 65% / 0.08) 30%, hsl(339 90% 60% / 0.06) 70%, hsl(217 91% 60% / 0.04));
 
     /* Dark shadows */
     --shadow-glow: 0 0 40px hsl(262 83% 65% / 0.2);
@@ -125,14 +125,18 @@
 
 @layer components {
   .glass-card {
-    background: hsl(var(--glass-bg));
+    background: hsl(var(--glass-bg) / 0.8);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
     box-shadow: var(--shadow-card);
-    border: 1px solid hsl(var(--border));
-    transition: box-shadow 0.2s ease;
+    border: 1px solid hsl(var(--border) / 0.5);
+    transition: all 0.3s ease;
   }
 
   .glass-card:hover {
+    background: hsl(var(--glass-bg) / 0.9);
     box-shadow: var(--shadow-hover);
+    border-color: hsl(var(--border) / 0.8);
   }
 
   .stat-card {
