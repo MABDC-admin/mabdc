@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Lock, ShieldCheck, Trash2, Edit, Eye, EyeOff } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Lock, ShieldCheck, Trash2, Edit, Eye, EyeOff, Image as ImageIcon, RotateCcw, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,24 +17,31 @@ interface LockSettingsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   hasCode: boolean;
+  backgroundImage: string | null;
   onSetCode: (code: string) => boolean;
   onChangeCode: (oldCode: string, newCode: string) => boolean;
   onRemoveCode: (code: string) => boolean;
+  onSetBackground: (file: File) => Promise<boolean>;
+  onResetBackground: () => void;
 }
 
 export function LockSettingsModal({
   open,
   onOpenChange,
   hasCode,
+  backgroundImage,
   onSetCode,
   onChangeCode,
   onRemoveCode,
+  onSetBackground,
+  onResetBackground,
 }: LockSettingsModalProps) {
-  const [mode, setMode] = useState<'menu' | 'set' | 'change' | 'remove'>('menu');
+  const [mode, setMode] = useState<'menu' | 'set' | 'change' | 'remove' | 'background'>('menu');
   const [newCode, setNewCode] = useState('');
   const [confirmCode, setConfirmCode] = useState('');
   const [oldCode, setOldCode] = useState('');
   const [showCodes, setShowCodes] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const resetForm = () => {
     setNewCode('');
@@ -70,6 +77,13 @@ export function LockSettingsModal({
   const handleRemoveCode = () => {
     if (onRemoveCode(oldCode)) {
       resetForm();
+    }
+  };
+
+  const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await onSetBackground(file);
     }
   };
 
@@ -143,6 +157,18 @@ export function LockSettingsModal({
                   </Button>
                 </>
               )}
+
+              {/* Background Customization Section */}
+              <div className="pt-2 border-t">
+                <Button
+                  onClick={() => setMode('background')}
+                  variant="outline"
+                  className="w-full justify-start"
+                >
+                  <ImageIcon className="w-4 h-4 mr-2" />
+                  Customize Lock Screen Background
+                </Button>
+              </div>
             </div>
           </>
         )}
@@ -353,6 +379,94 @@ export function LockSettingsModal({
               >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Remove Code
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+
+        {mode === 'background' && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-primary" />
+                Lock Screen Background
+              </DialogTitle>
+              <DialogDescription>
+                Customize your lock screen with a personal background image
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              {/* Current Background Preview */}
+              <div className="space-y-2">
+                <Label>Current Background</Label>
+                <div className="relative aspect-video rounded-lg overflow-hidden border-2 border-border bg-muted">
+                  {backgroundImage ? (
+                    <img
+                      src={backgroundImage}
+                      alt="Lock screen background"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                      <div className="text-center space-y-2">
+                        <ImageIcon className="w-12 h-12 mx-auto" />
+                        <p className="text-sm">No custom background set</p>
+                        <p className="text-xs">Using default gradient</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Upload Section */}
+              <div className="space-y-2">
+                <Label>Upload New Background</Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  onChange={handleBackgroundUpload}
+                  className="hidden"
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose Image
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Supported: JPG, PNG, WebP • Max: 5MB • Min: 1280×720px
+                </p>
+              </div>
+
+              {/* Reset Button */}
+              {backgroundImage && (
+                <Button
+                  onClick={onResetBackground}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Reset to Default
+                </Button>
+              )}
+
+              {/* Info Card */}
+              <Card className="border-primary/20 bg-primary/5">
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground">
+                    💡 <strong>Tip:</strong> Choose high-quality images with good contrast for the best lock screen experience. The image will be displayed full-screen when the app is locked.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setMode('menu')}>
+                Back to Settings
               </Button>
             </DialogFooter>
           </>

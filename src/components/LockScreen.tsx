@@ -5,18 +5,22 @@ import { cn } from '@/lib/utils';
 
 interface LockScreenProps {
   onUnlock: (code: string) => boolean;
+  backgroundImage?: string | null;
   className?: string;
 }
 
-export function LockScreen({ onUnlock, className }: LockScreenProps) {
+export function LockScreen({ onUnlock, backgroundImage, className }: LockScreenProps) {
   const [code, setCode] = useState<string[]>(['', '', '', '', '']);
   const [isShaking, setIsShaking] = useState(false);
+  const [showUnlockUI, setShowUnlockUI] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    // Focus first input on mount
-    inputRefs.current[0]?.focus();
-  }, []);
+    // Focus first input when unlock UI is shown
+    if (showUnlockUI) {
+      inputRefs.current[0]?.focus();
+    }
+  }, [showUnlockUI]);
 
   const handleInputChange = (index: number, value: string) => {
     // Only allow digits
@@ -81,24 +85,75 @@ export function LockScreen({ onUnlock, className }: LockScreenProps) {
     setTimeout(() => setIsShaking(false), 500);
   };
 
-  return (
-    <div className={cn(
-      "fixed inset-0 z-50 flex items-center justify-center",
-      "bg-gradient-to-br from-background via-background to-primary/5",
-      "backdrop-blur-xl",
-      className
-    )}>
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-      </div>
+  // Handle click on background to show unlock UI
+  const handleBackgroundClick = () => {
+    if (!showUnlockUI) {
+      setShowUnlockUI(true);
+    }
+  };
 
-      <div className={cn(
-        "relative glass-card rounded-3xl p-8 sm:p-12 max-w-md w-full mx-4 shadow-2xl",
-        "border-2 border-border/50",
-        isShaking && "animate-shake"
-      )}>
+  return (
+    <div 
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center cursor-pointer",
+        !backgroundImage && "bg-gradient-to-br from-background via-background to-primary/5",
+        "backdrop-blur-xl",
+        className
+      )}
+      onClick={handleBackgroundClick}
+      style={backgroundImage ? {
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      } : undefined}
+    >
+      {/* Dark overlay for better contrast */}
+      {backgroundImage && (
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      )}
+
+      {/* Animated background elements (only show when no custom background) */}
+      {!backgroundImage && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        </div>
+      )}
+
+      {/* Click to unlock hint - only show when unlock UI is hidden */}
+      {!showUnlockUI && (
+        <div className="relative z-10 text-center space-y-6 pointer-events-none">
+          <div className="flex justify-center">
+            <div className="relative">
+              <div className="absolute inset-0 bg-white/20 rounded-full blur-xl animate-pulse" />
+              <div className="relative w-24 h-24 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center shadow-2xl border border-white/20">
+                <Lock className="w-12 h-12 text-white" />
+              </div>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-3xl font-bold text-white drop-shadow-lg">
+              Application Locked
+            </h2>
+            <p className="text-lg text-white/90 drop-shadow flex items-center justify-center gap-2">
+              <ShieldCheck className="w-5 h-5" />
+              Click anywhere to unlock
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Unlock UI - shown after click */}
+      {showUnlockUI && (
+        <div 
+          className={cn(
+            "relative glass-card rounded-3xl p-8 sm:p-12 max-w-md w-full mx-4 shadow-2xl",
+            "border-2 border-border/50 z-10",
+            isShaking && "animate-shake"
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Lock Icon */}
         <div className="flex justify-center mb-8">
           <div className="relative">
@@ -160,6 +215,7 @@ export function LockScreen({ onUnlock, className }: LockScreenProps) {
           Lost your code? Contact your administrator
         </p>
       </div>
+      )}
     </div>
   );
 }

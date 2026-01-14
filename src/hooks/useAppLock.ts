@@ -3,23 +3,33 @@ import { toast } from 'sonner';
 
 const LOCK_CODE_KEY = 'app_lock_code';
 const LOCK_STATE_KEY = 'app_lock_state';
+const LOCK_BACKGROUND_KEY = 'app_lock_background';
 
 export interface AppLockState {
   isLocked: boolean;
   hasCode: boolean;
+  backgroundImage: string | null;
+}
+
+export interface BackgroundImageValidation {
+  isValid: boolean;
+  error?: string;
 }
 
 export function useAppLock() {
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [hasCode, setHasCode] = useState<boolean>(false);
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
 
   // Initialize lock state from localStorage
   useEffect(() => {
     const storedCode = localStorage.getItem(LOCK_CODE_KEY);
     const storedLockState = localStorage.getItem(LOCK_STATE_KEY);
+    const storedBackground = localStorage.getItem(LOCK_BACKGROUND_KEY);
     
     setHasCode(!!storedCode);
     setIsLocked(storedLockState === 'true');
+    setBackgroundImage(storedBackground);
   }, []);
 
   // Set a new lock code
@@ -106,13 +116,81 @@ export function useAppLock() {
     return true;
   }, []);
 
+  // Validate background image
+  const validateBackgroundImage = useCallback(async (file: File): Promise<BackgroundImageValidation> => {
+    // Check file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      return { isValid: false, error: 'Invalid file type. Please use JPG, PNG, or WebP format.' };
+    }
+
+    // Check file size (5MB limit)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      return { isValid: false, error: 'File size exceeds 5MB limit.' };
+    }
+
+    // Check image dimensions
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        if (img.width < 1280 || img.height < 720) {
+          resolve({ isValid: false, error: 'Image dimensions must be at least 1280×720 pixels.' });
+        } else {
+          resolve({ isValid: true });
+        }
+      };
+      img.onerror = () => {
+        resolve({ isValid: false, error: 'Failed to load image.' });
+      };
+      img.src = URL.createObjectURL(file);
+    });
+  }, []);
+
+  // Set background image
+  const setBackgroundImageFromFile = useCallback(async (file: File): Promise<boolean> => {
+    const validation = await validateBackgroundImage(file);
+    
+    if (!validation.isValid) {
+      toast.error(validation.error || 'Invalid image');
+      return false;
+    }
+
+    // Convert to base64
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        localStorage.setItem(LOCK_BACKGROUND_KEY, base64);
+        setBackgroundImage(base64);
+        toast.success('Lock screen background updated');
+        resolve(true);
+      };
+      reader.onerror = () => {
+        toast.error('Failed to read image file');
+        resolve(false);
+      };
+      reader.readAsDataURL(file);
+    });
+  }, [validateBackgroundImage]);
+
+  // Reset background to default
+  const resetBackground = useCallback(() => {
+    localStorage.removeItem(LOCK_BACKGROUND_KEY);
+    setBackgroundImage(null);
+    toast.success('Lock screen background reset to default');
+  }, []);
+
   return {
     isLocked,
     hasCode,
+    backgroundImage,
     setLockCode,
     changeLockCode,
     unlockWithCode,
     lockApp,
     removeLockCode,
+    setBackgroundImageFromFile,
+    resetBackground,
   };
 }

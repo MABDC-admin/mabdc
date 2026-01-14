@@ -23,14 +23,14 @@ import { useAppLock } from "./hooks/useAppLock";
 const queryClient = new QueryClient();
 
 const App = () => {
-  const { isLocked, unlockWithCode } = useAppLock();
+  const { isLocked, unlockWithCode, backgroundImage } = useAppLock();
 
   return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      {isLocked && <LockScreen onUnlock={unlockWithCode} />}
+      {isLocked && <LockScreen onUnlock={unlockWithCode} backgroundImage={backgroundImage} />}
       <BrowserRouter>
         <Routes>
           {/* Public routes */}

@@ -109,7 +109,7 @@ export function Sidebar() {
   const [showLockSettings, setShowLockSettings] = useState(false);
   const { signOut, user } = useAuth();
   const { data: appeals = [] } = useAttendanceAppeals();
-  const { hasCode, lockApp, setLockCode, changeLockCode, removeLockCode } = useAppLock();
+  const { hasCode, lockApp, setLockCode, changeLockCode, removeLockCode, backgroundImage, setBackgroundImageFromFile, resetBackground } = useAppLock();
   const navigate = useNavigate();
   
   // Get pending appeals count
@@ -363,9 +363,12 @@ export function Sidebar() {
         open={showLockSettings}
         onOpenChange={setShowLockSettings}
         hasCode={hasCode}
+        backgroundImage={backgroundImage}
         onSetCode={setLockCode}
         onChangeCode={changeLockCode}
         onRemoveCode={removeLockCode}
+        onSetBackground={setBackgroundImageFromFile}
+        onResetBackground={resetBackground}
       />
     </>
   );
