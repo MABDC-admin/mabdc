@@ -152,23 +152,40 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed lg:static inset-y-0 left-0 z-40 w-64 glass-card border-r border-border p-4 transition-transform duration-300",
+        "fixed lg:static inset-y-0 left-0 z-40 w-64 glass-card border-r border-border p-4 transition-transform duration-300 flex flex-col",
         isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}>
-        <div className="flex items-center justify-between px-4 py-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl uae-gradient flex items-center justify-center">
-              <span className="text-lg font-bold text-primary-foreground">M</span>
+        <div className="flex flex-col gap-4">
+          {/* Branding Section */}
+          <div className="flex items-center justify-between px-4 py-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl uae-gradient flex items-center justify-center">
+                <span className="text-lg font-bold text-primary-foreground">M</span>
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-foreground">MABDC</h1>
+                <p className="text-xs text-muted-foreground">HR Management</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-foreground">MABDC</h1>
-              <p className="text-xs text-muted-foreground">HR Management</p>
-            </div>
+            <ThemeSelector />
           </div>
-          <ThemeSelector />
+
+          {/* Sign Out Button */}
+          {user && (
+            <div className="px-4">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors text-sm font-medium border border-destructive/20 hover:border-destructive/30"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </button>
+              <p className="text-[10px] text-muted-foreground text-center mt-2 truncate px-2">{user.email}</p>
+            </div>
+          )}
         </div>
 
-        <nav className="space-y-1">
+        <nav className="space-y-1 flex-1 overflow-y-auto px-2 py-4">
           {navItems.map((item) => (
             <div key={item.id}>
               {item.subItems ? (
@@ -273,20 +290,39 @@ export function Sidebar() {
           </Link>
         </nav>
 
-        <div className="absolute bottom-4 left-4 right-4 space-y-3">
-          {user && (
-            <div className="glass-card rounded-xl border border-border p-3">
-              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-              <button
-                onClick={handleLogout}
-                className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors text-sm font-medium"
+        {/* Shortcut Links Section */}
+        <div className="px-4 pb-4 space-y-3">
+          <div className="glass-card rounded-xl border border-border p-4">
+            <h3 className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5" />
+              Quick Actions
+            </h3>
+            <div className="space-y-2">
+              <Link
+                to="/smart-upload"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-secondary transition-colors text-xs font-medium text-muted-foreground hover:text-foreground"
               >
-                <LogOut className="w-4 h-4" />
-                Sign Out
+                <Sparkles className="w-3.5 h-3.5" />
+                Smart Upload
+              </Link>
+              <Link
+                to="/attendance-scanner"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-secondary transition-colors text-xs font-medium text-muted-foreground hover:text-foreground"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                QR Scanner
+              </Link>
+              <button
+                onClick={() => setCurrentView('calendar')}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-secondary transition-colors text-xs font-medium text-muted-foreground hover:text-foreground text-left"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                Calendar
               </button>
             </div>
-          )}
-          <div className="glass-card rounded-xl border border-border p-4">
+          </div>
+
+          <div className="glass-card rounded-xl border border-border p-3">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               <span className="text-xs text-muted-foreground">System Status</span>
