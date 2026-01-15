@@ -775,6 +775,50 @@ export type Database = {
           },
         ]
       }
+      employee_shift_overrides: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          id: string
+          override_date: string
+          reason: string | null
+          shift_end_time: string
+          shift_start_time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          id?: string
+          override_date: string
+          reason?: string | null
+          shift_end_time: string
+          shift_start_time: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+          override_date?: string
+          reason?: string | null
+          shift_end_time?: string
+          shift_start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_shift_overrides_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_shifts: {
         Row: {
           created_at: string
