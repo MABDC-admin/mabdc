@@ -55,21 +55,22 @@ serve(async (req) => {
     // Get recent HR statistics for context
     const today = new Date().toISOString().split('T')[0];
     
-    const { data: employeeStats } = await supabase
+    const { count: employeeCount } = await supabase
       .from("employees")
-      .select("status", { count: "exact", head: true });
+      .select("status", { count: "exact", head: true })
+      .eq("status", "Active");
 
-    const { data: todayAttendance } = await supabase
+    const { count: todayAttendanceCount } = await supabase
       .from("attendance")
       .select("id", { count: "exact", head: true })
       .eq("date", today);
 
-    const { data: pendingLeaves } = await supabase
-      .from("leave_requests")
+    const { count: pendingLeavesCount } = await supabase
+      .from("leave_records")
       .select("id", { count: "exact", head: true })
       .eq("status", "Pending");
 
-    const { data: activeContracts } = await supabase
+    const { count: activeContractsCount } = await supabase
       .from("contracts")
       .select("id", { count: "exact", head: true })
       .eq("status", "Active");
@@ -87,10 +88,10 @@ serve(async (req) => {
 **Current System Context:**
 - User: ${profile?.full_name || "HR Admin"} (${profile?.role || "Admin"})
 - Today's Date: ${today}
-- Active Employees: ${employeeStats?.count || "N/A"}
-- Today's Attendance Records: ${todayAttendance?.count || 0}
-- Pending Leave Requests: ${pendingLeaves?.count || 0}
-- Active Contracts: ${activeContracts?.count || 0}
+- Active Employees: ${employeeCount || 0}
+- Today's Attendance Records: ${todayAttendanceCount || 0}
+- Pending Leave Requests: ${pendingLeavesCount || 0}
+- Active Contracts: ${activeContractsCount || 0}
 
 **MABDC HR Policies (Context):**
 - Standard Working Hours: 8 hours/day

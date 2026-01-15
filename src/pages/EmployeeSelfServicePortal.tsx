@@ -1013,7 +1013,7 @@ export default function EmployeeSelfServicePortal() {
                             {biometryType === 1 && 'Fingerprint authentication available'}
                             {biometryType === 2 && 'Face recognition available'}
                             {biometryType === 3 && 'Iris scanner available'}
-                            {(!biometryType || biometryType === 0) && 'Biometric authentication available'}
+                            {!biometryType && 'Biometric authentication available'}
                           </p>
                         </div>
                       </div>
