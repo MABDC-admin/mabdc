@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useAttendanceByDate, useUpdateAttendance, useCreateAttendance } from '@/hooks/useAttendance';
-import { useTimeShifts } from '@/hooks/useTimeShifts';
+import { useTimeShifts, SHIFT_DEFINITIONS } from '@/hooks/useTimeShifts';
 import { useShiftOverrides } from '@/hooks/useShiftOverrides';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -74,7 +74,8 @@ const STATUS_COLORS: Record<TimeClockStatus, string> = {
 
 const SHIFT_TIMES = {
   morning: { start: '08:00', end: '17:00' },
-  afternoon: { start: '10:00', end: '19:00' },
+  afternoon: { start: '09:00', end: '18:00' },
+  flexible: { start: '08:00', end: '17:00' }, // Default for flexible, will be overridden
   default: { start: '08:00', end: '17:00' }
 };
 

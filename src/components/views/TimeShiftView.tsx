@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { useEmployees } from "@/hooks/useEmployees";
-import { useTimeShifts, useAssignShift, useBulkAssignShift, useRemoveShift } from "@/hooks/useTimeShifts";
+import { useTimeShifts, useAssignShift, useBulkAssignShift, useRemoveShift, ShiftType, SHIFT_DEFINITIONS } from "@/hooks/useTimeShifts";
 import { useShiftOverrides } from "@/hooks/useShiftOverrides";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,12 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Sun, Sunset, Search, Users, RefreshCw, CalendarClock, Settings2 } from "lucide-react";
+import { Clock, Sun, Sunset, Search, Users, RefreshCw, CalendarClock, Settings2, Shuffle } from "lucide-react";
 import { ShiftOverrideDialog } from "@/components/modals/ShiftOverrideDialog";
 
 const SHIFTS = {
-  morning: { label: "Morning Shift", time: "08:00 - 17:00", icon: Sun },
-  afternoon: { label: "Afternoon Shift", time: "10:00 - 19:00", icon: Sunset },
+  morning: { label: "Morning Shift", time: "08:00 - 17:00", icon: Sun, color: "yellow" },
+  afternoon: { label: "Afternoon Shift", time: "09:00 - 18:00", icon: Sunset, color: "orange" },
+  flexible: { label: "Flexible Shift", time: "Custom", icon: Shuffle, color: "blue" },
 } as const;
 
 export default function TimeShiftView() {
@@ -29,12 +30,12 @@ export default function TimeShiftView() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
-  const [activeShiftFilter, setActiveShiftFilter] = useState<"all" | "morning" | "afternoon" | "unassigned">("all");
+  const [activeShiftFilter, setActiveShiftFilter] = useState<"all" | ShiftType | "unassigned">("all");
   const [overrideDialogOpen, setOverrideDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   const shiftMap = useMemo(() => {
-    const map = new Map<string, "morning" | "afternoon">();
+    const map = new Map<string, ShiftType>();
     shifts.forEach((s) => map.set(s.employee_id, s.shift_type));
     return map;
   }, [shifts]);
@@ -58,14 +59,16 @@ export default function TimeShiftView() {
   const shiftStats = useMemo(() => {
     let morning = 0,
       afternoon = 0,
+      flexible = 0,
       unassigned = 0;
     employees.forEach((emp) => {
       const shift = shiftMap.get(emp.id);
       if (shift === "morning") morning++;
       else if (shift === "afternoon") afternoon++;
+      else if (shift === "flexible") flexible++;
       else unassigned++;
     });
-    return { morning, afternoon, unassigned, total: employees.length };
+    return { morning, afternoon, flexible, unassigned, total: employees.length };
   }, [employees, shiftMap]);
 
   const handleSelectEmployee = (employeeId: string, checked: boolean) => {
@@ -76,13 +79,13 @@ export default function TimeShiftView() {
     setSelectedEmployees(checked ? filteredEmployees.map((e) => e.id) : []);
   };
 
-  const handleBulkAssign = (shiftType: "morning" | "afternoon") => {
+  const handleBulkAssign = (shiftType: ShiftType) => {
     if (selectedEmployees.length === 0) return;
     bulkAssignShift.mutate({ employeeIds: selectedEmployees, shiftType });
     setSelectedEmployees([]);
   };
 
-  const handleAssignShift = (employeeId: string, shiftType: "morning" | "afternoon") => {
+  const handleAssignShift = (employeeId: string, shiftType: ShiftType) => {
     assignShift.mutate({ employeeId, shiftType });
   };
 
@@ -145,7 +148,7 @@ export default function TimeShiftView() {
         <TabsContent value="assignments" className="space-y-6">
 
       {/* Shift Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveShiftFilter("all")}>
           <CardContent className="p-4 flex items-center gap-4">
             <div className="p-3 rounded-full bg-primary/10">
@@ -189,6 +192,21 @@ export default function TimeShiftView() {
         </Card>
 
         <Card
+          className={`cursor-pointer hover:shadow-md transition-shadow ${activeShiftFilter === "flexible" ? "ring-2 ring-blue-500" : ""}`}
+          onClick={() => setActiveShiftFilter("flexible")}
+        >
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/30">
+              <Shuffle className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Flexible (Custom)</p>
+              <p className="text-2xl font-bold">{shiftStats.flexible}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
           className={`cursor-pointer hover:shadow-md transition-shadow ${activeShiftFilter === "unassigned" ? "ring-2 ring-gray-500" : ""}`}
           onClick={() => setActiveShiftFilter("unassigned")}
         >
@@ -209,14 +227,14 @@ export default function TimeShiftView() {
         <Card className="bg-primary/5 border-primary/20">
           <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <p className="font-medium">{selectedEmployees.length} employee(s) selected</p>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button
                 size="sm"
                 onClick={() => handleBulkAssign("morning")}
                 className="bg-yellow-500 hover:bg-yellow-600 text-white"
               >
                 <Sun className="h-4 w-4 mr-2" />
-                Assign Morning
+                Morning
               </Button>
               <Button
                 size="sm"
@@ -224,7 +242,15 @@ export default function TimeShiftView() {
                 className="bg-orange-500 hover:bg-orange-600 text-white"
               >
                 <Sunset className="h-4 w-4 mr-2" />
-                Assign Afternoon
+                Afternoon
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleBulkAssign("flexible")}
+                className="bg-blue-500 hover:bg-blue-600 text-white"
+              >
+                <Shuffle className="h-4 w-4 mr-2" />
+                Flexible
               </Button>
               <Button size="sm" variant="outline" onClick={() => setSelectedEmployees([])}>
                 Clear Selection
@@ -299,10 +325,12 @@ export default function TimeShiftView() {
                             className={
                               currentShift === "morning"
                                 ? "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-300"
-                                : "bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300"
+                                : currentShift === "afternoon"
+                                ? "bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300"
+                                : "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300"
                             }
                           >
-                            {SHIFTS[currentShift].time}
+                            {currentShift === "flexible" ? "Flexible" : SHIFTS[currentShift].time}
                           </Badge>
                         )}
 
@@ -312,6 +340,7 @@ export default function TimeShiftView() {
                             variant={currentShift === "morning" ? "default" : "outline"}
                             onClick={() => handleAssignShift(employee.id, "morning")}
                             className={currentShift === "morning" ? "bg-yellow-500 hover:bg-yellow-600" : ""}
+                            title="Morning Shift (08:00-17:00)"
                           >
                             <Sun className="h-4 w-4" />
                           </Button>
@@ -320,8 +349,18 @@ export default function TimeShiftView() {
                             variant={currentShift === "afternoon" ? "default" : "outline"}
                             onClick={() => handleAssignShift(employee.id, "afternoon")}
                             className={currentShift === "afternoon" ? "bg-orange-500 hover:bg-orange-600" : ""}
+                            title="Afternoon Shift (09:00-18:00)"
                           >
                             <Sunset className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={currentShift === "flexible" ? "default" : "outline"}
+                            onClick={() => handleAssignShift(employee.id, "flexible")}
+                            className={currentShift === "flexible" ? "bg-blue-500 hover:bg-blue-600" : ""}
+                            title="Flexible Shift (Custom times via overrides)"
+                          >
+                            <Shuffle className="h-4 w-4" />
                           </Button>
                           {currentShift && (
                             <Button
@@ -348,7 +387,7 @@ export default function TimeShiftView() {
       <Card>
         <CardContent className="p-4">
           <h3 className="font-semibold mb-3">Shift Schedule (Monday - Friday)</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="flex items-center gap-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
               <Sun className="h-8 w-8 text-yellow-600" />
               <div>
@@ -360,7 +399,14 @@ export default function TimeShiftView() {
               <Sunset className="h-8 w-8 text-orange-600" />
               <div>
                 <p className="font-medium text-orange-800 dark:text-orange-300">Afternoon Shift</p>
-                <p className="text-sm text-orange-700 dark:text-orange-400">10:00 AM - 07:00 PM</p>
+                <p className="text-sm text-orange-700 dark:text-orange-400">09:00 AM - 06:00 PM</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <Shuffle className="h-8 w-8 text-blue-600" />
+              <div>
+                <p className="font-medium text-blue-800 dark:text-blue-300">Flexible Shift</p>
+                <p className="text-sm text-blue-700 dark:text-blue-400">Custom times via Daily Overrides</p>
               </div>
             </div>
           </div>
