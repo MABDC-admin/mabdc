@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
+import { format } from "date-fns";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useTimeShifts, useAssignShift, useBulkAssignShift, useRemoveShift } from "@/hooks/useTimeShifts";
+import { useShiftOverrides } from "@/hooks/useShiftOverrides";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +10,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Clock, Sun, Sunset, Search, Users, RefreshCw } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Clock, Sun, Sunset, Search, Users, RefreshCw, CalendarClock, Settings2 } from "lucide-react";
+import { ShiftOverrideDialog } from "@/components/modals/ShiftOverrideDialog";
 
 const SHIFTS = {
   morning: { label: "Morning Shift", time: "08:00 - 17:00", icon: Sun },
@@ -18,6 +22,7 @@ const SHIFTS = {
 export default function TimeShiftView() {
   const { data: employees = [], isLoading: loadingEmployees, refetch } = useEmployees();
   const { data: shifts = [], isLoading: loadingShifts } = useTimeShifts();
+  const { data: allOverrides = [] } = useShiftOverrides();
   const assignShift = useAssignShift();
   const bulkAssignShift = useBulkAssignShift();
   const removeShift = useRemoveShift();
@@ -25,6 +30,8 @@ export default function TimeShiftView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [activeShiftFilter, setActiveShiftFilter] = useState<"all" | "morning" | "afternoon" | "unassigned">("all");
+  const [overrideDialogOpen, setOverrideDialogOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   const shiftMap = useMemo(() => {
     const map = new Map<string, "morning" | "afternoon">();
@@ -94,6 +101,9 @@ export default function TimeShiftView() {
 
   const isLoading = loadingEmployees || loadingShifts;
 
+  // Count upcoming overrides
+  const upcomingOverridesCount = allOverrides.filter(o => o.override_date >= format(new Date(), 'yyyy-MM-dd')).length;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -102,11 +112,37 @@ export default function TimeShiftView() {
           <h1 className="text-2xl font-bold text-foreground">Time Shift Management</h1>
           <p className="text-muted-foreground">Assign employees to shifts (Monday - Friday)</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setOverrideDialogOpen(true)}>
+            <CalendarClock className="h-4 w-4 mr-2" />
+            Manage Overrides
+            {upcomingOverridesCount > 0 && (
+              <Badge variant="secondary" className="ml-2">{upcomingOverridesCount}</Badge>
+            )}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
+
+      <Tabs defaultValue="assignments" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="assignments" className="gap-2">
+            <Settings2 className="h-4 w-4" />
+            Permanent Shifts
+          </TabsTrigger>
+          <TabsTrigger value="overrides" className="gap-2">
+            <CalendarClock className="h-4 w-4" />
+            Daily Overrides
+            {upcomingOverridesCount > 0 && (
+              <Badge variant="secondary" className="ml-1">{upcomingOverridesCount}</Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="assignments" className="space-y-6">
 
       {/* Shift Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -330,6 +366,103 @@ export default function TimeShiftView() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="overrides" className="space-y-6">
+          {/* Overrides Management Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarClock className="h-5 w-5" />
+                    Daily Shift Overrides
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Manage custom schedules for specific dates. Overrides take precedence over permanent shift assignments.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-auto"
+                  />
+                  <Button onClick={() => setOverrideDialogOpen(true)}>
+                    <CalendarClock className="h-4 w-4 mr-2" />
+                    Add Override
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {allOverrides.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <CalendarClock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="font-medium">No shift overrides configured</p>
+                  <p className="text-sm">Click "Add Override" to create flexible schedules for specific dates</p>
+                </div>
+              ) : (
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-2">
+                    {allOverrides.map((override) => {
+                      const employee = employees.find(e => e.id === override.employee_id);
+                      const isPast = override.override_date < format(new Date(), 'yyyy-MM-dd');
+                      
+                      return (
+                        <div
+                          key={override.id}
+                          className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
+                            isPast ? 'opacity-60 bg-muted/30' : 'hover:bg-muted/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage src={employee?.photo_url || ""} alt={employee?.full_name || ""} />
+                              <AvatarFallback>{employee?.full_name?.split(" ").map(n => n[0]).join("").slice(0, 2) || "?"}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{employee?.full_name || "Unknown"}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {employee?.hrms_no} • {format(new Date(override.override_date), 'EEE, MMM dd, yyyy')}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                              <Clock className="w-3 h-3 mr-1" />
+                              {override.shift_start_time.substring(0, 5)} - {override.shift_end_time.substring(0, 5)}
+                            </Badge>
+                            
+                            {override.reason && (
+                              <span className="text-xs text-muted-foreground max-w-[150px] truncate" title={override.reason}>
+                                {override.reason}
+                              </span>
+                            )}
+                            
+                            {isPast && (
+                              <Badge variant="secondary" className="text-xs">Past</Badge>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Shift Override Dialog */}
+      <ShiftOverrideDialog
+        isOpen={overrideDialogOpen}
+        onClose={() => setOverrideDialogOpen(false)}
+        selectedDate={selectedDate}
+      />
     </div>
   );
 }
