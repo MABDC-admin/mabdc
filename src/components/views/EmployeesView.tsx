@@ -4,13 +4,14 @@ import { useDeactivateEmployee } from '@/hooks/useDeactivatedEmployees';
 import { useLeave, useAllLeaveBalances, useLeaveTypes } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { useHRStore } from '@/store/hrStore';
+import { useDocumentExpiryPriority, getUrgencyBadgeStyles, formatDaysRemaining } from '@/hooks/useDocumentExpiryPriority';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
 import { AddEmployeeModal } from '@/components/modals/AddEmployeeModal';
-import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning, FilePlus, MessageCircle, UserMinus, Calculator, DollarSign, AlertTriangle, Pencil, RotateCcw } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning, FilePlus, MessageCircle, UserMinus, Calculator, DollarSign, AlertTriangle, Pencil, RotateCcw, ShieldAlert, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/hr';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -109,12 +110,21 @@ export function EmployeesView() {
       .map(l => l.employee_id)
   );
 
-  const filteredEmployees = employees.filter(emp =>
-    emp.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    emp.hrms_no.includes(searchQuery) ||
-    emp.job_position.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    emp.department.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Document expiry priority sorting
+  const { sortByPriority, getPriority, stats: expiryStats } = useDocumentExpiryPriority(employees);
+
+  // Filter and sort employees - expiring documents first
+  const filteredAndSortedEmployees = useMemo(() => {
+    const filtered = employees.filter(emp =>
+      emp.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      emp.hrms_no.includes(searchQuery) ||
+      emp.job_position.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      emp.department.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    
+    // Sort by document expiry priority (most urgent first)
+    return sortByPriority(filtered);
+  }, [employees, searchQuery, sortByPriority]);
 
   const openProfile = (employee: Employee) => {
     setCurrentEmployee(employee);
@@ -217,6 +227,34 @@ export function EmployeesView() {
   return (
     <div className="space-y-6 animate-slide-up">
       <section className="glass-card rounded-3xl border border-border p-4 sm:p-6">
+        {/* Expiry Priority Banner */}
+        {expiryStats.total > 0 && (
+          <div className="mb-4 p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <CalendarClock className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Document Expiry Priority Active</p>
+                <p className="text-xs text-muted-foreground">
+                  Employees sorted by document urgency • 
+                  {expiryStats.critical > 0 && <span className="text-destructive font-medium"> {expiryStats.critical} critical</span>}
+                  {expiryStats.warning > 0 && <span className="text-amber-500 font-medium"> {expiryStats.warning} warning</span>}
+                  {expiryStats.upcoming > 0 && <span className="text-blue-500 font-medium"> {expiryStats.upcoming} upcoming</span>}
+                </p>
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentView('renewal')}
+              className="text-xs"
+            >
+              View Queue
+            </Button>
+          </div>
+        )}
+        
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
             <h1 className="text-xl font-semibold text-foreground">Employee Management</h1>
@@ -280,7 +318,7 @@ export function EmployeesView() {
               <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
               <p className="text-sm">Loading employees...</p>
             </div>
-          ) : filteredEmployees.length === 0 ? (
+          ) : filteredAndSortedEmployees.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground col-span-full">
               <p className="text-sm">No employees found.</p>
               <Button 
@@ -293,25 +331,45 @@ export function EmployeesView() {
               </Button>
             </div>
           ) : viewMode === 'grid' ? (
-            filteredEmployees.map((emp) => {
+            filteredAndSortedEmployees.map((emp) => {
               const visaDays = getVisaDaysRemaining(emp);
               const hasPendingLeave = employeesWithPendingLeave.has(emp.id);
               const contractStatus = getContractStatus(emp.id);
               const isContractExpired = contractStatus.isExpired || !contractStatus.hasContract;
+              const expiryPriority = getPriority(emp.id);
+              const expiryBadgeStyles = expiryPriority ? getUrgencyBadgeStyles(expiryPriority.urgencyLevel) : null;
               
               return (
                 <div 
                   key={emp.id} 
                   className={cn(
                     "rounded-2xl border p-4 transition-all hover:shadow-lg relative group cursor-pointer overflow-hidden",
-                    isContractExpired 
-                      ? "bg-muted/50 border-muted grayscale-[50%] opacity-80"
-                      : hasPendingLeave 
-                        ? "animate-pulse border-amber-500/50 bg-gradient-to-br from-amber-500/10 via-background to-orange-500/10"
-                        : "bg-gradient-to-br from-primary/5 via-background to-accent/10 border-border hover:border-primary/30"
+                    // Priority styling based on document expiry
+                    expiryPriority?.urgencyLevel === 'critical' && !isContractExpired
+                      ? "border-destructive/50 bg-gradient-to-br from-destructive/10 via-background to-destructive/5"
+                      : expiryPriority?.urgencyLevel === 'warning' && !isContractExpired
+                        ? "border-amber-500/50 bg-gradient-to-br from-amber-500/10 via-background to-amber-500/5"
+                        : isContractExpired 
+                          ? "bg-muted/50 border-muted grayscale-[50%] opacity-80"
+                          : hasPendingLeave 
+                            ? "animate-pulse border-amber-500/50 bg-gradient-to-br from-amber-500/10 via-background to-orange-500/10"
+                            : "bg-gradient-to-br from-primary/5 via-background to-accent/10 border-border hover:border-primary/30"
                   )}
                   onClick={() => openProfile(emp)}
                 >
+                  {/* Document Expiry Priority Badge - shows for critical/warning/upcoming */}
+                  {expiryPriority?.hasExpiringItems && !isContractExpired && (
+                    <div className={cn(
+                      "absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium z-10",
+                      expiryBadgeStyles?.bg,
+                      expiryBadgeStyles?.text,
+                      expiryPriority.urgencyLevel === 'critical' && "animate-pulse"
+                    )}>
+                      <ShieldAlert className="w-3 h-3" />
+                      {expiryPriority.expiringDocuments.length} doc{expiryPriority.expiringDocuments.length > 1 ? 's' : ''} • {formatDaysRemaining(expiryPriority.mostUrgentDays || 0)}
+                    </div>
+                  )}
+                  
                   {/* Contract Expired Badge */}
                   {isContractExpired && (
                     <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-destructive/20 text-destructive text-[10px] font-medium z-10 animate-pulse">
@@ -320,18 +378,10 @@ export function EmployeesView() {
                     </div>
                   )}
                   
-                  {/* Contract Expiring Soon Badge */}
-                  {contractStatus.status === 'expiring-soon' && (
+                  {hasPendingLeave && !isContractExpired && !expiryPriority?.hasExpiringItems && (
                     <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-medium z-10">
                       <Clock className="w-3 h-3" />
-                      Contract: {(contractStatus as any).daysLeft}d
-                    </div>
-                  )}
-                  
-                  {hasPendingLeave && !isContractExpired && contractStatus.status !== 'expiring-soon' && (
-                    <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-medium z-10">
-                      <Clock className="w-3 h-3" />
-                      Pending
+                      Pending Leave
                     </div>
                   )}
                   
@@ -462,22 +512,29 @@ export function EmployeesView() {
             })
           ) : (
             // List View
-            filteredEmployees.map((emp) => {
+            filteredAndSortedEmployees.map((emp) => {
               const visaDays = getVisaDaysRemaining(emp);
               const hasPendingLeave = employeesWithPendingLeave.has(emp.id);
               const contractStatus = getContractStatus(emp.id);
               const isContractExpired = contractStatus.isExpired || !contractStatus.hasContract;
+              const expiryPriority = getPriority(emp.id);
+              const expiryBadgeStyles = expiryPriority ? getUrgencyBadgeStyles(expiryPriority.urgencyLevel) : null;
               
               return (
                 <div 
                   key={emp.id} 
                   className={cn(
                     "rounded-2xl border p-4 transition-colors overflow-hidden",
-                    isContractExpired 
-                      ? "bg-muted/50 border-muted grayscale-[50%] opacity-80"
-                      : hasPendingLeave 
-                        ? "animate-pulse border-amber-500/50 bg-gradient-to-r from-amber-500/10 via-background to-orange-500/10"
-                        : "bg-gradient-to-r from-primary/5 via-background to-accent/10 border-border hover:border-primary/30"
+                    // Priority styling based on document expiry
+                    expiryPriority?.urgencyLevel === 'critical' && !isContractExpired
+                      ? "border-destructive/50 bg-gradient-to-r from-destructive/10 via-background to-destructive/5"
+                      : expiryPriority?.urgencyLevel === 'warning' && !isContractExpired
+                        ? "border-amber-500/50 bg-gradient-to-r from-amber-500/10 via-background to-amber-500/5"
+                        : isContractExpired 
+                          ? "bg-muted/50 border-muted grayscale-[50%] opacity-80"
+                          : hasPendingLeave 
+                            ? "animate-pulse border-amber-500/50 bg-gradient-to-r from-amber-500/10 via-background to-orange-500/10"
+                            : "bg-gradient-to-r from-primary/5 via-background to-accent/10 border-border hover:border-primary/30"
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -510,6 +567,19 @@ export function EmployeesView() {
                           )}>
                             {emp.status || 'Active'}
                           </span>
+                          {/* Document Expiry Priority Badge */}
+                          {expiryPriority?.hasExpiringItems && !isContractExpired && (
+                            <span className={cn(
+                              "text-xs px-2 py-1 rounded-full border flex items-center gap-1",
+                              expiryBadgeStyles?.bg,
+                              expiryBadgeStyles?.text,
+                              expiryBadgeStyles?.border,
+                              expiryPriority.urgencyLevel === 'critical' && "animate-pulse"
+                            )}>
+                              <ShieldAlert className="w-3 h-3" />
+                              {expiryPriority.expiringDocuments.length} doc{expiryPriority.expiringDocuments.length > 1 ? 's' : ''} • {formatDaysRemaining(expiryPriority.mostUrgentDays || 0)}
+                            </span>
+                          )}
                           {/* Contract Status Badges - inline with other badges */}
                           {isContractExpired && (
                             <span className="text-xs px-2 py-1 rounded-full bg-destructive/10 text-destructive border border-destructive/30 animate-pulse flex items-center gap-1">
@@ -517,13 +587,7 @@ export function EmployeesView() {
                               {contractStatus.hasContract ? 'Contract Expired' : 'No Contract'}
                             </span>
                           )}
-                          {contractStatus.status === 'expiring-soon' && (
-                            <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              Contract: {(contractStatus as any).daysLeft}d left
-                            </span>
-                          )}
-                          {hasPendingLeave && !isContractExpired && contractStatus.status !== 'expiring-soon' && (
+                          {hasPendingLeave && !isContractExpired && !expiryPriority?.hasExpiringItems && (
                             <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               Pending Leave
