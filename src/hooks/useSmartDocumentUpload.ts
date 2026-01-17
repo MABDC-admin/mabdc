@@ -208,12 +208,12 @@ export function useSmartDocumentUpload() {
       return 0;
     }
 
-    // Mark as expired
+    // Mark as expired (contracts table doesn't have notes field, just update status)
     const { error: updateError } = await supabase
       .from('contracts')
       .update({
         status: 'Expired',
-        notes: `Automatically archived on ${today} when new contract was uploaded`,
+        updated_at: new Date().toISOString(),
       })
       .in('id', expiredContracts.map((c) => c.id));
 
