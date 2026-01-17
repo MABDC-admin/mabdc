@@ -108,12 +108,22 @@ export function useSmartDocumentUpload() {
       // Convert file to base64
       const base64 = await fileToBase64(fileToAnalyze);
 
-      // Call edge function
+      // Convert additional pages to base64 for multi-page analysis
+      const additionalImages: string[] = [];
+      if (pdfPages?.page2) {
+        console.log('Converting page 2 to base64 for multi-page analysis...');
+        const page2Base64 = await blobToBase64(pdfPages.page2);
+        additionalImages.push(page2Base64);
+        console.log('Page 2 converted, total pages to analyze:', additionalImages.length + 1);
+      }
+
+      // Call edge function with all pages
       const { data, error } = await supabase.functions.invoke('ai-document-reader', {
         body: {
           fileBase64: base64,
           fileType: fileToAnalyze.type,
           fileName: file.name,
+          additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
         },
       });
 
@@ -490,6 +500,20 @@ function fileToBase64(file: File): Promise<string> {
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
+  });
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Remove data URL prefix
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
   });
 }
 
