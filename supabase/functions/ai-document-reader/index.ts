@@ -52,7 +52,7 @@ serve(async (req) => {
   }
 
   try {
-    const { fileBase64, fileType, fileName } = await req.json();
+    const { fileBase64, fileType, fileName, additionalImages } = await req.json();
 
     if (!fileBase64) {
       throw new Error("No file provided");
@@ -77,9 +77,19 @@ serve(async (req) => {
       mediaType = "image/heic";
     }
 
-    // AI prompt for document analysis
+    // Check if we have additional pages (for multi-page documents)
+    const hasAdditionalPages = Array.isArray(additionalImages) && additionalImages.length > 0;
+    console.log(`Processing document with ${hasAdditionalPages ? additionalImages.length + 1 : 1} page(s)`);
+
+    // AI prompt for document analysis - enhanced for multi-page support
     const systemPrompt = `You are an expert document analyzer specializing in UAE employment documents. 
-Analyze the provided document image and extract all relevant information.
+Analyze the provided document image(s) and extract all relevant information.
+
+IMPORTANT FOR MULTI-PAGE DOCUMENTS: 
+- Employment contracts often have salary details (Basic Salary, Housing Allowance, Transportation Allowance, Total Salary) on PAGE 2.
+- If multiple pages/images are provided, examine ALL pages to extract complete information.
+- Page 1 typically contains: Employee name, Contract number, Job title, Start/End dates, Work location
+- Page 2 typically contains: Salary breakdown, Working hours, Leave days, Probation period, Notice period
 
 You must identify the document type from these categories:
 - Passport
@@ -127,22 +137,22 @@ For Medical Insurance:
 - Policy Number
 - Insurance Company Name
 
-For Employment Contract:
+For Employment Contract (CHECK ALL PAGES FOR COMPLETE DATA):
 - MOHRE Contract Number
 - Contract Type (Limited/Unlimited)
 - Job Title (English)
 - Job Title (Arabic)
-- Basic Salary (number only)
-- Housing Allowance (number only)
-- Transportation Allowance (number only)
-- Total Salary (number only)
+- Basic Salary (number only - OFTEN ON PAGE 2)
+- Housing Allowance (number only - OFTEN ON PAGE 2)
+- Transportation Allowance (number only - OFTEN ON PAGE 2)
+- Total Salary (number only - OFTEN ON PAGE 2)
 - Start Date
 - End Date
 - Work Location
-- Working Hours per day
-- Probation Period (in months)
-- Notice Period (in days)
-- Annual Leave Days
+- Working Hours per day (OFTEN ON PAGE 2)
+- Probation Period (in months - OFTEN ON PAGE 2)
+- Notice Period (in days - OFTEN ON PAGE 2)
+- Annual Leave Days (OFTEN ON PAGE 2)
 
 Respond ONLY with a valid JSON object in this exact format:
 {
@@ -179,6 +189,35 @@ Respond ONLY with a valid JSON object in this exact format:
 
     console.log("Sending document to AI for analysis...");
 
+    // Build user content with all pages
+    const userContent: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
+      {
+        type: "text",
+        text: hasAdditionalPages 
+          ? `Please analyze this ${fileName || "document"} (${additionalImages.length + 1} pages provided). Extract all information from ALL pages. For contracts, salary details are typically on page 2.`
+          : `Please analyze this ${fileName || "document"} and extract all the information.`,
+      },
+      {
+        type: "image_url",
+        image_url: {
+          url: `data:${mediaType};base64,${fileBase64}`,
+        },
+      },
+    ];
+
+    // Add additional pages if provided
+    if (hasAdditionalPages) {
+      additionalImages.forEach((imgBase64: string, idx: number) => {
+        userContent.push({
+          type: "image_url",
+          image_url: {
+            url: `data:image/jpeg;base64,${imgBase64}`,
+          },
+        });
+        console.log(`Added page ${idx + 2} to AI request`);
+      });
+    }
+
     // Call Lovable AI Gateway with vision capabilities
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -192,18 +231,7 @@ Respond ONLY with a valid JSON object in this exact format:
           { role: "system", content: systemPrompt },
           {
             role: "user",
-            content: [
-              {
-                type: "text",
-                text: `Please analyze this ${fileName || "document"} and extract all the information.`,
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mediaType};base64,${fileBase64}`,
-                },
-              },
-            ],
+            content: userContent,
           },
         ],
       }),
