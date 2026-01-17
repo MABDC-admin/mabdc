@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useContracts, useUpdateContractStatus, useAddContract, useRenewContract, useCheckContractExpiry, useUpdateContract } from '@/hooks/useContracts';
 import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
@@ -175,6 +175,39 @@ export function ContractsView() {
     const expiryStatus = getContractExpiryStatus(contract);
     return expiryStatus.status === filter;
   });
+
+  // Sort contracts by expiry priority (nearest expiry first, then by status)
+  const sortedContracts = useMemo(() => {
+    return [...filteredContracts].sort((a, b) => {
+      const statusA = getContractExpiryStatus(a);
+      const statusB = getContractExpiryStatus(b);
+      
+      // Priority order: expiring > nearing > active > expired/terminated
+      const priorityOrder: Record<string, number> = {
+        expiring: 0,
+        nearing: 1, 
+        active: 2,
+        expired: 3,
+        terminated: 4,
+      };
+      
+      const priorityA = priorityOrder[statusA.status] ?? 5;
+      const priorityB = priorityOrder[statusB.status] ?? 5;
+      
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      
+      // Within same status, sort by days remaining
+      if (statusA.daysLeft !== null && statusB.daysLeft !== null) {
+        return statusA.daysLeft - statusB.daysLeft;
+      }
+      if (statusA.daysLeft !== null) return -1;
+      if (statusB.daysLeft !== null) return 1;
+      
+      return 0;
+    });
+  }, [filteredContracts]);
 
   const statusCounts = {
     all: contracts.length,
@@ -739,14 +772,14 @@ export function ContractsView() {
               <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">Loading contracts...</p>
             </div>
-          ) : filteredContracts.length === 0 ? (
+          ) : sortedContracts.length === 0 ? (
             <div className="text-center py-8">
               <FileText className="w-8 h-8 mx-auto mb-2 opacity-50 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">No contracts found</p>
               <p className="text-xs text-muted-foreground mt-1">Add MOHRE contracts for your employees</p>
             </div>
           ) : (
-            filteredContracts.map((contract) => {
+            sortedContracts.map((contract) => {
               const expiryStatus = getContractExpiryStatus(contract);
               const StatusIcon = expiryStatus.icon;
               const canRenew = expiryStatus.status === 'expired' || expiryStatus.status === 'expiring' || expiryStatus.status === 'nearing';
