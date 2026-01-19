@@ -5,13 +5,14 @@ import { useLeave, useAllLeaveBalances, useLeaveTypes } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { useHRStore } from '@/store/hrStore';
 import { useDocumentExpiryPriority, getUrgencyBadgeStyles, formatDaysRemaining } from '@/hooks/useDocumentExpiryPriority';
+import { useDocumentCompleteness } from '@/hooks/useDocumentCompleteness';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
 import { AddEmployeeModal } from '@/components/modals/AddEmployeeModal';
-import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning, FilePlus, MessageCircle, UserMinus, Calculator, DollarSign, AlertTriangle, Pencil, RotateCcw, ShieldAlert, CalendarClock } from 'lucide-react';
+import { Search, Plus, Trash2, RefreshCw, Link2, Clock, LayoutGrid, List, FileWarning, FilePlus, MessageCircle, UserMinus, Calculator, DollarSign, AlertTriangle, Pencil, RotateCcw, ShieldAlert, CalendarClock, CheckCircle, FileX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Employee } from '@/types/hr';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -112,6 +113,7 @@ export function EmployeesView() {
 
   // Document expiry priority sorting
   const { sortByPriority, getPriority, stats: expiryStats } = useDocumentExpiryPriority(employees);
+  const { getCompleteness } = useDocumentCompleteness();
 
   // Filter and sort employees - expiring documents first
   const filteredAndSortedEmployees = useMemo(() => {
@@ -338,6 +340,7 @@ export function EmployeesView() {
               const isContractExpired = contractStatus.isExpired || !contractStatus.hasContract;
               const expiryPriority = getPriority(emp.id);
               const expiryBadgeStyles = expiryPriority ? getUrgencyBadgeStyles(expiryPriority.urgencyLevel) : null;
+              const docCompleteness = getCompleteness(emp.id);
               
               return (
                 <div 
@@ -462,6 +465,36 @@ export function EmployeesView() {
                       <p className="text-[10px] text-muted-foreground">{emp.department}</p>
                     </div>
 
+                    {/* Document Completeness Badge */}
+                    <div className="text-center">
+                      {docCompleteness.isComplete ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-medium border border-emerald-500/30">
+                          <CheckCircle className="w-3 h-3" />
+                          Complete
+                        </span>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-600 dark:text-orange-400 text-[10px] font-medium border border-orange-500/30 cursor-help">
+                              <FileX className="w-3 h-3" />
+                              Missing {docCompleteness.missingCategories.length} Doc{docCompleteness.missingCategories.length > 1 ? 's' : ''}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs">
+                            <p className="font-medium mb-1">Missing Documents:</p>
+                            <ul className="text-xs space-y-0.5">
+                              {docCompleteness.missingCategories.map(cat => (
+                                <li key={cat} className="flex items-center gap-1">
+                                  <span className="w-1 h-1 rounded-full bg-orange-500" />
+                                  {cat}
+                                </li>
+                              ))}
+                            </ul>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+
                     {visaDays && (
                       <div className="text-center">
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
@@ -519,6 +552,7 @@ export function EmployeesView() {
               const isContractExpired = contractStatus.isExpired || !contractStatus.hasContract;
               const expiryPriority = getPriority(emp.id);
               const expiryBadgeStyles = expiryPriority ? getUrgencyBadgeStyles(expiryPriority.urgencyLevel) : null;
+              const docCompleteness = getCompleteness(emp.id);
               
               return (
                 <div 
@@ -597,6 +631,33 @@ export function EmployeesView() {
                             <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
                               Visa: {visaDays}d
                             </span>
+                          )}
+                          {/* Document Completeness Badge */}
+                          {docCompleteness.isComplete ? (
+                            <span className="text-xs px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                              <CheckCircle className="w-3 h-3" />
+                              Complete
+                            </span>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-xs px-2 py-1 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 flex items-center gap-1 cursor-help">
+                                  <FileX className="w-3 h-3" />
+                                  Missing {docCompleteness.missingCategories.length} Doc{docCompleteness.missingCategories.length > 1 ? 's' : ''}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-xs">
+                                <p className="font-medium mb-1">Missing Documents:</p>
+                                <ul className="text-xs space-y-0.5">
+                                  {docCompleteness.missingCategories.map(cat => (
+                                    <li key={cat} className="flex items-center gap-1">
+                                      <span className="w-1 h-1 rounded-full bg-orange-500" />
+                                      {cat}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </TooltipContent>
+                            </Tooltip>
                           )}
                         </div>
                       </div>
