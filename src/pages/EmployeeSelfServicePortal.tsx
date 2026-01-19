@@ -230,117 +230,148 @@ export default function EmployeeSelfServicePortal() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={employee.photo_url || undefined} />
-              <AvatarFallback>{employee.full_name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-            </Avatar>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-primary/5 dark:from-slate-950 dark:via-background dark:to-primary/10">
+      {/* Header - Enhanced Glassmorphism */}
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-primary/95 via-primary/90 to-accent/90 dark:from-primary/80 dark:via-primary/70 dark:to-accent/80 backdrop-blur-xl shadow-lg shadow-primary/20">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="absolute -inset-1 bg-white/30 rounded-full blur-sm" />
+              <Avatar className="h-12 w-12 ring-2 ring-white/50 shadow-lg relative">
+                <AvatarImage src={employee.photo_url || undefined} />
+                <AvatarFallback className="bg-white/20 text-white font-bold text-lg">
+                  {employee.full_name.split(' ').map(n => n[0]).join('')}
+                </AvatarFallback>
+              </Avatar>
+            </div>
             <div>
-              <h1 className="font-semibold">{employee.full_name}</h1>
-              <p className="text-xs text-muted-foreground">{employee.job_position}</p>
+              <h1 className="font-bold text-lg text-white drop-shadow-sm">{employee.full_name}</h1>
+              <p className="text-sm text-white/80 font-medium">{employee.job_position}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <NotificationBell />
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleSignOut}
+              className="text-white hover:bg-white/20 hover:text-white border border-white/20"
+            >
               <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
+              <span className="hidden sm:inline">Sign Out</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <CalendarDays className="w-5 h-5 text-primary" />
+      <main className="container mx-auto px-4 py-8 space-y-8">
+        {/* Quick Stats - Premium Card Design */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          {/* Annual Leave Card */}
+          <Card className="relative overflow-hidden border-0 shadow-lg shadow-primary/10 bg-gradient-to-br from-white to-primary/5 dark:from-card dark:to-primary/10 group hover:shadow-xl hover:shadow-primary/20 transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-primary/20 to-transparent rounded-bl-full" />
+            <CardContent className="pt-5 pb-4 relative">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2">
+                  <p className="text-3xl md:text-4xl font-black text-primary tracking-tight">{annualLeaveBalance}</p>
+                  <p className="text-xs md:text-sm font-semibold text-muted-foreground uppercase tracking-wide">Annual Leave</p>
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{annualLeaveBalance}</p>
-                  <p className="text-xs text-muted-foreground">Annual Leave Balance</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/10 rounded-lg">
-                  <Clock className="w-5 h-5 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{presentDays}</p>
-                  <p className="text-xs text-muted-foreground">Days This Month</p>
+                <div className="p-3 bg-gradient-to-br from-primary to-primary/80 rounded-xl shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform duration-300">
+                  <CalendarDays className="w-5 h-5 md:w-6 md:h-6 text-white" />
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-500/10 rounded-lg">
-                  <FileText className="w-5 h-5 text-amber-500" />
+          {/* Attendance Card */}
+          <Card className="relative overflow-hidden border-0 shadow-lg shadow-emerald-500/10 bg-gradient-to-br from-white to-emerald-50 dark:from-card dark:to-emerald-950/30 group hover:shadow-xl hover:shadow-emerald-500/20 transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-emerald-500/20 to-transparent rounded-bl-full" />
+            <CardContent className="pt-5 pb-4 relative">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2">
+                  <p className="text-3xl md:text-4xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">{presentDays}</p>
+                  <p className="text-xs md:text-sm font-semibold text-muted-foreground uppercase tracking-wide">Days Present</p>
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{pendingLeave}</p>
-                  <p className="text-xs text-muted-foreground">Pending Requests</p>
+                <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg shadow-emerald-500/30 group-hover:scale-110 transition-transform duration-300">
+                  <Clock className="w-5 h-5 md:w-6 md:h-6 text-white" />
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-500/10 rounded-lg">
-                  <Award className="w-5 h-5 text-purple-500" />
+          {/* Pending Requests Card */}
+          <Card className="relative overflow-hidden border-0 shadow-lg shadow-amber-500/10 bg-gradient-to-br from-white to-amber-50 dark:from-card dark:to-amber-950/30 group hover:shadow-xl hover:shadow-amber-500/20 transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-500/20 to-transparent rounded-bl-full" />
+            <CardContent className="pt-5 pb-4 relative">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2">
+                  <p className="text-3xl md:text-4xl font-black text-amber-600 dark:text-amber-400 tracking-tight">{pendingLeave}</p>
+                  <p className="text-xs md:text-sm font-semibold text-muted-foreground uppercase tracking-wide">Pending</p>
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{gamification?.points || 0}</p>
-                  <p className="text-xs text-muted-foreground">Total Points</p>
+                <div className="p-3 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl shadow-lg shadow-amber-500/30 group-hover:scale-110 transition-transform duration-300">
+                  <FileText className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Points Card */}
+          <Card className="relative overflow-hidden border-0 shadow-lg shadow-violet-500/10 bg-gradient-to-br from-white to-violet-50 dark:from-card dark:to-violet-950/30 group hover:shadow-xl hover:shadow-violet-500/20 transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-violet-500/20 to-transparent rounded-bl-full" />
+            <CardContent className="pt-5 pb-4 relative">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2">
+                  <p className="text-3xl md:text-4xl font-black text-violet-600 dark:text-violet-400 tracking-tight">{gamification?.points || 0}</p>
+                  <p className="text-xs md:text-sm font-semibold text-muted-foreground uppercase tracking-wide">Points</p>
+                </div>
+                <div className="p-3 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl shadow-lg shadow-violet-500/30 group-hover:scale-110 transition-transform duration-300">
+                  <Award className="w-5 h-5 md:w-6 md:h-6 text-white" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => setShowLeaveModal(true)}>
-            <Plus className="w-4 h-4 mr-2" />
+        {/* Quick Actions - Enhanced Button */}
+        <div className="flex flex-wrap gap-3">
+          <Button 
+            onClick={() => setShowLeaveModal(true)} 
+            size="lg"
+            className="shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 font-semibold"
+          >
+            <Plus className="w-5 h-5 mr-2" />
             Request Leave
           </Button>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs - Enhanced Pill Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="flex flex-wrap h-auto gap-1">
+          <TabsList className="flex flex-wrap h-auto gap-1.5 p-1.5 bg-muted/50 border border-border/50 rounded-xl shadow-inner">
             {tabs.map(tab => (
-              <TabsTrigger key={tab.id} value={tab.id} className="flex items-center gap-2">
+              <TabsTrigger 
+                key={tab.id} 
+                value={tab.id} 
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:text-primary"
+              >
                 <tab.icon className="w-4 h-4" />
                 <span className="hidden sm:inline">{tab.label}</span>
               </TabsTrigger>
             ))}
           </TabsList>
 
-          <TabsContent value="overview" className="mt-6 space-y-6">
+          <TabsContent value="overview" className="mt-8 space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
-              {/* Personal Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Personal Information</CardTitle>
+              {/* Personal Info - Enhanced */}
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-card dark:to-muted/20 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 border-b border-border/50">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <User className="w-4 h-4 text-primary" />
+                    </div>
+                    Personal Information
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="pt-6 space-y-4">
                   <InfoItem icon={User} label="HRMS No" value={employee.hrms_no} />
                   <InfoItem icon={Building2} label="Department" value={employee.department} />
                   <InfoItem icon={Briefcase} label="Position" value={employee.job_position} />
@@ -351,28 +382,42 @@ export default function EmployeeSelfServicePortal() {
                 </CardContent>
               </Card>
 
-              {/* Recent Activity */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Recent Leave Requests</CardTitle>
+              {/* Recent Activity - Enhanced */}
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-card dark:to-muted/20 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-accent/5 to-primary/5 border-b border-border/50">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <div className="p-2 bg-accent/10 rounded-lg">
+                      <CalendarDays className="w-4 h-4 text-accent-foreground" />
+                    </div>
+                    Recent Leave Requests
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-6">
                   {employeeLeave.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No leave requests yet</p>
+                    <div className="text-center py-8">
+                      <CalendarDays className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                      <p className="text-sm text-muted-foreground">No leave requests yet</p>
+                    </div>
                   ) : (
                     <div className="space-y-3">
                       {employeeLeave.slice(0, 5).map(leave => (
-                        <div key={leave.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div 
+                          key={leave.id} 
+                          className="flex items-center justify-between p-4 bg-gradient-to-r from-muted/50 to-muted/30 rounded-xl border border-border/50 hover:border-primary/30 hover:shadow-md transition-all duration-200"
+                        >
                           <div>
-                            <p className="font-medium text-sm">{leave.leave_type}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="font-semibold text-sm">{leave.leave_type}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
                               {format(parseISO(leave.start_date), 'dd MMM')} - {format(parseISO(leave.end_date), 'dd MMM yyyy')}
                             </p>
                           </div>
-                          <Badge variant={
-                            leave.status === 'Approved' ? 'default' :
-                            leave.status === 'Rejected' ? 'destructive' : 'secondary'
-                          }>
+                          <Badge 
+                            variant={leave.status === 'Approved' ? 'default' : leave.status === 'Rejected' ? 'destructive' : 'secondary'}
+                            className={`font-semibold ${
+                              leave.status === 'Approved' ? 'bg-emerald-500 hover:bg-emerald-600' : 
+                              leave.status === 'Pending' ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''
+                            }`}
+                          >
                             {leave.status}
                           </Badge>
                         </div>
@@ -384,42 +429,59 @@ export default function EmployeeSelfServicePortal() {
             </div>
           </TabsContent>
 
-          <TabsContent value="attendance" className="mt-6">
-            <EmployeeAttendanceCalendar
-              employeeId={employee.id}
-              employeeName={employee.full_name}
-              hrmsNo={employee.hrms_no}
-              showBackButton={false}
-              isEmployeePortal={true}
-            />
+          <TabsContent value="attendance" className="mt-8">
+            <Card className="border-0 shadow-lg overflow-hidden">
+              <EmployeeAttendanceCalendar
+                employeeId={employee.id}
+                employeeName={employee.full_name}
+                hrmsNo={employee.hrms_no}
+                showBackButton={false}
+                isEmployeePortal={true}
+              />
+            </Card>
           </TabsContent>
 
-          <TabsContent value="leave" className="mt-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+          <TabsContent value="leave" className="mt-8">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-card dark:to-muted/20 overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-primary/5 to-accent/5 border-b border-border/50">
                 <div>
-                  <CardTitle>Leave History</CardTitle>
-                  <CardDescription>Your leave requests and balance</CardDescription>
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <CalendarDays className="w-4 h-4 text-primary" />
+                    </div>
+                    Leave History
+                  </CardTitle>
+                  <CardDescription className="mt-2">Your leave requests and balance</CardDescription>
                 </div>
-                <Button onClick={() => setShowLeaveModal(true)}>
+                <Button onClick={() => setShowLeaveModal(true)} className="shadow-md">
                   <Plus className="w-4 h-4 mr-2" />
                   New Request
                 </Button>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 {employeeLeave.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No leave records found</p>
+                  <div className="text-center py-12">
+                    <CalendarDays className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
+                    <p className="text-muted-foreground font-medium">No leave records found</p>
+                    <p className="text-sm text-muted-foreground/60 mt-1">Your leave history will appear here</p>
+                  </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {employeeLeave.map(leave => (
-                      <div key={leave.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{leave.leave_type}</span>
-                            <Badge variant={
-                              leave.status === 'Approved' ? 'default' :
-                              leave.status === 'Rejected' ? 'destructive' : 'secondary'
-                            }>
+                      <div 
+                        key={leave.id} 
+                        className="flex items-center justify-between p-5 bg-gradient-to-r from-muted/40 to-muted/20 rounded-xl border border-border/50 hover:border-primary/30 hover:shadow-lg transition-all duration-300 group"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-3">
+                            <span className="font-bold text-foreground">{leave.leave_type}</span>
+                            <Badge 
+                              variant={leave.status === 'Approved' ? 'default' : leave.status === 'Rejected' ? 'destructive' : 'secondary'}
+                              className={`font-semibold shadow-sm ${
+                                leave.status === 'Approved' ? 'bg-emerald-500 hover:bg-emerald-600' : 
+                                leave.status === 'Pending' ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''
+                              }`}
+                            >
                               {leave.status}
                             </Badge>
                           </div>
@@ -427,11 +489,12 @@ export default function EmployeeSelfServicePortal() {
                             {format(parseISO(leave.start_date), 'dd MMM yyyy')} - {format(parseISO(leave.end_date), 'dd MMM yyyy')}
                           </p>
                           {leave.reason && (
-                            <p className="text-sm">{leave.reason}</p>
+                            <p className="text-sm text-muted-foreground/80 italic">{leave.reason}</p>
                           )}
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold">{leave.days_count} days</p>
+                          <p className="text-2xl font-black text-primary">{leave.days_count}</p>
+                          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">days</p>
                         </div>
                       </div>
                     ))}
@@ -441,16 +504,21 @@ export default function EmployeeSelfServicePortal() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="contract" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Contract Details</CardTitle>
-                <CardDescription>Your current employment contract</CardDescription>
+          <TabsContent value="contract" className="mt-8">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-card dark:to-muted/20 overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 border-b border-border/50">
+                <CardTitle className="flex items-center gap-2">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <FileText className="w-4 h-4 text-primary" />
+                  </div>
+                  Contract Details
+                </CardTitle>
+                <CardDescription className="mt-2">Your current employment contract</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 {activeContract ? (
                   <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <InfoItem icon={FileText} label="Contract No" value={activeContract.mohre_contract_no} />
                       <InfoItem icon={Briefcase} label="Contract Type" value={activeContract.contract_type} />
                       <InfoItem icon={Calendar} label="Start Date" value={format(parseISO(activeContract.start_date), 'dd MMM yyyy')} />
@@ -458,7 +526,7 @@ export default function EmployeeSelfServicePortal() {
                         <InfoItem icon={Calendar} label="End Date" value={format(parseISO(activeContract.end_date), 'dd MMM yyyy')} />
                       )}
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <InfoItem icon={Clock} label="Working Hours" value={`${activeContract.working_hours || 48} hrs/week`} />
                       <InfoItem icon={CalendarDays} label="Annual Leave" value={`${activeContract.annual_leave_days || 30} days`} />
                       <InfoItem icon={FileText} label="Notice Period" value={`${activeContract.notice_period || 30} days`} />
@@ -466,24 +534,30 @@ export default function EmployeeSelfServicePortal() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-muted-foreground text-center py-8">No active contract found</p>
+                  <div className="text-center py-12">
+                    <FileText className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
+                    <p className="text-muted-foreground font-medium">No active contract found</p>
+                    <p className="text-sm text-muted-foreground/60 mt-1">Contact HR for contract details</p>
+                  </div>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="documents" className="mt-6 space-y-6">
+          <TabsContent value="documents" className="mt-8 space-y-6">
             {/* Key Documents Grid - Mobile Optimized */}
-            <Card>
-              <CardHeader>
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-card dark:to-muted/20 overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 border-b border-border/50">
                 <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                  <CreditCard className="w-5 h-5 text-primary" />
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <CreditCard className="w-4 h-4 text-primary" />
+                  </div>
                   Identity & Key Documents
                 </CardTitle>
-                <CardDescription>Your important identity documents</CardDescription>
+                <CardDescription className="mt-2">Your important identity documents</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
                   {/* Photo */}
                   {(() => {
                     return (
@@ -817,25 +891,33 @@ export default function EmployeeSelfServicePortal() {
             </Card>
 
             {/* Other Documents */}
-            <Card>
-              <CardHeader>
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-card dark:to-muted/20 overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-accent/5 to-primary/5 border-b border-border/50">
                 <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                  <FileCheck className="w-5 h-5 text-primary" />
+                  <div className="p-2 bg-accent/10 rounded-lg">
+                    <FileCheck className="w-4 h-4 text-accent-foreground" />
+                  </div>
                   Other Documents
                 </CardTitle>
-                <CardDescription>Additional uploaded documents and certificates</CardDescription>
+                <CardDescription className="mt-2">Additional uploaded documents and certificates</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 {(() => {
                   const keyCategories = ['Emirates ID', 'Passport', 'Visa', 'Work Permit', 'Medical Insurance', 'Contract', 'ILOE'];
                   const otherDocs = documents.filter(d => !keyCategories.includes(d.category || '') && !d.is_renewed);
                   
                   if (otherDocs.length === 0) {
-                    return <p className="text-muted-foreground text-center py-8">No additional documents uploaded</p>;
+                    return (
+                      <div className="text-center py-12">
+                        <FileCheck className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
+                        <p className="text-muted-foreground font-medium">No additional documents</p>
+                        <p className="text-sm text-muted-foreground/60 mt-1">Other documents will appear here</p>
+                      </div>
+                    );
                   }
                   
                   return (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
                       {otherDocs.map(doc => {
                         const isImage = doc.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
                         const isExpired = doc.expiry_date && differenceInDays(parseISO(doc.expiry_date), new Date()) < 0;
@@ -903,33 +985,45 @@ export default function EmployeeSelfServicePortal() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="performance" className="mt-6">
+          <TabsContent value="performance" className="mt-8">
             <div className="grid md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Performance Reviews</CardTitle>
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-card dark:to-muted/20 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-b border-border/50">
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 bg-amber-500/10 rounded-lg">
+                      <Star className="w-4 h-4 text-amber-500" />
+                    </div>
+                    Performance Reviews
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-6">
                   {employeePerformance.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">No performance reviews yet</p>
+                    <div className="text-center py-12">
+                      <Star className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
+                      <p className="text-muted-foreground font-medium">No performance reviews yet</p>
+                      <p className="text-sm text-muted-foreground/60 mt-1">Your reviews will appear here</p>
+                    </div>
                   ) : (
                     <div className="space-y-4">
                       {employeePerformance.map(perf => (
-                        <div key={perf.id} className="p-4 border rounded-lg space-y-2">
+                        <div 
+                          key={perf.id} 
+                          className="p-5 bg-gradient-to-r from-muted/40 to-muted/20 rounded-xl border border-border/50 hover:border-amber-500/30 hover:shadow-md transition-all duration-200 space-y-3"
+                        >
                           <div className="flex items-center justify-between">
-                            <span className="font-medium">{perf.review_period}</span>
+                            <span className="font-bold text-foreground">{perf.review_period}</span>
                             <div className="flex items-center gap-1">
                               {[1, 2, 3, 4, 5].map(star => (
                                 <Star
                                   key={star}
-                                  className={`w-4 h-4 ${star <= (perf.rating || 0) ? 'text-amber-500 fill-amber-500' : 'text-muted'}`}
+                                  className={`w-5 h-5 transition-colors ${star <= (perf.rating || 0) ? 'text-amber-500 fill-amber-500' : 'text-muted-foreground/30'}`}
                                 />
                               ))}
                             </div>
                           </div>
-                          <Badge variant="secondary">{perf.performance_type}</Badge>
+                          <Badge variant="secondary" className="font-medium">{perf.performance_type}</Badge>
                           {perf.comments && (
-                            <p className="text-sm text-muted-foreground">{perf.comments}</p>
+                            <p className="text-sm text-muted-foreground italic">{perf.comments}</p>
                           )}
                         </div>
                       ))}
@@ -938,29 +1032,42 @@ export default function EmployeeSelfServicePortal() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-card dark:to-muted/20 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-red-500/5 to-orange-500/5 border-b border-border/50">
                   <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                    <div className="p-2 bg-amber-500/10 rounded-lg">
+                      <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    </div>
                     Discipline Records
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-6">
                   {employeeDiscipline.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">No discipline records - Great job!</p>
+                    <div className="text-center py-12">
+                      <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Award className="w-8 h-8 text-emerald-500" />
+                      </div>
+                      <p className="text-emerald-600 dark:text-emerald-400 font-semibold">No discipline records</p>
+                      <p className="text-sm text-muted-foreground/60 mt-1">Great job! Keep it up!</p>
+                    </div>
                   ) : (
                     <div className="space-y-4">
                       {employeeDiscipline.map(disc => (
-                        <div key={disc.id} className="p-4 border rounded-lg space-y-2">
+                        <div 
+                          key={disc.id} 
+                          className="p-5 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30 rounded-xl border border-red-200/50 dark:border-red-800/30 space-y-3"
+                        >
                           <div className="flex items-center justify-between">
-                            <Badge variant="destructive">{disc.incident_type}</Badge>
-                            <span className="text-xs text-muted-foreground">
+                            <Badge variant="destructive" className="font-semibold shadow-sm">{disc.incident_type}</Badge>
+                            <span className="text-xs text-muted-foreground font-medium">
                               {format(parseISO(disc.incident_date), 'dd MMM yyyy')}
                             </span>
                           </div>
-                          <p className="text-sm">{disc.description}</p>
+                          <p className="text-sm text-foreground">{disc.description}</p>
                           {disc.action_taken && (
-                            <p className="text-xs text-muted-foreground">Action: {disc.action_taken}</p>
+                            <p className="text-xs text-muted-foreground bg-background/50 p-2 rounded-lg">
+                              <span className="font-semibold">Action:</span> {disc.action_taken}
+                            </p>
                           )}
                         </div>
                       ))}
@@ -971,25 +1078,29 @@ export default function EmployeeSelfServicePortal() {
             </div>
           </TabsContent>
 
-          <TabsContent value="achievements" className="mt-6">
+          <TabsContent value="achievements" className="mt-8">
             {employee && (
-              <EmployeeGamificationCard employeeId={employee.id} />
+              <Card className="border-0 shadow-lg overflow-hidden">
+                <EmployeeGamificationCard employeeId={employee.id} />
+              </Card>
             )}
           </TabsContent>
 
-          <TabsContent value="security" className="mt-6 space-y-6">
+          <TabsContent value="security" className="mt-8 space-y-6">
             {/* Native Biometric Authentication */}
-            <Card>
-              <CardHeader>
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-card dark:to-muted/20 overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 border-b border-border/50">
                 <CardTitle className="flex items-center gap-2">
-                  <Shield className="w-5 h-5" />
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Shield className="w-4 h-4 text-primary" />
+                  </div>
                   Biometric Login
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="mt-2">
                   Use fingerprint or face recognition to quickly sign in
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="pt-6 space-y-4">
                 {!isBiometricAvailable ? (
                   <div className="flex items-start gap-3 p-4 bg-muted rounded-lg">
                     <AlertTriangle className="w-5 h-5 text-muted-foreground mt-0.5" />
@@ -1150,11 +1261,13 @@ export default function EmployeeSelfServicePortal() {
 
 function InfoItem({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-3">
-      <Icon className="w-4 h-4 text-muted-foreground" />
-      <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-sm font-medium">{value}</p>
+    <div className="flex items-center gap-4 p-3 rounded-xl bg-gradient-to-r from-muted/30 to-transparent hover:from-muted/50 transition-colors duration-200 group">
+      <div className="p-2.5 bg-primary/10 rounded-lg group-hover:bg-primary/15 transition-colors duration-200">
+        <Icon className="w-4 h-4 text-primary" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
+        <p className="text-sm font-semibold text-foreground truncate mt-0.5">{value}</p>
       </div>
     </div>
   );
