@@ -191,38 +191,62 @@ export function useSmartDocumentUpload() {
     return expiredDocs.length;
   };
 
-  const archiveExpiredContracts = async (
+  const archivePreviousContracts = async (
     employeeId: string
   ): Promise<number> => {
+    // Find ALL existing contracts that are not already archived/terminated/expired
+    const { data: existingContracts, error: fetchError } = await supabase
+      .from('contracts')
+      .select('id, end_date')
+      .eq('employee_id', employeeId)
+      .not('status', 'in', '("Terminated","Expired","Archived")');
+
+    if (fetchError || !existingContracts || existingContracts.length === 0) {
+      return 0;
+    }
+
     const today = new Date().toISOString().split('T')[0];
 
-    // Find existing contracts that are expired (end_date passed) and not already terminated/expired
-    const { data: expiredContracts, error: fetchError } = await supabase
-      .from('contracts')
-      .select('id')
-      .eq('employee_id', employeeId)
-      .lte('end_date', today)
-      .not('status', 'in', '("Terminated","Expired")');
+    // Determine appropriate status for each contract:
+    // - If end_date has passed → "Expired"
+    // - If end_date is still in future → "Archived" (superseded by new contract)
+    const expiredIds = existingContracts
+      .filter(c => c.end_date && c.end_date <= today)
+      .map(c => c.id);
+    
+    const archivedIds = existingContracts
+      .filter(c => !c.end_date || c.end_date > today)
+      .map(c => c.id);
 
-    if (fetchError || !expiredContracts || expiredContracts.length === 0) {
-      return 0;
+    let totalArchived = 0;
+
+    // Mark expired contracts
+    if (expiredIds.length > 0) {
+      const { error } = await supabase
+        .from('contracts')
+        .update({
+          status: 'Expired',
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', expiredIds);
+      
+      if (!error) totalArchived += expiredIds.length;
     }
 
-    // Mark as expired (contracts table doesn't have notes field, just update status)
-    const { error: updateError } = await supabase
-      .from('contracts')
-      .update({
-        status: 'Expired',
-        updated_at: new Date().toISOString(),
-      })
-      .in('id', expiredContracts.map((c) => c.id));
-
-    if (updateError) {
-      console.error('Failed to archive expired contracts:', updateError);
-      return 0;
+    // Archive still-active contracts (superseded by new contract)
+    if (archivedIds.length > 0) {
+      const { error } = await supabase
+        .from('contracts')
+        .update({
+          status: 'Archived',
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', archivedIds);
+      
+      if (!error) totalArchived += archivedIds.length;
     }
 
-    return expiredContracts.length;
+    return totalArchived;
   };
 
   const saveDocument = async (
@@ -368,8 +392,8 @@ export function useSmartDocumentUpload() {
     setIsSaving(true);
 
     try {
-      // 1. Archive any expired contracts first
-      const archivedCount = await archiveExpiredContracts(employeeId);
+      // 1. Archive any previous contracts first (both expired and still-active)
+      const archivedCount = await archivePreviousContracts(employeeId);
 
       // 2. Upload page 1 to contract-documents bucket
       const page1FileName = `${employeeId}/${Date.now()}-contract-page1.jpg`;
