@@ -5,6 +5,7 @@ import { useEmployeeDocuments, useUploadDocument, useDeleteDocument, useUploadEm
 import { useLeave, useDeleteLeave, useLeaveBalances } from '@/hooks/useLeave';
 import { useContracts } from '@/hooks/useContracts';
 import { useEmployeeEducation, useAddEducation, useDeleteEducation } from '@/hooks/useEducation';
+import { useDocumentCompleteness } from '@/hooks/useDocumentCompleteness';
 import { EditEmployeeModal } from './EditEmployeeModal';
 import { LeaveRequestModal } from './LeaveRequestModal';
 import { ImagePreviewModal } from './ImagePreviewModal';
@@ -23,7 +24,7 @@ import uaeVisa from '@/assets/uae-visa.png';
 import passportIcon from '@/assets/passport-icon.png';
 import contractIcon from '@/assets/contract-icon.png';
 import photoPlaceholder from '@/assets/photo-placeholder.png';
-import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase, MessageCircle, Link2, Copy, HeartPulse, CreditCard, Plane, BookOpen, FileCheck } from 'lucide-react';
+import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase, MessageCircle, Link2, Copy, HeartPulse, CreditCard, Plane, BookOpen, FileCheck, CheckCircle, FileX } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { toast } from 'sonner';
 import { GenerateEmployeeAccountButton } from '@/components/employee/GenerateEmployeeAccountButton';
@@ -92,6 +93,10 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
   const { data: education = [], refetch: refetchEducation } = useEmployeeEducation(currentEmployee?.id || '');
   const addEducation = useAddEducation();
   const deleteEducation = useDeleteEducation();
+
+  // Document completeness hook
+  const { getCompleteness, requiredCategories } = useDocumentCompleteness();
+  const docCompleteness = currentEmployee ? getCompleteness(currentEmployee.id) : null;
 
   if (!currentEmployee) return null;
 
@@ -377,23 +382,82 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                   </div>
 
                   <div className="glass-card rounded-2xl border border-border p-5">
-                    <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-2">REMINDERS</p>
-                    <div className="space-y-2">
-                      {getExpiryWarning(currentEmployee.visa_expiration) && (
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle className={cn("w-4 h-4", 
-                            getExpiryWarning(currentEmployee.visa_expiration)?.type === 'expired' ? 'text-destructive' :
-                            getExpiryWarning(currentEmployee.visa_expiration)?.type === 'urgent' ? 'text-amber-400' : 'text-yellow-400'
-                          )} />
-                          <span className="text-sm text-foreground">Visa: {getExpiryWarning(currentEmployee.visa_expiration)?.text}</span>
+                    <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-3">DOCUMENT STATUS</p>
+                    
+                    {/* Document Completeness Section */}
+                    <div className="space-y-3">
+                      {docCompleteness?.isComplete ? (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                          <CheckCircle className="w-4 h-4 text-emerald-500" />
+                          <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                            Complete ({docCompleteness.uploadedCount}/{docCompleteness.totalRequired})
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="p-2 rounded-lg bg-orange-500/10 border border-orange-500/30">
+                          <div className="flex items-center gap-2 mb-2">
+                            <FileX className="w-4 h-4 text-orange-500" />
+                            <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                              Missing {docCompleteness?.missingCategories.length || requiredCategories.length} Document{(docCompleteness?.missingCategories.length || requiredCategories.length) > 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <ul className="space-y-1 ml-6">
+                            {(docCompleteness?.missingCategories || [...requiredCategories]).map(cat => (
+                              <li key={cat} className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span className="w-1 h-1 rounded-full bg-orange-500" />
+                                {cat}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       )}
-                      {!getExpiryWarning(currentEmployee.visa_expiration) && 
+
+                      {/* Expiry Alerts Section */}
+                      {(getExpiryWarning(currentEmployee.visa_expiration) || 
+                        getExpiryWarning(currentEmployee.emirates_id_expiry) || 
+                        getExpiryWarning(currentEmployee.passport_expiry)) && (
+                        <div className="pt-2 border-t border-border">
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">EXPIRY ALERTS</p>
+                          <div className="space-y-1.5">
+                            {getExpiryWarning(currentEmployee.visa_expiration) && (
+                              <div className="flex items-center gap-2">
+                                <AlertTriangle className={cn("w-4 h-4", 
+                                  getExpiryWarning(currentEmployee.visa_expiration)?.type === 'expired' ? 'text-destructive' :
+                                  getExpiryWarning(currentEmployee.visa_expiration)?.type === 'urgent' ? 'text-amber-400' : 'text-yellow-400'
+                                )} />
+                                <span className="text-sm text-foreground">Visa: {getExpiryWarning(currentEmployee.visa_expiration)?.text}</span>
+                              </div>
+                            )}
+                            {getExpiryWarning(currentEmployee.emirates_id_expiry) && (
+                              <div className="flex items-center gap-2">
+                                <AlertTriangle className={cn("w-4 h-4", 
+                                  getExpiryWarning(currentEmployee.emirates_id_expiry)?.type === 'expired' ? 'text-destructive' :
+                                  getExpiryWarning(currentEmployee.emirates_id_expiry)?.type === 'urgent' ? 'text-amber-400' : 'text-yellow-400'
+                                )} />
+                                <span className="text-sm text-foreground">Emirates ID: {getExpiryWarning(currentEmployee.emirates_id_expiry)?.text}</span>
+                              </div>
+                            )}
+                            {getExpiryWarning(currentEmployee.passport_expiry) && (
+                              <div className="flex items-center gap-2">
+                                <AlertTriangle className={cn("w-4 h-4", 
+                                  getExpiryWarning(currentEmployee.passport_expiry)?.type === 'expired' ? 'text-destructive' :
+                                  getExpiryWarning(currentEmployee.passport_expiry)?.type === 'urgent' ? 'text-amber-400' : 'text-yellow-400'
+                                )} />
+                                <span className="text-sm text-foreground">Passport: {getExpiryWarning(currentEmployee.passport_expiry)?.text}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* All Good Message - Only when truly complete AND no expiry issues */}
+                      {docCompleteness?.isComplete && 
+                       !getExpiryWarning(currentEmployee.visa_expiration) && 
                        !getExpiryWarning(currentEmployee.emirates_id_expiry) && 
                        !getExpiryWarning(currentEmployee.passport_expiry) && (
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-primary" />
-                          <span className="text-sm text-foreground">All documents up to date</span>
+                        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="text-sm">All documents up to date</span>
                         </div>
                       )}
                     </div>
