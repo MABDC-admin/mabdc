@@ -338,6 +338,25 @@ export default function KioskPage() {
         </div>
       )}
 
+      {/* Shift Ended - Check-in Blocked Error */}
+      {scanError && scanError.toLowerCase().includes('check-in blocked') && (
+        <div className="px-4 pb-3">
+          <div className="rounded-2xl p-4 shadow-lg border mx-auto max-w-md bg-amber-950/80 border-amber-500/30">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-500/20">
+                <Clock className="w-8 h-8 text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-bold text-amber-300">Shift Ended</h3>
+                <p className="text-white/70 text-sm">
+                  {scanError.replace('Check-in blocked: ', '')}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Already Checked In Error Notification */}
       {scanError && scanError.toLowerCase().includes('already') && (
         <div className="px-4 pb-3">
