@@ -36,7 +36,7 @@ import { ShiftOverrideDialog } from '@/components/modals/ShiftOverrideDialog';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
-type TimeClockStatus = 'early_in' | 'late_entry' | 'early_out' | 'late_exit' | 'miss_punch_in' | 'miss_punch_out' | 'on_time';
+type TimeClockStatus = 'early_in' | 'late_entry' | 'early_out' | 'late_exit' | 'miss_punch_in' | 'miss_punch_out' | 'on_time' | 'appealed';
 
 interface TimeClockRecord {
   employeeId: string;
@@ -59,7 +59,8 @@ const STATUS_LABELS: Record<TimeClockStatus, string> = {
   late_exit: 'Late Exit',
   miss_punch_in: 'Miss Punch In',
   miss_punch_out: 'Miss Punch Out',
-  on_time: 'On Time'
+  on_time: 'On Time',
+  appealed: 'Appealed'
 };
 
 const STATUS_COLORS: Record<TimeClockStatus, string> = {
@@ -69,7 +70,8 @@ const STATUS_COLORS: Record<TimeClockStatus, string> = {
   late_exit: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
   miss_punch_in: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
   miss_punch_out: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  on_time: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+  on_time: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  appealed: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300'
 };
 
 const SHIFT_TIMES = {
@@ -177,11 +179,19 @@ export default function TimeClockView() {
       'Late': 'late_entry',
       'Undertime': 'early_out',
       'Late | Undertime': 'late_entry',
-      'Missed Punch': 'miss_punch_in'
+      'Missed Punch': 'miss_punch_in',
+      'Miss Punch In': 'miss_punch_in',
+      'Miss Punch In | Undertime': 'miss_punch_in',
+      'Appealed': 'appealed',
+      'Absent': 'miss_punch_in',
+      'Half Day': 'early_out',
+      'On Leave': 'on_time',
+      'Holiday': 'on_time'
     };
     
     const mapped = statusMap[dbStatus];
-    return mapped ? [mapped] : ['on_time'];
+    // Return empty array for unknown statuses - let calculateStatus handle it
+    return mapped ? [mapped] : [];
   };
 
   const calculateStatus = (
@@ -192,6 +202,12 @@ export default function TimeClockView() {
     forDate: Date,
     hasOverride?: boolean
   ): TimeClockStatus[] => {
+    // Chronological validation: check-out should not be before check-in
+    if (checkIn && checkOut && checkOut < checkIn) {
+      // Time inconsistency - flag as data issue
+      return ['miss_punch_in'];
+    }
+    
     const statuses: TimeClockStatus[] = [];
     const dateStr = format(forDate, 'yyyy-MM-dd');
     const now = new Date();
@@ -256,9 +272,10 @@ export default function TimeClockView() {
       
       const att = attendanceMap.get(emp.id);
       
-      // Use saved database status if available, otherwise calculate
-      const statuses = att?.dbStatus 
-        ? dbStatusToTimeClock(att.dbStatus)
+      // Use saved database status if available and mapped, otherwise calculate
+      const dbStatuses = att?.dbStatus ? dbStatusToTimeClock(att.dbStatus) : [];
+      const statuses = dbStatuses.length > 0
+        ? dbStatuses
         : calculateStatus(att?.checkIn, att?.checkOut, shiftTimes.start, shiftTimes.end, selectedDate, !!override);
 
       return {
@@ -291,14 +308,15 @@ export default function TimeClockView() {
   }, [timeClockRecords, searchQuery, statusFilter]);
 
   const statusStats = useMemo(() => {
-    const stats = {
+    const stats: Record<TimeClockStatus, number> = {
       early_in: 0,
       late_entry: 0,
       early_out: 0,
       late_exit: 0,
       miss_punch_in: 0,
       miss_punch_out: 0,
-      on_time: 0
+      on_time: 0,
+      appealed: 0
     };
     
     timeClockRecords.forEach(record => {
@@ -346,7 +364,8 @@ export default function TimeClockView() {
       early_out: 'Undertime',
       late_exit: 'Present',
       miss_punch_in: 'Missed Punch',
-      miss_punch_out: 'Missed Punch'
+      miss_punch_out: 'Missed Punch',
+      appealed: 'Appealed'
     };
     
     const dbStatus = statusMap[editStatus] || 'Present';
