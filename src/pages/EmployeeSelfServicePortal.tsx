@@ -196,6 +196,7 @@ export default function EmployeeSelfServicePortal() {
     return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
   });
   const presentDays = thisMonthAttendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
+  const lateDaysThisMonth = thisMonthAttendance.filter(a => a.status === 'Late' || a.status === 'Late | Undertime').length;
 
   const handleSignOut = async () => {
     await signOut();
@@ -315,17 +316,17 @@ export default function EmployeeSelfServicePortal() {
             </CardContent>
           </Card>
           
-          {/* Points Card */}
-          <Card className="relative overflow-hidden border-0 shadow-lg shadow-violet-500/10 bg-gradient-to-br from-white to-violet-50 dark:from-card dark:to-violet-950/30 group hover:shadow-xl hover:shadow-violet-500/20 transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-violet-500/20 to-transparent rounded-bl-full" />
+          {/* Late Card */}
+          <Card className="relative overflow-hidden border-0 shadow-lg shadow-rose-500/10 bg-gradient-to-br from-white to-rose-50 dark:from-card dark:to-rose-950/30 group hover:shadow-xl hover:shadow-rose-500/20 transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-rose-500/20 to-transparent rounded-bl-full" />
             <CardContent className="pt-5 pb-4 relative">
               <div className="flex items-start justify-between">
                 <div className="space-y-2">
-                  <p className="text-3xl md:text-4xl font-black text-violet-600 dark:text-violet-400 tracking-tight">{gamification?.points || 0}</p>
-                  <p className="text-xs md:text-sm font-semibold text-muted-foreground uppercase tracking-wide">Points</p>
+                  <p className="text-3xl md:text-4xl font-black text-rose-600 dark:text-rose-400 tracking-tight">{lateDaysThisMonth}</p>
+                  <p className="text-xs md:text-sm font-semibold text-muted-foreground uppercase tracking-wide">Late</p>
                 </div>
-                <div className="p-3 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl shadow-lg shadow-violet-500/30 group-hover:scale-110 transition-transform duration-300">
-                  <Award className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                <div className="p-3 bg-gradient-to-br from-rose-500 to-red-600 rounded-xl shadow-lg shadow-rose-500/30 group-hover:scale-110 transition-transform duration-300">
+                  <AlertTriangle className="w-5 h-5 md:w-6 md:h-6 text-white" />
                 </div>
               </div>
             </CardContent>
