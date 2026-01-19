@@ -2,6 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useEffect } from 'react';
+import { 
+  getEmployeeShiftTimes, 
+  isWithinCheckInWindow, 
+  formatShiftEndForDisplay,
+  isLateForShift 
+} from '@/utils/shiftValidation';
 
 export interface Attendance {
   id: string;
@@ -165,6 +171,18 @@ export function useCheckInByHRMS() {
       const now = new Date();
       const checkInTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       
+      // Get employee's assigned shift times
+      const shiftTimes = await getEmployeeShiftTimes(employee.id, today);
+      
+      // Validate check-in is within allowed window (before shift end time)
+      if (!isWithinCheckInWindow(now, shiftTimes.end)) {
+        const endTimeFormatted = formatShiftEndForDisplay(shiftTimes.end);
+        throw new Error(
+          `Check-in blocked: Your shift ended at ${endTimeFormatted}. ` +
+          `Please contact HR if you need to record attendance for today.`
+        );
+      }
+      
       // Check if already checked in today
       const { data: existing } = await supabase
         .from('attendance')
@@ -181,12 +199,8 @@ export function useCheckInByHRMS() {
         }
       }
       
-      // Work hours: 8:00 AM to 7:00 PM, Monday to Friday
-      // Late if check-in after 8:00 AM (8:01 or later)
-      const hour = now.getHours();
-      const minutes = now.getMinutes();
-      // On time if check-in is before 8:01 AM (i.e., 8:00:xx is still on time)
-      const isLate = hour > 8 || (hour === 8 && minutes >= 1);
+      // Late calculation based on employee's shift start time
+      const isLate = isLateForShift(now, shiftTimes.start);
       const status = isLate ? 'Late' : 'Present';
       
       const { data, error } = await supabase
@@ -354,6 +368,18 @@ export function useCheckInById() {
       const now = new Date();
       const checkInTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       
+      // Get employee's assigned shift times
+      const shiftTimes = await getEmployeeShiftTimes(employee.id, today);
+      
+      // Validate check-in is within allowed window (before shift end time)
+      if (!isWithinCheckInWindow(now, shiftTimes.end)) {
+        const endTimeFormatted = formatShiftEndForDisplay(shiftTimes.end);
+        throw new Error(
+          `Check-in blocked: Your shift ended at ${endTimeFormatted}. ` +
+          `Please contact HR if you need to record attendance for today.`
+        );
+      }
+      
       // Check if already checked in today
       const { data: existing } = await supabase
         .from('attendance')
@@ -370,11 +396,8 @@ export function useCheckInById() {
         }
       }
       
-      // Late if check-in after 8:00 AM (8:01 or later)
-      const hour = now.getHours();
-      const minutes = now.getMinutes();
-      // On time if check-in is before 8:01 AM (i.e., 8:00:xx is still on time)
-      const isLate = hour > 8 || (hour === 8 && minutes >= 1);
+      // Late calculation based on employee's shift start time
+      const isLate = isLateForShift(now, shiftTimes.start);
       const status = isLate ? 'Late' : 'Present';
       
       const { data, error } = await supabase
