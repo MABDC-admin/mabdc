@@ -128,33 +128,24 @@ export function DashboardView() {
     { name: 'Contracts', count: activeContracts, fill: 'hsl(210, 100%, 35%)' },
   ];
 
-  // Upcoming birthdays (next 7 days)
+  // Upcoming birthdays (this month)
   const getUpcomingBirthdays = () => {
     const today = new Date();
-    const next7Days = addDays(today, 7);
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
     
     return employees.filter(emp => {
       if (!emp.birthday) return false;
       
       const birthday = parseISO(emp.birthday);
-      // Create this year's birthday
-      const thisYearBirthday = new Date(today.getFullYear(), birthday.getMonth(), birthday.getDate());
-      
-      // If this year's birthday has passed, check next year
-      if (isBefore(thisYearBirthday, today)) {
-        thisYearBirthday.setFullYear(today.getFullYear() + 1);
-      }
-      
-      return !isBefore(thisYearBirthday, today) && !isAfter(thisYearBirthday, next7Days);
+      // Check if birthday is in the current month
+      return birthday.getMonth() === currentMonth;
     }).map(emp => {
       const birthday = parseISO(emp.birthday!);
-      const thisYearBirthday = new Date(today.getFullYear(), birthday.getMonth(), birthday.getDate());
-      if (isBefore(thisYearBirthday, today)) {
-        thisYearBirthday.setFullYear(today.getFullYear() + 1);
-      }
+      const thisYearBirthday = new Date(currentYear, birthday.getMonth(), birthday.getDate());
       const daysUntil = differenceInDays(thisYearBirthday, today);
       return { ...emp, daysUntil, birthdayDate: thisYearBirthday };
-    }).sort((a, b) => a.daysUntil - b.daysUntil);
+    }).sort((a, b) => a.birthdayDate.getDate() - b.birthdayDate.getDate());
   };
 
   const upcomingBirthdays = getUpcomingBirthdays();
@@ -415,7 +406,7 @@ export function DashboardView() {
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
                 <Cake className="w-8 h-8 mb-2 text-pink-500 opacity-50" />
                 <p className="text-xs font-medium">No birthdays</p>
-                <p className="text-[10px] opacity-70">Next 7 days</p>
+                <p className="text-[10px] opacity-70">This month</p>
               </div>
             ) : (
               <div className="space-y-1.5">
