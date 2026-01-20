@@ -74,7 +74,7 @@ export function useDeactivateEmployee() {
       
       if (error) throw error;
 
-      // Calculate and create EOS record automatically
+      // Calculate and create/update EOS record automatically
       const basicSalary = employee.basic_salary || 0;
       const joiningDate = employee.joining_date;
       
@@ -93,20 +93,45 @@ export function useDeactivateEmployee() {
           ? `${status}: ${reason} | Gratuity Adjustment: ${gratuityAdjustmentReason || 'No reason provided'}`
           : `${status}: ${reason}`;
         
-        const { error: eosError } = await supabase
+        // Check if EOS record already exists for this employee
+        const { data: existingEOS } = await supabase
           .from('eos_records')
-          .insert({
-            employee_id: employeeId,
-            years_of_service: yearsOfService,
-            basic_salary: basicSalary,
-            gratuity_amount: finalGratuity,
-            reason: eosReason,
-            paid: false,
-          });
+          .select('id')
+          .eq('employee_id', employeeId)
+          .maybeSingle();
         
-        if (eosError) {
-          console.error('Failed to create EOS record:', eosError);
-          // Don't throw - EOS creation is supplementary
+        if (existingEOS) {
+          // Update existing EOS record instead of creating duplicate
+          const { error: eosError } = await supabase
+            .from('eos_records')
+            .update({
+              years_of_service: yearsOfService,
+              basic_salary: basicSalary,
+              gratuity_amount: finalGratuity,
+              reason: eosReason,
+              paid: false,
+            })
+            .eq('id', existingEOS.id);
+          
+          if (eosError) {
+            console.error('Failed to update EOS record:', eosError);
+          }
+        } else {
+          // Create new EOS record
+          const { error: eosError } = await supabase
+            .from('eos_records')
+            .insert({
+              employee_id: employeeId,
+              years_of_service: yearsOfService,
+              basic_salary: basicSalary,
+              gratuity_amount: finalGratuity,
+              reason: eosReason,
+              paid: false,
+            });
+          
+          if (eosError) {
+            console.error('Failed to create EOS record:', eosError);
+          }
         }
       }
 
