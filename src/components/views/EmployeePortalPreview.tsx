@@ -18,7 +18,7 @@ import {
   UserCircle, Cake, Phone, MapPin, Globe, Heart, Baby, Star, Scale, Trophy
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, parseISO, differenceInYears } from 'date-fns';
+import { format, parseISO, differenceInYears, differenceInDays, addMonths } from 'date-fns';
 import type { Employee } from '@/types/hr';
 
 type TabType = 'overview' | 'attendance' | 'leave' | 'contract' | 'letters' | 'personal' | 'records' | 'gamification';
@@ -67,6 +67,34 @@ export function EmployeePortalPreview() {
                       annualLeave.used_days - annualLeave.pending_days;
     return Math.max(0, available);
   }, [leaveBalances]);
+
+  // Calculate probation status (6 months from joining date)
+  const probationStatus = useMemo(() => {
+    if (!selectedEmployee?.joining_date) return null;
+    
+    const joiningDate = parseISO(selectedEmployee.joining_date);
+    const now = new Date();
+    const probationEndDate = addMonths(joiningDate, 6);
+    
+    const daysRemaining = differenceInDays(probationEndDate, now);
+    
+    // If probation has ended (passed 6 months)
+    if (daysRemaining <= 0) {
+      return { isOnProbation: false, daysRemaining: 0, percentComplete: 100, endDate: probationEndDate };
+    }
+    
+    // Calculate progress percentage
+    const totalProbationDays = differenceInDays(probationEndDate, joiningDate);
+    const daysElapsed = differenceInDays(now, joiningDate);
+    const percentComplete = Math.round((daysElapsed / totalProbationDays) * 100);
+    
+    return { 
+      isOnProbation: true, 
+      daysRemaining, 
+      percentComplete,
+      endDate: probationEndDate 
+    };
+  }, [selectedEmployee?.joining_date]);
 
   const tabs = [
     { id: 'personal' as TabType, label: 'Personal Info', icon: UserCircle },
@@ -261,6 +289,30 @@ export function EmployeePortalPreview() {
                     </p>
                   </CardContent>
                 </Card>
+
+                {/* Probation Card - Only shows if on probation */}
+                {probationStatus?.isOnProbation && (
+                  <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm text-blue-600 dark:text-blue-400">Probation Days Left</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {probationStatus.daysRemaining}
+                      </p>
+                      {/* Progress bar */}
+                      <div className="w-full bg-blue-100 dark:bg-blue-900/30 rounded-full h-1.5 mt-2">
+                        <div 
+                          className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" 
+                          style={{ width: `${probationStatus.percentComplete}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Ends: {format(probationStatus.endDate, 'MMM dd, yyyy')}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             )}
 
