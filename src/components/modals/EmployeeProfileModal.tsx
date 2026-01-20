@@ -1163,33 +1163,61 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                       );
                     })()}
 
-                    {/* Contract */}
+                    {/* Contract - Page 1 */}
                     {(() => {
+                      // Prioritize contract images from contracts table, fallback to employee_documents
+                      const hasContractPage1 = employeeContract?.page1_url;
                       const contractDoc = documents.find(d => d.category === 'Contract' && !d.is_renewed);
-                      const isImage = contractDoc?.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(contractDoc.file_url);
+                      const displayUrl = hasContractPage1 ? employeeContract.page1_url : contractDoc?.file_url;
+                      const isImage = displayUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(displayUrl);
+                      const hasContract = hasContractPage1 || contractDoc;
+                      
                       return (
                         <div className="relative group">
                           <input type="file" id="contract-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Contract')} className="hidden" />
                           <label htmlFor="contract-upload" className="block cursor-pointer">
                             <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-green-500/5 to-emerald-500/5 hover:border-green-500/50 transition-all">
                               <div className="flex flex-col items-center">
-                                {contractDoc ? (
+                                {hasContract ? (
                                   <>
                                     {isImage ? (
                                       <img 
-                                        src={contractDoc.file_url} 
-                                        alt="Contract" 
+                                        src={displayUrl} 
+                                        alt="Contract Page 1" 
                                         className="w-14 h-14 rounded-lg object-cover mb-2 cursor-pointer hover:scale-105 transition-transform"
-                                        onClick={(e) => handleDocumentClick(contractDoc, e)}
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setPreviewImage({ url: displayUrl!, title: 'Contract - Page 1' });
+                                        }}
                                       />
                                     ) : (
-                                      <div className="w-14 h-14 rounded-lg bg-green-500/20 flex items-center justify-center mb-2" onClick={(e) => handleDocumentClick(contractDoc, e)}>
+                                      <div 
+                                        className="w-14 h-14 rounded-lg bg-green-500/20 flex items-center justify-center mb-2 cursor-pointer" 
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          if (hasContractPage1) {
+                                            window.open(employeeContract.page1_url, '_blank');
+                                          } else if (contractDoc) {
+                                            handleDocumentClick(contractDoc, e);
+                                          }
+                                        }}
+                                      >
                                         <FileCheck className="w-7 h-7 text-green-500" />
                                       </div>
                                     )}
-                                    <p className="text-xs font-medium text-foreground">Contract</p>
+                                    <p className="text-xs font-medium text-foreground">Contract P1</p>
                                     <div className="flex gap-1 mt-1">
-                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => handleDocumentClick(contractDoc, e)}><Eye className="w-3 h-3" /></Button>
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (hasContractPage1) {
+                                          setPreviewImage({ url: employeeContract.page1_url!, title: 'Contract - Page 1' });
+                                        } else if (contractDoc) {
+                                          handleDocumentClick(contractDoc, e);
+                                        }
+                                      }}><Eye className="w-3 h-3" /></Button>
                                       <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('contract-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
                                     </div>
                                   </>
@@ -1198,7 +1226,69 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                                     <div className="w-14 h-14 rounded-lg bg-green-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
                                       <FileCheck className="w-7 h-7 text-green-400" />
                                     </div>
-                                    <p className="text-xs font-medium text-foreground">Contract</p>
+                                    <p className="text-xs font-medium text-foreground">Contract P1</p>
+                                    <p className="text-[10px] text-muted-foreground">Upload</p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </label>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Contract - Page 2 */}
+                    {(() => {
+                      const hasContractPage2 = employeeContract?.page2_url;
+                      const isImage = hasContractPage2 && /\.(jpg|jpeg|png|gif|webp)$/i.test(employeeContract.page2_url!);
+                      
+                      return (
+                        <div className="relative group">
+                          <input type="file" id="contract-page2-upload" accept="image/*,.pdf" onChange={(e) => handleFileUpload(e, 'Contract')} className="hidden" />
+                          <label htmlFor="contract-page2-upload" className="block cursor-pointer">
+                            <div className="relative p-3 rounded-2xl border-2 border-dashed border-border bg-gradient-to-br from-green-500/5 to-emerald-500/5 hover:border-green-500/50 transition-all">
+                              <div className="flex flex-col items-center">
+                                {hasContractPage2 ? (
+                                  <>
+                                    {isImage ? (
+                                      <img 
+                                        src={employeeContract.page2_url!} 
+                                        alt="Contract Page 2" 
+                                        className="w-14 h-14 rounded-lg object-cover mb-2 cursor-pointer hover:scale-105 transition-transform"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setPreviewImage({ url: employeeContract.page2_url!, title: 'Contract - Page 2' });
+                                        }}
+                                      />
+                                    ) : (
+                                      <div 
+                                        className="w-14 h-14 rounded-lg bg-green-500/20 flex items-center justify-center mb-2 cursor-pointer" 
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          window.open(employeeContract.page2_url!, '_blank');
+                                        }}
+                                      >
+                                        <FileCheck className="w-7 h-7 text-green-500" />
+                                      </div>
+                                    )}
+                                    <p className="text-xs font-medium text-foreground">Contract P2</p>
+                                    <div className="flex gap-1 mt-1">
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setPreviewImage({ url: employeeContract.page2_url!, title: 'Contract - Page 2' });
+                                      }}><Eye className="w-3 h-3" /></Button>
+                                      <Button size="sm" variant="ghost" className="text-[10px] h-5 px-1" onClick={(e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('contract-page2-upload')?.click(); }}><Pencil className="w-3 h-3" /></Button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="w-14 h-14 rounded-lg bg-green-500/10 flex items-center justify-center mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                      <FileCheck className="w-7 h-7 text-green-400" />
+                                    </div>
+                                    <p className="text-xs font-medium text-foreground">Contract P2</p>
                                     <p className="text-[10px] text-muted-foreground">Upload</p>
                                   </>
                                 )}
