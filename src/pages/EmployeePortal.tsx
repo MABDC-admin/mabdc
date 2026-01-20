@@ -24,7 +24,7 @@ import { useEmployeeDocuments } from '@/hooks/useDocuments';
 import { EmployeeAttendanceCalendar } from '@/components/attendance/EmployeeAttendanceCalendar';
 import { EmployeeGamificationCard } from '@/components/gamification/EmployeeGamificationCard';
 import { cn } from '@/lib/utils';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, parseISO, differenceInDays, addMonths } from 'date-fns';
 import { toast } from 'sonner';
 import type { Employee } from '@/types/hr';
 
@@ -105,6 +105,34 @@ export default function EmployeePortal() {
       return acc + Math.max(0, available);
     }, 0);
   }, [leaveBalances]);
+
+  // Calculate probation status (6 months from joining date)
+  const probationStatus = useMemo(() => {
+    if (!employee?.joining_date) return null;
+    
+    const joiningDate = parseISO(employee.joining_date);
+    const now = new Date();
+    const probationEndDate = addMonths(joiningDate, 6);
+    
+    const daysRemaining = differenceInDays(probationEndDate, now);
+    
+    // If probation has ended (passed 6 months)
+    if (daysRemaining <= 0) {
+      return { isOnProbation: false, daysRemaining: 0, percentComplete: 100, endDate: probationEndDate };
+    }
+    
+    // Calculate progress percentage
+    const totalProbationDays = differenceInDays(probationEndDate, joiningDate);
+    const daysElapsed = differenceInDays(now, joiningDate);
+    const percentComplete = Math.round((daysElapsed / totalProbationDays) * 100);
+    
+    return { 
+      isOnProbation: true, 
+      daysRemaining, 
+      percentComplete,
+      endDate: probationEndDate 
+    };
+  }, [employee?.joining_date]);
 
   // Leave request form
   const [leaveForm, setLeaveForm] = useState({
@@ -309,6 +337,31 @@ export default function EmployeePortal() {
                   </div>
                 </div>
               </div>
+
+              {/* Probation Card - Only shows if on probation */}
+              {probationStatus?.isOnProbation && (
+                <div className="cream-card cream-card-hover p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="stat-icon-bg">
+                      <Briefcase className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-4xl font-bold text-blue-600">{probationStatus.daysRemaining}</p>
+                      <p className="text-sm text-[#5d4a36] mt-1">Probation Days Left</p>
+                      {/* Progress bar */}
+                      <div className="w-full bg-blue-100 rounded-full h-1.5 mt-2">
+                        <div 
+                          className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" 
+                          style={{ width: `${probationStatus.percentComplete}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-[#5d4a36] mt-1">
+                        Ends: {format(probationStatus.endDate, 'MMM dd, yyyy')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Request Leave Button - Purple Gradient */}

@@ -33,7 +33,7 @@ import { NotificationSettings } from '@/components/NotificationSettings';
 import { NotificationBell } from '@/components/NotificationBell';
 import { HRAssistantChat } from '@/components/admin/HRAssistantChat';
 import { toast } from 'sonner';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, parseISO, differenceInDays, addMonths } from 'date-fns';
 
 interface Employee {
   id: string;
@@ -188,6 +188,34 @@ export default function EmployeeSelfServicePortal() {
     return Math.max(0, available);
   }, [leaveBalances]);
 
+  // Calculate probation status (6 months from joining date)
+  const probationStatus = useMemo(() => {
+    if (!employee?.joining_date) return null;
+    
+    const joiningDate = parseISO(employee.joining_date);
+    const now = new Date();
+    const probationEndDate = addMonths(joiningDate, 6);
+    
+    const daysRemaining = differenceInDays(probationEndDate, now);
+    
+    // If probation has ended (passed 6 months)
+    if (daysRemaining <= 0) {
+      return { isOnProbation: false, daysRemaining: 0, percentComplete: 100, endDate: probationEndDate };
+    }
+    
+    // Calculate progress percentage
+    const totalProbationDays = differenceInDays(probationEndDate, joiningDate);
+    const daysElapsed = differenceInDays(now, joiningDate);
+    const percentComplete = Math.round((daysElapsed / totalProbationDays) * 100);
+    
+    return { 
+      isOnProbation: true, 
+      daysRemaining, 
+      percentComplete,
+      endDate: probationEndDate 
+    };
+  }, [employee?.joining_date]);
+
   // Calculate stats
   const pendingLeave = employeeLeave.filter(l => l.status === 'Pending').length;
   const thisMonthAttendance = employeeAttendance.filter(a => {
@@ -331,6 +359,34 @@ export default function EmployeeSelfServicePortal() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Probation Card - Only shows if on probation */}
+          {probationStatus?.isOnProbation && (
+            <Card className="relative overflow-hidden border-0 shadow-lg shadow-blue-500/10 bg-gradient-to-br from-white to-blue-50 dark:from-card dark:to-blue-950/30 group hover:shadow-xl hover:shadow-blue-500/20 transition-all duration-300 hover:-translate-y-1 col-span-2 lg:col-span-1">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-blue-500/20 to-transparent rounded-bl-full" />
+              <CardContent className="pt-5 pb-4 relative">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2 flex-1">
+                    <p className="text-3xl md:text-4xl font-black text-blue-600 dark:text-blue-400 tracking-tight">{probationStatus.daysRemaining}</p>
+                    <p className="text-xs md:text-sm font-semibold text-muted-foreground uppercase tracking-wide">Probation Days Left</p>
+                    {/* Progress bar */}
+                    <div className="w-full bg-blue-100 dark:bg-blue-900/30 rounded-full h-1.5 mt-2">
+                      <div 
+                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-1.5 rounded-full transition-all duration-500" 
+                        style={{ width: `${probationStatus.percentComplete}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Ends: {format(probationStatus.endDate, 'MMM dd, yyyy')}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform duration-300">
+                    <Briefcase className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Quick Actions - Enhanced Button */}
