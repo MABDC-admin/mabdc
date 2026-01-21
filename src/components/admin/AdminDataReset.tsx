@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2, AlertTriangle, Clock, Calendar, FileText, Users, DollarSign, CalendarDays, Filter } from 'lucide-react';
+import { Trash2, AlertTriangle, Clock, Calendar, FileText, Users, DollarSign, CalendarDays, Filter, Eye, ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useEmployees } from '@/hooks/useEmployees';
 import {
   Popover,
@@ -15,10 +15,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 type DataType = 'attendance' | 'attendance_filtered' | 'leave_records' | 'leave_records_filtered' | 'payroll' | 'payroll_filtered' | 'contracts' | 'contracts_filtered' | 'employees' | 'all';
 
@@ -44,6 +46,91 @@ export function AdminDataReset() {
   const [attendanceDateOpen, setAttendanceDateOpen] = useState(false);
   const [leaveDateOpen, setLeaveDateOpen] = useState(false);
   const [contractsDateOpen, setContractsDateOpen] = useState(false);
+
+  // Preview states
+  const [showAttendancePreview, setShowAttendancePreview] = useState(false);
+  const [showLeavePreview, setShowLeavePreview] = useState(false);
+  const [showPayrollPreview, setShowPayrollPreview] = useState(false);
+  const [showContractsPreview, setShowContractsPreview] = useState(false);
+
+  // Preview queries - only fetch when preview is open and has filters
+  const hasAttendanceFilters = attendanceEmployees.length > 0 || !!attendanceDateRange?.from;
+  const hasLeaveFilters = leaveEmployees.length > 0 || !!leaveDateRange?.from;
+  const hasPayrollFilters = payrollEmployees.length > 0 || !!payrollMonth;
+  const hasContractsFilters = contractsEmployees.length > 0 || !!contractsDateRange?.from;
+
+  const { data: attendancePreview = [], isLoading: attendancePreviewLoading } = useQuery({
+    queryKey: ['attendance-preview', attendanceDateRange, attendanceEmployees],
+    queryFn: async () => {
+      let query = supabase.from('attendance').select('*, employees(full_name)');
+      if (attendanceEmployees.length > 0) {
+        query = query.in('employee_id', attendanceEmployees);
+      }
+      if (attendanceDateRange?.from) {
+        query = query.gte('date', format(attendanceDateRange.from, 'yyyy-MM-dd'));
+      }
+      if (attendanceDateRange?.to) {
+        query = query.lte('date', format(attendanceDateRange.to, 'yyyy-MM-dd'));
+      }
+      const { data } = await query.order('date', { ascending: false }).limit(50);
+      return data || [];
+    },
+    enabled: showAttendancePreview && hasAttendanceFilters,
+  });
+
+  const { data: leavePreview = [], isLoading: leavePreviewLoading } = useQuery({
+    queryKey: ['leave-preview', leaveDateRange, leaveEmployees],
+    queryFn: async () => {
+      let query = supabase.from('leave_records').select('*, employees(full_name)');
+      if (leaveEmployees.length > 0) {
+        query = query.in('employee_id', leaveEmployees);
+      }
+      if (leaveDateRange?.from) {
+        query = query.gte('start_date', format(leaveDateRange.from, 'yyyy-MM-dd'));
+      }
+      if (leaveDateRange?.to) {
+        query = query.lte('start_date', format(leaveDateRange.to, 'yyyy-MM-dd'));
+      }
+      const { data } = await query.order('start_date', { ascending: false }).limit(50);
+      return data || [];
+    },
+    enabled: showLeavePreview && hasLeaveFilters,
+  });
+
+  const { data: payrollPreview = [], isLoading: payrollPreviewLoading } = useQuery({
+    queryKey: ['payroll-preview', payrollMonth, payrollEmployees],
+    queryFn: async () => {
+      let query = supabase.from('payroll').select('*, employees(full_name)');
+      if (payrollEmployees.length > 0) {
+        query = query.in('employee_id', payrollEmployees);
+      }
+      if (payrollMonth) {
+        query = query.eq('month', payrollMonth);
+      }
+      const { data } = await query.order('created_at', { ascending: false }).limit(50);
+      return data || [];
+    },
+    enabled: showPayrollPreview && hasPayrollFilters,
+  });
+
+  const { data: contractsPreview = [], isLoading: contractsPreviewLoading } = useQuery({
+    queryKey: ['contracts-preview', contractsDateRange, contractsEmployees],
+    queryFn: async () => {
+      let query = supabase.from('contracts').select('*, employees(full_name)');
+      if (contractsEmployees.length > 0) {
+        query = query.in('employee_id', contractsEmployees);
+      }
+      if (contractsDateRange?.from) {
+        query = query.gte('start_date', format(contractsDateRange.from, 'yyyy-MM-dd'));
+      }
+      if (contractsDateRange?.to) {
+        query = query.lte('start_date', format(contractsDateRange.to, 'yyyy-MM-dd'));
+      }
+      const { data } = await query.order('start_date', { ascending: false }).limit(50);
+      return data || [];
+    },
+    enabled: showContractsPreview && hasContractsFilters,
+  });
 
   const dataTypes = [
     { type: 'attendance' as DataType, filteredType: 'attendance_filtered' as DataType, label: 'Attendance Records', icon: Clock, description: 'Delete check-in/check-out records', hasDateRange: true, hasEmployeeFilter: true },
@@ -438,6 +525,56 @@ export function AdminDataReset() {
                       <EmployeeSelector list={list} setList={setList} label={`Filter ${data.label}`} />
                     )}
                     
+                    {/* Preview Button */}
+                    {data.type === 'attendance' && hasAttendanceFilters && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs gap-1"
+                        onClick={() => setShowAttendancePreview(!showAttendancePreview)}
+                      >
+                        <Eye size={12} />
+                        Preview
+                        <ChevronDown size={12} className={cn("transition-transform", showAttendancePreview && "rotate-180")} />
+                      </Button>
+                    )}
+                    {data.type === 'leave_records' && hasLeaveFilters && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs gap-1"
+                        onClick={() => setShowLeavePreview(!showLeavePreview)}
+                      >
+                        <Eye size={12} />
+                        Preview
+                        <ChevronDown size={12} className={cn("transition-transform", showLeavePreview && "rotate-180")} />
+                      </Button>
+                    )}
+                    {data.type === 'payroll' && hasPayrollFilters && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs gap-1"
+                        onClick={() => setShowPayrollPreview(!showPayrollPreview)}
+                      >
+                        <Eye size={12} />
+                        Preview
+                        <ChevronDown size={12} className={cn("transition-transform", showPayrollPreview && "rotate-180")} />
+                      </Button>
+                    )}
+                    {data.type === 'contracts' && hasContractsFilters && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs gap-1"
+                        onClick={() => setShowContractsPreview(!showContractsPreview)}
+                      >
+                        <Eye size={12} />
+                        Preview
+                        <ChevronDown size={12} className={cn("transition-transform", showContractsPreview && "rotate-180")} />
+                      </Button>
+                    )}
+                    
                     {/* Delete with Filters button */}
                     {data.filteredType && (
                       <Button
@@ -452,6 +589,155 @@ export function AdminDataReset() {
                     )}
                   </div>
                 )}
+                
+                {/* Preview Tables - Outside hasFilters block */}
+                {data.type === 'attendance' && showAttendancePreview && hasAttendanceFilters && (
+                    <div className="border rounded-lg bg-muted/30 overflow-hidden">
+                      <ScrollArea className="max-h-[200px]">
+                        {attendancePreviewLoading ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">Loading preview...</p>
+                        ) : attendancePreview.length === 0 ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">No records match the filters</p>
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="hover:bg-transparent">
+                                <TableHead className="text-xs h-8">Employee</TableHead>
+                                <TableHead className="text-xs h-8">Date</TableHead>
+                                <TableHead className="text-xs h-8">Status</TableHead>
+                                <TableHead className="text-xs h-8">Check In</TableHead>
+                                <TableHead className="text-xs h-8">Check Out</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {attendancePreview.map((record: any) => (
+                                <TableRow key={record.id} className="hover:bg-muted/50">
+                                  <TableCell className="text-xs py-1.5">{record.employees?.full_name || '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.date ? format(parseISO(record.date), 'MMM d, yyyy') : '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.status || '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.check_in || '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.check_out || '-'}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                        {attendancePreview.length >= 50 && (
+                          <p className="text-xs text-muted-foreground text-center py-2 border-t">Showing first 50 records...</p>
+                        )}
+                      </ScrollArea>
+                    </div>
+                  )}
+                  
+                  {data.type === 'leave_records' && showLeavePreview && hasLeaveFilters && (
+                    <div className="border rounded-lg bg-muted/30 overflow-hidden">
+                      <ScrollArea className="max-h-[200px]">
+                        {leavePreviewLoading ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">Loading preview...</p>
+                        ) : leavePreview.length === 0 ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">No records match the filters</p>
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="hover:bg-transparent">
+                                <TableHead className="text-xs h-8">Employee</TableHead>
+                                <TableHead className="text-xs h-8">Leave Type</TableHead>
+                                <TableHead className="text-xs h-8">Start Date</TableHead>
+                                <TableHead className="text-xs h-8">End Date</TableHead>
+                                <TableHead className="text-xs h-8">Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {leavePreview.map((record: any) => (
+                                <TableRow key={record.id} className="hover:bg-muted/50">
+                                  <TableCell className="text-xs py-1.5">{record.employees?.full_name || '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.leave_type || '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.start_date ? format(parseISO(record.start_date), 'MMM d, yyyy') : '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.end_date ? format(parseISO(record.end_date), 'MMM d, yyyy') : '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.status || '-'}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                        {leavePreview.length >= 50 && (
+                          <p className="text-xs text-muted-foreground text-center py-2 border-t">Showing first 50 records...</p>
+                        )}
+                      </ScrollArea>
+                    </div>
+                  )}
+                  
+                  {data.type === 'payroll' && showPayrollPreview && hasPayrollFilters && (
+                    <div className="border rounded-lg bg-muted/30 overflow-hidden">
+                      <ScrollArea className="max-h-[200px]">
+                        {payrollPreviewLoading ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">Loading preview...</p>
+                        ) : payrollPreview.length === 0 ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">No records match the filters</p>
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="hover:bg-transparent">
+                                <TableHead className="text-xs h-8">Employee</TableHead>
+                                <TableHead className="text-xs h-8">Month</TableHead>
+                                <TableHead className="text-xs h-8">Basic Salary</TableHead>
+                                <TableHead className="text-xs h-8">Net Salary</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {payrollPreview.map((record: any) => (
+                                <TableRow key={record.id} className="hover:bg-muted/50">
+                                  <TableCell className="text-xs py-1.5">{record.employees?.full_name || '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.month || '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.basic_salary?.toLocaleString() || '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.net_salary?.toLocaleString() || '-'}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                        {payrollPreview.length >= 50 && (
+                          <p className="text-xs text-muted-foreground text-center py-2 border-t">Showing first 50 records...</p>
+                        )}
+                      </ScrollArea>
+                    </div>
+                  )}
+                  
+                  {data.type === 'contracts' && showContractsPreview && hasContractsFilters && (
+                    <div className="border rounded-lg bg-muted/30 overflow-hidden">
+                      <ScrollArea className="max-h-[200px]">
+                        {contractsPreviewLoading ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">Loading preview...</p>
+                        ) : contractsPreview.length === 0 ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">No records match the filters</p>
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="hover:bg-transparent">
+                                <TableHead className="text-xs h-8">Employee</TableHead>
+                                <TableHead className="text-xs h-8">Start Date</TableHead>
+                                <TableHead className="text-xs h-8">End Date</TableHead>
+                                <TableHead className="text-xs h-8">Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {contractsPreview.map((record: any) => (
+                                <TableRow key={record.id} className="hover:bg-muted/50">
+                                  <TableCell className="text-xs py-1.5">{record.employees?.full_name || '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.start_date ? format(parseISO(record.start_date), 'MMM d, yyyy') : '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.end_date ? format(parseISO(record.end_date), 'MMM d, yyyy') : '-'}</TableCell>
+                                  <TableCell className="text-xs py-1.5">{record.status || '-'}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                        {contractsPreview.length >= 50 && (
+                          <p className="text-xs text-muted-foreground text-center py-2 border-t">Showing first 50 records...</p>
+                        )}
+                      </ScrollArea>
+                    </div>
+                  )}
               </div>
             );
           })}
