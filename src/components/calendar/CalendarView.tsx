@@ -10,9 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { ChevronLeft, ChevronRight, Plus, Search, X, Cake } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Search, X, Cake, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, isWeekend } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, isWeekend, isSameMonth } from 'date-fns';
 
 interface CalendarViewProps {
   className?: string;
@@ -27,7 +27,7 @@ export function CalendarView({ className }: CalendarViewProps) {
   const deleteEvent = useDeleteEvent();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'matrix' | 'calendar' | 'birthdays'>('calendar');
+  const [viewMode, setViewMode] = useState<'matrix' | 'calendar' | 'birthdays' | 'leave-overview'>('calendar');
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
@@ -184,6 +184,18 @@ export function CalendarView({ className }: CalendarViewProps) {
           {/* View Toggle */}
           <div className="inline-flex rounded-lg border border-border bg-secondary/30 p-1">
             <button
+              onClick={() => setViewMode('leave-overview')}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
+                viewMode === 'leave-overview' 
+                  ? "bg-blue-500 text-white shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Users className="w-3 h-3" />
+              Leave
+            </button>
+            <button
               onClick={() => setViewMode('matrix')}
               className={cn(
                 "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
@@ -241,6 +253,243 @@ export function CalendarView({ className }: CalendarViewProps) {
           </Button>
         </div>
       </div>
+
+      {/* Leave Overview View */}
+      {viewMode === 'leave-overview' && (
+        <div className="space-y-4">
+          {/* Leave Type Legend & Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+            {Object.entries(leaveTypeColors).map(([type, colors]) => {
+              const count = approvedLeave.filter(l => {
+                if (l.leave_type !== type) return false;
+                const start = parseISO(l.start_date);
+                const end = parseISO(l.end_date);
+                return (isSameMonth(start, currentMonth) || isSameMonth(end, currentMonth) ||
+                  (start < monthStart && end > monthEnd));
+              }).length;
+              
+              return (
+                <div 
+                  key={type} 
+                  className={cn(
+                    "p-3 rounded-lg border border-border",
+                    colors.bg
+                  )}
+                >
+                  <div className={cn("text-lg font-bold", colors.text)}>{count}</div>
+                  <div className={cn("text-xs font-medium", colors.text)}>{type}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Calendar Grid with Leave Focus */}
+          <div className="bg-card rounded-xl border border-border overflow-hidden">
+            {/* Day Headers */}
+            <div className="grid grid-cols-7 border-b border-border bg-muted/30">
+              {dayNames.map((day, idx) => (
+                <div 
+                  key={day} 
+                  className={cn(
+                    "py-3 text-center text-xs font-semibold border-r border-border last:border-r-0",
+                    idx === 0 || idx === 6 ? "text-muted-foreground/70" : "text-foreground"
+                  )}
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar Weeks */}
+            {weeks.map((week, weekIndex) => (
+              <div key={weekIndex} className="grid grid-cols-7 border-b border-border last:border-b-0">
+                {week.map((day, dayIndex) => {
+                  const { leaveItems, holidayItems } = getEventsForDate(day);
+                  const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
+                  const isTodayDate = isToday(day);
+                  const isWeekendDay = isWeekend(day);
+
+                  // Group employees on leave by leave type
+                  const leaveByType: Record<string, { employee: typeof employees[0]; leave: typeof leaveItems[0] }[]> = {};
+                  leaveItems.forEach(l => {
+                    const employee = getEmployeeById(l.employee_id);
+                    if (employee) {
+                      const type = l.leave_type;
+                      if (!leaveByType[type]) leaveByType[type] = [];
+                      leaveByType[type].push({ employee, leave: l });
+                    }
+                  });
+
+                  const totalOnLeave = leaveItems.length;
+
+                  return (
+                    <div
+                      key={day.toISOString()}
+                      className={cn(
+                        "min-h-[140px] p-2 border-r border-border last:border-r-0 transition-colors",
+                        !isCurrentMonth && "bg-muted/20",
+                        isCurrentMonth && "bg-card",
+                        isWeekendDay && isCurrentMonth && "bg-muted/10",
+                        isTodayDate && "bg-primary/5 ring-1 ring-inset ring-primary/20",
+                        holidayItems.length > 0 && "bg-destructive/5"
+                      )}
+                    >
+                      {/* Day Header */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={cn(
+                          "text-sm font-semibold",
+                          !isCurrentMonth && "text-muted-foreground/40",
+                          isCurrentMonth && "text-foreground",
+                          isTodayDate && "bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs"
+                        )}>
+                          {format(day, 'd')}
+                        </span>
+                        {totalOnLeave > 0 && isCurrentMonth && (
+                          <span className="text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-full">
+                            {totalOnLeave} on leave
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Holiday */}
+                      {holidayItems.map(holiday => (
+                        <div 
+                          key={holiday.id} 
+                          className="mb-2 p-1.5 rounded bg-destructive/10 border border-destructive/20"
+                        >
+                          <span className="text-[10px] font-semibold text-destructive">
+                            🏖️ {holiday.name}
+                          </span>
+                        </div>
+                      ))}
+
+                      {/* Leave Items by Type */}
+                      {isCurrentMonth && (
+                        <div className="space-y-1.5">
+                          {Object.entries(leaveByType).map(([type, items]) => {
+                            const colors = leaveTypeColors[type] || leaveTypeColors['Annual'];
+                            return (
+                              <div key={type} className={cn("rounded p-1.5", colors.bg)}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className={cn("text-[9px] font-bold uppercase", colors.text)}>
+                                    {type}
+                                  </span>
+                                  <span className={cn("text-[9px] font-medium", colors.text)}>
+                                    ({items.length})
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {items.slice(0, 3).map(({ employee }) => (
+                                    <div 
+                                      key={employee.id}
+                                      className="flex items-center gap-1 bg-white/50 dark:bg-black/20 rounded px-1 py-0.5"
+                                      title={`${employee.full_name} - ${employee.department}`}
+                                    >
+                                      <Avatar className="w-4 h-4 border border-white/50">
+                                        <AvatarImage src={employee.photo_url || ''} />
+                                        <AvatarFallback className="text-[7px] bg-secondary">
+                                          {employee.full_name?.charAt(0)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className={cn("text-[8px] font-medium truncate max-w-[50px]", colors.text)}>
+                                        {employee.full_name.split(' ')[0]}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {items.length > 3 && (
+                                    <span className={cn("text-[8px] font-medium px-1", colors.text)}>
+                                      +{items.length - 3}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          {/* Leave Summary for Current Month */}
+          <div className="bg-card rounded-xl border border-border p-4">
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Users className="w-4 h-4 text-blue-500" />
+              All Leaves in {format(currentMonth, 'MMMM yyyy')}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {approvedLeave
+                .filter(l => {
+                  const start = parseISO(l.start_date);
+                  const end = parseISO(l.end_date);
+                  return (isSameMonth(start, currentMonth) || isSameMonth(end, currentMonth) ||
+                    (start < monthStart && end > monthEnd));
+                })
+                .sort((a, b) => parseISO(a.start_date).getTime() - parseISO(b.start_date).getTime())
+                .map(l => {
+                  const employee = getEmployeeById(l.employee_id);
+                  const colors = leaveTypeColors[l.leave_type] || leaveTypeColors['Annual'];
+                  const start = parseISO(l.start_date);
+                  const end = parseISO(l.end_date);
+                  
+                  return (
+                    <div 
+                      key={l.id} 
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border transition-colors",
+                        colors.bg,
+                        "border-border/50"
+                      )}
+                    >
+                      <Avatar className="w-10 h-10 border-2 border-white/50">
+                        <AvatarImage src={employee?.photo_url || ''} />
+                        <AvatarFallback className="text-sm bg-secondary">
+                          {employee?.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2) || '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn("text-sm font-medium truncate", colors.text)}>
+                          {employee?.full_name || 'Unknown'}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {employee?.department}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className={cn(
+                          "text-[10px] font-bold uppercase px-2 py-0.5 rounded-full",
+                          colors.bg, colors.text, "border border-current/20"
+                        )}>
+                          {l.leave_type}
+                        </span>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {format(start, 'MMM d')} - {format(end, 'MMM d')}
+                        </p>
+                        <p className="text-[10px] font-medium text-foreground">
+                          {l.days_count} days
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              {approvedLeave.filter(l => {
+                const start = parseISO(l.start_date);
+                const end = parseISO(l.end_date);
+                return (isSameMonth(start, currentMonth) || isSameMonth(end, currentMonth) ||
+                  (start < monthStart && end > monthEnd));
+              }).length === 0 && (
+                <div className="col-span-full text-center py-8 text-muted-foreground">
+                  <Users className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No approved leaves in {format(currentMonth, 'MMMM')}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Matrix View */}
       {viewMode === 'matrix' && (
