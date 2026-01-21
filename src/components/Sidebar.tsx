@@ -158,22 +158,27 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed lg:static inset-y-0 left-0 z-40 w-64 glass-card border-r border-border p-4 transition-transform duration-300 flex flex-col",
+        "fixed lg:static inset-y-0 left-0 z-40 w-64 p-4 transition-transform duration-300 flex flex-col",
+        "bg-gradient-to-b from-[hsl(174_40%_97%)] via-[hsl(180_35%_95%)] to-[hsl(174_35%_93%)]",
+        "dark:from-[hsl(180_30%_8%)] dark:via-[hsl(180_25%_10%)] dark:to-[hsl(180_30%_8%)]",
+        "backdrop-blur-xl border-r border-[hsl(174_30%_88%)] dark:border-[hsl(180_20%_18%)]",
         isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}>
         <div className="flex flex-col gap-4">
-          {/* Branding Section */}
-          <div className="flex items-center justify-between px-4 py-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl uae-gradient flex items-center justify-center">
-                <span className="text-lg font-bold text-primary-foreground">M</span>
+          {/* Branding Section - Welcome Card Style */}
+          <div className="tropical-card rounded-2xl p-4 border border-[hsl(174_40%_85%)] dark:border-[hsl(180_20%_22%)]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[hsl(174_60%_45%)] to-[hsl(180_55%_40%)] flex items-center justify-center shadow-lg shadow-[hsl(174_60%_42%/0.3)]">
+                  <span className="text-xl font-bold text-white">M</span>
+                </div>
+                <div>
+                  <p className="text-[10px] text-[hsl(174_40%_45%)] dark:text-[hsl(174_40%_60%)] font-medium uppercase tracking-wider">Welcome to</p>
+                  <h1 className="text-lg font-bold text-[hsl(180_30%_25%)] dark:text-[hsl(180_20%_90%)]">MABDC</h1>
+                </div>
               </div>
-              <div>
-                <h1 className="text-lg font-bold text-foreground">MABDC</h1>
-                <p className="text-xs text-muted-foreground">HR Management</p>
-              </div>
+              <ThemeSelector />
             </div>
-            <ThemeSelector />
           </div>
 
           {/* Sign Out Button */}
