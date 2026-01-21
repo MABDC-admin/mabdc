@@ -1860,10 +1860,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      calculate_tenure_based_leave: {
-        Args: { p_as_of_date?: string; p_joining_date: string }
-        Returns: number
-      }
+      calculate_tenure_based_leave:
+        | { Args: { emp_joining_date: string }; Returns: number }
+        | {
+            Args: { p_as_of_date?: string; p_joining_date: string }
+            Returns: number
+          }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1873,16 +1875,7 @@ export type Database = {
       }
       process_monthly_leave_accrual: {
         Args: { target_month?: number; target_year?: number }
-        Returns: {
-          accrual_rate: number
-          days_accrued: number
-          employee_id: string
-          employee_name: string
-          joining_date: string
-          months_of_service: number
-          new_entitled_days: number
-          status: string
-        }[]
+        Returns: Json
       }
     }
     Enums: {

@@ -23,6 +23,7 @@ const STATUS_TO_DB: Record<string, string> = {
   'A': 'Absent',
   'SL': 'Sick Leave',
   'VL': 'Vacation Leave',
+  'M': 'Maternity Leave',
   'H': 'Holiday',
   'SB': 'Spring Break',
   'WB': 'Winter Break',
@@ -43,6 +44,7 @@ const STATUS_CONFIG = {
   L: { label: 'L', name: 'Late', bg: 'bg-amber-400', text: 'text-amber-900', pdfBg: [251, 191, 36] },
   A: { label: 'A', name: 'Absent', bg: 'bg-red-500', text: 'text-white', pdfBg: [239, 68, 68] },
   VL: { label: 'VL', name: 'On Leave', bg: 'bg-blue-500', text: 'text-white', pdfBg: [59, 130, 246] },
+  M: { label: 'M', name: 'Maternity Leave', bg: 'bg-pink-500', text: 'text-white', pdfBg: [236, 72, 153] },
   W: { label: 'W', name: 'Weekend', bg: 'bg-slate-200', text: 'text-slate-600', pdfBg: [226, 232, 240] },
   DO: { label: 'DO', name: 'Day Off', bg: 'bg-purple-400', text: 'text-purple-900', pdfBg: [192, 132, 252] },
   H: { label: 'H', name: 'Half Day', bg: 'bg-orange-400', text: 'text-orange-900', pdfBg: [251, 146, 60] },
@@ -58,7 +60,7 @@ const STATUS_CONFIG = {
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // Editable statuses for the dropdown
-const EDITABLE_STATUSES = ['-', 'A', 'PH', 'P', 'L', 'SL', 'HDSL', 'VL', 'SB', 'WB', 'HDA', 'DO'] as const;
+const EDITABLE_STATUSES = ['-', 'A', 'PH', 'P', 'L', 'SL', 'HDSL', 'VL', 'M', 'SB', 'WB', 'HDA', 'DO'] as const;
 
 // Legend items for the header bar
 const LEGEND_ITEMS = [
@@ -66,6 +68,7 @@ const LEGEND_ITEMS = [
   { code: 'L', color: 'bg-amber-400' },
   { code: 'A', color: 'bg-red-500' },
   { code: 'VL', color: 'bg-blue-500', label: 'On Leave' },
+  { code: 'M', color: 'bg-pink-500', label: 'Maternity' },
   { code: 'W', color: 'bg-slate-200' },
   { code: 'DO', color: 'bg-purple-400', label: 'Day Off' },
   { code: 'H', color: 'bg-orange-400', label: 'Half Day' },
@@ -199,6 +202,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       const leaveType = leave.leave_type?.toLowerCase() || '';
       if (leaveType.includes('sick')) return 'SL';
       if (leaveType.includes('vacation') || leaveType.includes('annual')) return 'VL';
+      if (leaveType.includes('maternity')) return 'M';
       if (leaveType.includes('spring')) return 'SB';
       if (leaveType.includes('winter')) return 'WB';
       if (leaveType.includes('day off')) return 'DO';

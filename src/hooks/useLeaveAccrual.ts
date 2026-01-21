@@ -109,8 +109,8 @@ export function calculateAccrualRate(joiningDate: string): { rate: number; month
   const monthsOfService = (now.getFullYear() * 12 + now.getMonth()) - 
                           (joining.getFullYear() * 12 + joining.getMonth());
   
-  // Up to 6 months: 2 days/month, after 6 months: 2.5 days/month
-  const rate = monthsOfService < 6 ? 2 : 2.5;
+  // Flat rate: 2.5 days/month from joining date
+  const rate = 2.5;
   
   return { rate, monthsOfService: Math.max(0, monthsOfService) };
 }
