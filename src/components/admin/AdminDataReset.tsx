@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2, AlertTriangle, Clock, Calendar, FileText, Users, DollarSign, CalendarDays, Filter, Eye, ChevronDown } from 'lucide-react';
+import { Trash2, AlertTriangle, Clock, Calendar, FileText, Users, DollarSign, CalendarDays, Filter, Eye, ChevronDown, RotateCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
@@ -21,8 +21,12 @@ import { DateRange } from 'react-day-picker';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 type DataType = 'attendance' | 'attendance_filtered' | 'leave_records' | 'leave_records_filtered' | 'payroll' | 'payroll_filtered' | 'contracts' | 'contracts_filtered' | 'employees' | 'all';
+type ClearPunchType = 'check_in' | 'check_out' | 'both';
 
 export function AdminDataReset() {
   const [confirmType, setConfirmType] = useState<DataType | null>(null);
@@ -53,11 +57,89 @@ export function AdminDataReset() {
   const [showPayrollPreview, setShowPayrollPreview] = useState(false);
   const [showContractsPreview, setShowContractsPreview] = useState(false);
 
+  // Clear punch states (for re-testing check-in/out)
+  const [clearPunchDate, setClearPunchDate] = useState<Date | undefined>(new Date());
+  const [clearPunchEmployees, setClearPunchEmployees] = useState<string[]>([]);
+  const [clearPunchType, setClearPunchType] = useState<ClearPunchType>('check_out');
+  const [clearPunchDateOpen, setClearPunchDateOpen] = useState(false);
+  const [showClearPunchPreview, setShowClearPunchPreview] = useState(false);
+  const [isClearingPunch, setIsClearingPunch] = useState(false);
+  const [confirmClearPunch, setConfirmClearPunch] = useState(false);
+
   // Preview queries - only fetch when preview is open and has filters
   const hasAttendanceFilters = attendanceEmployees.length > 0 || !!attendanceDateRange?.from;
   const hasLeaveFilters = leaveEmployees.length > 0 || !!leaveDateRange?.from;
   const hasPayrollFilters = payrollEmployees.length > 0 || !!payrollMonth;
   const hasContractsFilters = contractsEmployees.length > 0 || !!contractsDateRange?.from;
+  const hasClearPunchFilters = clearPunchEmployees.length > 0 && !!clearPunchDate;
+
+  // Clear punch preview query
+  const { data: clearPunchPreview = [], isLoading: clearPunchPreviewLoading, refetch: refetchClearPunchPreview } = useQuery({
+    queryKey: ['clear-punch-preview', clearPunchDate, clearPunchEmployees],
+    queryFn: async () => {
+      if (!clearPunchDate || clearPunchEmployees.length === 0) return [];
+      const dateStr = format(clearPunchDate, 'yyyy-MM-dd');
+      const { data } = await supabase
+        .from('attendance')
+        .select('*, employees(full_name)')
+        .eq('date', dateStr)
+        .in('employee_id', clearPunchEmployees)
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+    enabled: showClearPunchPreview && hasClearPunchFilters,
+  });
+
+  // Handle clear punch (for re-testing)
+  const handleClearPunch = async () => {
+    if (!clearPunchDate || clearPunchEmployees.length === 0) {
+      toast.error('Please select date and employees');
+      return;
+    }
+
+    setIsClearingPunch(true);
+    try {
+      const dateStr = format(clearPunchDate, 'yyyy-MM-dd');
+
+      if (clearPunchType === 'both') {
+        // Delete the entire attendance record
+        const { error } = await supabase
+          .from('attendance')
+          .delete()
+          .eq('date', dateStr)
+          .in('employee_id', clearPunchEmployees);
+        if (error) throw error;
+        toast.success(`Deleted attendance records for ${clearPunchEmployees.length} employee(s) on ${format(clearPunchDate, 'MMM d, yyyy')}`);
+      } else {
+        // Clear only check_in or check_out
+        const updateData: { check_in?: null; check_out?: null; status?: string } = {};
+        if (clearPunchType === 'check_in') {
+          updateData.check_in = null;
+          updateData.status = 'Miss Punch In';
+        } else {
+          updateData.check_out = null;
+        }
+
+        const { error } = await supabase
+          .from('attendance')
+          .update(updateData)
+          .eq('date', dateStr)
+          .in('employee_id', clearPunchEmployees);
+        if (error) throw error;
+        toast.success(`Cleared ${clearPunchType.replace('_', '-')} for ${clearPunchEmployees.length} employee(s) on ${format(clearPunchDate, 'MMM d, yyyy')}`);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['clear-punch-preview'] });
+      setClearPunchEmployees([]);
+      setConfirmClearPunch(false);
+    } catch (error) {
+      console.error('Clear punch error:', error);
+      toast.error('Failed to clear attendance punch');
+    } finally {
+      setIsClearingPunch(false);
+    }
+  };
 
   const { data: attendancePreview = [], isLoading: attendancePreviewLoading } = useQuery({
     queryKey: ['attendance-preview', attendanceDateRange, attendanceEmployees],
@@ -761,6 +843,209 @@ export function AdminDataReset() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Clear Check-In/Out for Re-Testing */}
+      <Card className="border-amber-500/30 bg-amber-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+            <RotateCcw size={20} />
+            Reset Attendance Punch (For Testing)
+          </CardTitle>
+          <CardDescription>
+            Clear check-in or check-out times so employees can re-test punch. Useful for testing shift rules.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Date Picker */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Date</Label>
+              <Popover open={clearPunchDateOpen} onOpenChange={setClearPunchDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !clearPunchDate && "text-muted-foreground")}>
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    {clearPunchDate ? format(clearPunchDate, 'PPP') : 'Pick a date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={clearPunchDate}
+                    onSelect={(date) => {
+                      setClearPunchDate(date);
+                      setClearPunchDateOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Employee Selector */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Employees</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Filter className="mr-2 h-4 w-4" />
+                    {clearPunchEmployees.length > 0 ? `${clearPunchEmployees.length} Selected` : 'Select Employees'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-2" align="start">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-2 py-1">
+                      <span className="text-xs font-medium text-muted-foreground">Select Employees</span>
+                      {clearPunchEmployees.length > 0 && (
+                        <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setClearPunchEmployees([])}>
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                    <ScrollArea className="h-[200px]">
+                      <div className="space-y-1">
+                        {employees.map(emp => (
+                          <div
+                            key={emp.id}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
+                            onClick={() => toggleEmployee(emp.id, clearPunchEmployees, setClearPunchEmployees)}
+                          >
+                            <Checkbox checked={clearPunchEmployees.includes(emp.id)} />
+                            <span className="text-sm truncate">{emp.full_name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Clear Type */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">What to Clear</Label>
+              <RadioGroup value={clearPunchType} onValueChange={(val) => setClearPunchType(val as ClearPunchType)} className="flex gap-3">
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="check_out" id="clear_out" />
+                  <Label htmlFor="clear_out" className="text-sm cursor-pointer">Check-Out</Label>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="check_in" id="clear_in" />
+                  <Label htmlFor="clear_in" className="text-sm cursor-pointer">Check-In</Label>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="both" id="clear_both" />
+                  <Label htmlFor="clear_both" className="text-sm cursor-pointer">Both</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-2 flex flex-col justify-end">
+              <div className="flex gap-2">
+                {hasClearPunchFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs gap-1"
+                    onClick={() => {
+                      setShowClearPunchPreview(!showClearPunchPreview);
+                      if (!showClearPunchPreview) refetchClearPunchPreview();
+                    }}
+                  >
+                    <Eye size={12} />
+                    Preview
+                    <ChevronDown size={12} className={cn("transition-transform", showClearPunchPreview && "rotate-180")} />
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  className="border-amber-500/50 text-amber-600 hover:bg-amber-500/10"
+                  disabled={!hasClearPunchFilters}
+                  onClick={() => setConfirmClearPunch(true)}
+                >
+                  <RotateCcw size={14} className="mr-1" />
+                  Clear Punch
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview Table */}
+          {showClearPunchPreview && hasClearPunchFilters && (
+            <div className="border rounded-lg bg-muted/30 overflow-hidden mt-4">
+              <ScrollArea className="max-h-[200px]">
+                {clearPunchPreviewLoading ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">Loading preview...</p>
+                ) : clearPunchPreview.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">No attendance records found for selected employees on this date</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="text-xs h-8">Employee</TableHead>
+                        <TableHead className="text-xs h-8">Date</TableHead>
+                        <TableHead className="text-xs h-8">Check In</TableHead>
+                        <TableHead className="text-xs h-8">Check Out</TableHead>
+                        <TableHead className="text-xs h-8">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clearPunchPreview.map((record: any) => (
+                        <TableRow key={record.id} className="hover:bg-muted/50">
+                          <TableCell className="text-xs py-1.5">{record.employees?.full_name || '-'}</TableCell>
+                          <TableCell className="text-xs py-1.5">{record.date ? format(parseISO(record.date), 'MMM d, yyyy') : '-'}</TableCell>
+                          <TableCell className="text-xs py-1.5">
+                            {record.check_in || '-'}
+                            {clearPunchType === 'check_in' || clearPunchType === 'both' ? (
+                              <Badge variant="outline" className="ml-2 text-[10px] text-amber-600 border-amber-500/50">Will Clear</Badge>
+                            ) : null}
+                          </TableCell>
+                          <TableCell className="text-xs py-1.5">
+                            {record.check_out || '-'}
+                            {clearPunchType === 'check_out' || clearPunchType === 'both' ? (
+                              <Badge variant="outline" className="ml-2 text-[10px] text-amber-600 border-amber-500/50">Will Clear</Badge>
+                            ) : null}
+                          </TableCell>
+                          <TableCell className="text-xs py-1.5">{record.status || '-'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </ScrollArea>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Confirm Clear Punch Dialog */}
+      <AlertDialog open={confirmClearPunch} onOpenChange={setConfirmClearPunch}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="text-amber-600" size={20} />
+              Confirm Clear Punch
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will clear the <strong>{clearPunchType === 'both' ? 'check-in AND check-out' : clearPunchType.replace('_', '-')}</strong> for{' '}
+              <strong>{clearPunchEmployees.length} employee(s)</strong> on{' '}
+              <strong>{clearPunchDate ? format(clearPunchDate, 'MMM d, yyyy') : ''}</strong>.
+              {clearPunchType === 'both' && ' The attendance record will be deleted entirely.'}
+              {' '}Employees can then re-test their punch.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClearingPunch}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleClearPunch}
+              disabled={isClearingPunch}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              {isClearingPunch ? 'Clearing...' : 'Clear Punch'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={confirmType !== null} onOpenChange={(open) => !open && setConfirmType(null)}>
         <AlertDialogContent>
