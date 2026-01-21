@@ -6,7 +6,8 @@ import {
   getEmployeeShiftTimes, 
   isWithinCheckInWindow, 
   formatShiftEndForDisplay,
-  isLateForShift 
+  isLateForShift,
+  isUndertimeForShift 
 } from '@/utils/shiftValidation';
 
 export interface Attendance {
@@ -269,9 +270,9 @@ export function useCheckOutByHRMS() {
       // If already checked out, prevent double checkout
       if (attendance?.check_out) throw new Error(`${employee.full_name} already checked out`);
       
-      // Check if undertime (before 7:00 PM / 19:00)
-      const hour = now.getHours();
-      const isUndertime = hour < 19;
+      // Get employee's shift end time for today and check if undertime
+      const shiftTimes = await getEmployeeShiftTimes(employee.id, today);
+      const isUndertime = isUndertimeForShift(now, shiftTimes.end);
       
       // If no attendance record exists (no check-in), create one with miss_punch_in status
       if (!attendance) {
@@ -466,9 +467,9 @@ export function useCheckOutById() {
       if (!attendance) throw new Error(`${employee.full_name} hasn't checked in today`);
       if (attendance.check_out) throw new Error(`${employee.full_name} already checked out`);
       
-      // Check if undertime (before 7:00 PM / 19:00)
-      const hour = now.getHours();
-      const isUndertime = hour < 19;
+      // Get employee's shift end time for today and check if undertime
+      const shiftTimes = await getEmployeeShiftTimes(employee.id, today);
+      const isUndertime = isUndertimeForShift(now, shiftTimes.end);
       const wasLate = String(attendance.status).includes('Late');
       
       // Determine combined status
