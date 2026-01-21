@@ -24,12 +24,15 @@ export function AttendanceAppealsView() {
   const createAttendance = useCreateAttendance();
   
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [employeeFilter, setEmployeeFilter] = useState<string>('all');
   const [selectedAppeal, setSelectedAppeal] = useState<any>(null);
   const [reviewForm, setReviewForm] = useState({ action: '', reason: '' });
 
-  const filteredAppeals = appeals.filter(appeal => 
-    statusFilter === 'all' || appeal.status === statusFilter
-  );
+  const filteredAppeals = appeals.filter(appeal => {
+    const matchesStatus = statusFilter === 'all' || appeal.status === statusFilter;
+    const matchesEmployee = employeeFilter === 'all' || appeal.employee_id === employeeFilter;
+    return matchesStatus && matchesEmployee;
+  });
 
   const getEmployeeName = (employeeId: string) => {
     const emp = employees.find(e => e.id === employeeId);
@@ -183,7 +186,7 @@ export function AttendanceAppealsView() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <Filter className="w-4 h-4 text-muted-foreground" />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]">
@@ -194,6 +197,17 @@ export function AttendanceAppealsView() {
             <SelectItem value="Pending">Pending</SelectItem>
             <SelectItem value="Approved">Approved</SelectItem>
             <SelectItem value="Rejected">Rejected</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filter by employee" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Employees</SelectItem>
+            {employees.map(emp => (
+              <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

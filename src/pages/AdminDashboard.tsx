@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Shield, Users, Calendar, FileText, DollarSign, ClipboardList, 
   Trash2, Edit, Plus, Download, RefreshCw, Database, BarChart3,
-  ChevronDown, AlertTriangle, Star, Scale, LogOut, MessageSquare, FileSignature, UserCog, Megaphone
+  ChevronDown, AlertTriangle, Star, Scale, LogOut, MessageSquare, FileSignature, UserCog, Megaphone,
+  Lock, KeyRound
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useLeave, useDeleteLeave, useAddLeave, useUpdateLeave } from '@/hooks/useLeave';
 import { useAttendance } from '@/hooks/useAttendance';
@@ -29,8 +31,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+const ADMIN_PINCODE = '192168';
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [isPincodeVerified, setIsPincodeVerified] = useState(false);
+  const [pincodeInput, setPincodeInput] = useState('');
+  const [pincodeError, setPincodeError] = useState('');
+  
   const { data: employees = [] } = useEmployees();
   const { data: leaveRecords = [] } = useLeave();
   const { data: attendance = [] } = useAttendance();
@@ -40,13 +48,92 @@ export default function AdminDashboard() {
   const { data: announcements = [] } = useAnnouncements();
   const { user, signOut } = useAuth();
 
+  // Check sessionStorage for pincode verification on mount
+  useEffect(() => {
+    const verified = sessionStorage.getItem('admin_pincode_verified');
+    if (verified === 'true') {
+      setIsPincodeVerified(true);
+    }
+  }, []);
+
+  const handlePincodeSubmit = () => {
+    if (pincodeInput === ADMIN_PINCODE) {
+      setIsPincodeVerified(true);
+      sessionStorage.setItem('admin_pincode_verified', 'true');
+      setPincodeError('');
+      toast.success('Access granted');
+    } else {
+      setPincodeError('Invalid pincode. Please try again.');
+      setPincodeInput('');
+    }
+  };
+
   const handleLogout = async () => {
+    sessionStorage.removeItem('admin_pincode_verified');
     await signOut();
     toast.success('Logged out successfully');
     window.location.href = '/auth?portal=admin';
   };
 
   const pendingAppeals = appeals.filter(a => a.status === 'Pending').length;
+
+  // Pincode verification screen
+  if (!isPincodeVerified) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <div className="glass-card rounded-3xl border border-border/50 p-8 w-full max-w-md space-y-6 bg-card/80 backdrop-blur-xl shadow-2xl">
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
+              <Lock className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-foreground">Admin Access</h1>
+            <p className="text-sm text-muted-foreground">Enter your 6-digit security pincode</p>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="relative">
+              <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="Enter pincode"
+                value={pincodeInput}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '');
+                  setPincodeInput(value);
+                  setPincodeError('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && pincodeInput.length === 6) {
+                    handlePincodeSubmit();
+                  }
+                }}
+                className="pl-10 text-center text-2xl tracking-[0.5em] font-mono h-14 border-2 focus:border-primary"
+              />
+            </div>
+            
+            {pincodeError && (
+              <p className="text-sm text-destructive text-center animate-shake">{pincodeError}</p>
+            )}
+            
+            <Button 
+              onClick={handlePincodeSubmit}
+              disabled={pincodeInput.length !== 6}
+              className="w-full h-12 text-lg font-semibold"
+            >
+              <Shield className="w-5 h-5 mr-2" />
+              Verify Access
+            </Button>
+          </div>
+          
+          <p className="text-xs text-center text-muted-foreground">
+            This area is restricted to authorized administrators only
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const stats = [
     { label: 'Employees', value: employees.length, icon: Users, color: 'text-primary' },
