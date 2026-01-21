@@ -23,7 +23,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+
 
 type DataType = 'attendance' | 'attendance_filtered' | 'leave_records' | 'leave_records_filtered' | 'payroll' | 'payroll_filtered' | 'contracts' | 'contracts_filtered' | 'employees' | 'all';
 type ClearPunchType = 'check_in' | 'check_out' | 'both';
@@ -923,20 +923,16 @@ export function AdminDataReset() {
             {/* Clear Type */}
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">What to Clear</Label>
-              <RadioGroup value={clearPunchType} onValueChange={(val) => setClearPunchType(val as ClearPunchType)} className="flex gap-3">
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="check_out" id="clear_out" />
-                  <Label htmlFor="clear_out" className="text-sm cursor-pointer">Check-Out</Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="check_in" id="clear_in" />
-                  <Label htmlFor="clear_in" className="text-sm cursor-pointer">Check-In</Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="both" id="clear_both" />
-                  <Label htmlFor="clear_both" className="text-sm cursor-pointer">Both</Label>
-                </div>
-              </RadioGroup>
+              <Select value={clearPunchType} onValueChange={(val) => setClearPunchType(val as ClearPunchType)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select what to clear" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="check_out">Check-Out</SelectItem>
+                  <SelectItem value="check_in">Check-In</SelectItem>
+                  <SelectItem value="both">Both (Delete Record)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Action Buttons */}
