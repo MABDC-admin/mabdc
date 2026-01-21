@@ -91,9 +91,9 @@ export function isLateForShift(currentTime: Date, shiftStartTime: string): boole
   const currentHour = currentTime.getHours();
   const currentMinute = currentTime.getMinutes();
 
-  // Late if after shift start (even by 1 minute)
+  // Late if after shift start time (comparing against actual shift start minute)
   if (currentHour > startHour) return true;
-  if (currentHour === startHour && currentMinute >= 1) return true;
+  if (currentHour === startHour && currentMinute > startMinute) return true;
   
   return false;
 }
