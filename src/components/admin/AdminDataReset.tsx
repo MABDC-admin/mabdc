@@ -419,12 +419,12 @@ export function AdminDataReset() {
                     
                     {/* Month Filter for Payroll */}
                     {data.hasMonthFilter && (
-                      <Select value={payrollMonth} onValueChange={setPayrollMonth}>
+                      <Select value={payrollMonth || 'all'} onValueChange={(val) => setPayrollMonth(val === 'all' ? '' : val)}>
                         <SelectTrigger className="w-[140px] h-8 text-xs">
                           <SelectValue placeholder="Select Month" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">All Months</SelectItem>
+                          <SelectItem value="all">All Months</SelectItem>
                           {Array.from({ length: 12 }, (_, i) => {
                             const month = format(new Date(2024, i, 1), 'MMMM yyyy');
                             return <SelectItem key={i} value={month}>{month}</SelectItem>;
