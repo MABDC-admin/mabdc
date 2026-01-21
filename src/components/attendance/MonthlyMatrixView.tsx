@@ -191,18 +191,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     const isSat = dayOfWeek === 6;
     const isSun = dayOfWeek === 0;
     
-    // Weekend (Saturday and Sunday only)
-    if (isSat || isSun) {
-      return 'W';
-    }
-    
-    // Public Holiday
-    const holiday = getHolidayForDay(date);
-    if (holiday) {
-      return 'PH';
-    }
-
-    // Check for approved leave
+    // CHECK LEAVE FIRST - before weekends! So leave shows on Sat/Sun too
     const leave = getLeaveForEmployeeDay(employeeId, date);
     if (leave) {
       const leaveType = leave.leave_type?.toLowerCase() || '';
@@ -213,6 +202,17 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       if (leaveType.includes('winter')) return 'WB';
       if (leaveType.includes('day off')) return 'DO';
       return 'VL'; // Default to vacation leave for other approved leaves
+    }
+    
+    // Weekend (Saturday and Sunday only) - only if NOT on leave
+    if (isSat || isSun) {
+      return 'W';
+    }
+    
+    // Public Holiday
+    const holiday = getHolidayForDay(date);
+    if (holiday) {
+      return 'PH';
     }
     
     // Check attendance
