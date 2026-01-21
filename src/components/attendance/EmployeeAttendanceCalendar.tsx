@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Download, Grid3X3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay, isWithinInterval } from 'date-fns';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useQuery } from '@tanstack/react-query';
@@ -62,7 +62,23 @@ export function EmployeeAttendanceCalendar({
   });
 
   const employeeId = propEmployeeId || selectedEmployeeId;
-  
+
+  // Fetch approved leave records for the selected employee
+  const { data: leaveRecords = [] } = useQuery({
+    queryKey: ['leave_records', employeeId],
+    queryFn: async () => {
+      if (!employeeId) return [];
+      const { data, error } = await supabase
+        .from('leave_records')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('status', 'Approved');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!employeeId,
+  });
+
   const selectedEmployee = useMemo(() => {
     return employees.find(e => e.id === employeeId);
   }, [employees, employeeId]);
@@ -91,14 +107,30 @@ export function EmployeeAttendanceCalendar({
     let missedPunch = 0;
     let appealed = 0;
     let undertime = 0;
+    let onLeave = 0;
 
     // Count holidays in month
     const monthStart = startOfMonth(new Date(selectedYear, selectedMonth));
     const monthEnd = endOfMonth(monthStart);
+    const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    
     const holidays = publicHolidays.filter(h => {
       const date = parseISO(h.date);
       return date >= monthStart && date <= monthEnd;
     }).length;
+
+    // Count leave days in month for the employee
+    leaveRecords.forEach(leave => {
+      const leaveStart = parseISO(leave.start_date);
+      const leaveEnd = parseISO(leave.end_date);
+      daysInMonth.forEach(day => {
+        const dayOfWeek = getDay(day);
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        if (!isWeekend && isWithinInterval(day, { start: leaveStart, end: leaveEnd })) {
+          onLeave++;
+        }
+      });
+    });
 
     monthAttendance.forEach(record => {
       const status = record.status?.toLowerCase() || '';
@@ -126,8 +158,8 @@ export function EmployeeAttendanceCalendar({
       }
     });
 
-    return { present, late, absent, holidays, missedPunch, appealed, undertime };
-  }, [monthAttendance, publicHolidays, selectedMonth, selectedYear]);
+    return { present, late, absent, holidays, missedPunch, appealed, undertime, onLeave };
+  }, [monthAttendance, publicHolidays, leaveRecords, selectedMonth, selectedYear]);
 
   // Generate calendar days
   const calendarDays = useMemo(() => {
@@ -149,14 +181,38 @@ export function EmployeeAttendanceCalendar({
     return publicHolidays.find(h => isSameDay(parseISO(h.date), date));
   };
 
+  // Check if date falls within any approved leave period
+  const getLeaveForDay = (date: Date) => {
+    return leaveRecords.find(l => 
+      isWithinInterval(date, { 
+        start: parseISO(l.start_date), 
+        end: parseISO(l.end_date) 
+      })
+    );
+  };
+
   const getDayStatus = (date: Date) => {
     const attendance = getAttendanceForDay(date);
     const holiday = getHolidayForDay(date);
+    const leave = getLeaveForDay(date);
     const dayOfWeek = getDay(date);
     const isSat = dayOfWeek === 6;
     const isSun = dayOfWeek === 0;
     
-    // Weekend - Dark Grey
+    // CHECK LEAVE FIRST - even on weekends (for continuous leave display)
+    if (leave) {
+      const leaveType = leave.leave_type?.toLowerCase() || '';
+      if (leaveType.includes('maternity')) {
+        return { type: 'maternity', label: 'Maternity Leave', color: 'bg-pink-500/20 border-pink-500', textColor: 'text-pink-500', pulse: false };
+      }
+      if (leaveType.includes('sick')) {
+        return { type: 'sick-leave', label: 'Sick Leave', color: 'bg-lime-500/20 border-lime-500', textColor: 'text-lime-600', pulse: false };
+      }
+      // Default to Vacation/Annual Leave
+      return { type: 'vacation-leave', label: 'Vacation Leave', color: 'bg-blue-500/20 border-blue-500', textColor: 'text-blue-500', pulse: false };
+    }
+    
+    // Weekend - Dark Grey (only if NOT on leave)
     if (isSat || isSun) {
       return { type: 'weekend', label: 'Weekend', color: 'bg-zinc-600 dark:bg-zinc-700', textColor: 'text-white', pulse: false };
     }
@@ -335,7 +391,13 @@ export function EmployeeAttendanceCalendar({
       const isWeekendDay = dayOfWeek === 0 || dayOfWeek === 6;
 
       // Cell background color
-      if (isWeekendDay) {
+      if (status.type === 'maternity') {
+        doc.setFillColor(252, 231, 243); // Pink light
+      } else if (status.type === 'vacation-leave') {
+        doc.setFillColor(219, 234, 254); // Blue light
+      } else if (status.type === 'sick-leave') {
+        doc.setFillColor(236, 252, 203); // Lime light
+      } else if (isWeekendDay) {
         doc.setFillColor(82, 82, 91); // Dark grey
       } else if (status.type === 'holiday') {
         doc.setFillColor(186, 230, 253); // Light blue
@@ -373,6 +435,9 @@ export function EmployeeAttendanceCalendar({
         else if (status.type === 'absent') doc.setTextColor(220, 38, 38);
         else if (status.type === 'missed-punch') doc.setTextColor(234, 88, 12);
         else if (status.type === 'holiday') doc.setTextColor(14, 165, 233);
+        else if (status.type === 'maternity') doc.setTextColor(236, 72, 153);
+        else if (status.type === 'vacation-leave') doc.setTextColor(59, 130, 246);
+        else if (status.type === 'sick-leave') doc.setTextColor(132, 204, 22);
         else doc.setTextColor(156, 163, 175);
         
         doc.text(status.label.substring(0, 15), cellX + 3, cellY + 12);
@@ -431,7 +496,7 @@ export function EmployeeAttendanceCalendar({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Present</p>
@@ -460,6 +525,12 @@ export function EmployeeAttendanceCalendar({
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Missed Punch</p>
             <p className="text-3xl font-bold text-orange-500">{stats.missedPunch}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">On Leave</p>
+            <p className="text-3xl font-bold text-blue-500">{stats.onLeave}</p>
           </CardContent>
         </Card>
       </div>
@@ -564,7 +635,19 @@ export function EmployeeAttendanceCalendar({
         </div>
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-full bg-zinc-600"></span>
-          <span>Weekend (Sat/Sun)</span>
+          <span>Weekend</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-pink-500"></span>
+          <span>Maternity</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+          <span>Vacation</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-lime-500"></span>
+          <span>Sick Leave</span>
         </div>
       </div>
 
