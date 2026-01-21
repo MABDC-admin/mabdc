@@ -79,11 +79,18 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
   const deleteLeave = useDeleteLeave();
   const employeeLeaveRecords = leaveRecords.filter(r => r.employee_id === currentEmployee?.id);
 
-  // Calculate total available leave from leave_balances table
-  const totalLeaveBalance = leaveBalances.reduce((acc, balance) => {
-    const available = (balance.entitled_days + balance.carried_forward_days) - balance.used_days - balance.pending_days;
-    return acc + Math.max(0, available);
-  }, 0);
+  // Calculate Annual Leave balance only (to match card view consistency)
+  const annualLeaveBalance = (() => {
+    const annualLeave = leaveBalances.find(lb => 
+      (lb as any).leave_types?.code === 'ANNUAL' || (lb as any).leave_types?.name === 'Annual Leave'
+    );
+    if (!annualLeave) return 0;
+    const available = (annualLeave.entitled_days || 0) + 
+                      (annualLeave.carried_forward_days || 0) - 
+                      (annualLeave.used_days || 0) - 
+                      (annualLeave.pending_days || 0);
+    return Math.max(0, available);
+  })();
 
   // Hooks for contracts
   const { data: contracts = [] } = useContracts();
@@ -501,9 +508,9 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                     </div>
                     <div className="space-y-4">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Leave Balance</p>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Leave Balance (Annual)</p>
                         <p className="text-lg font-semibold text-foreground">
-                          {leaveBalances.length > 0 ? `${totalLeaveBalance} days` : 'Not allocated'}
+                          {leaveBalances.length > 0 ? `${annualLeaveBalance} days` : 'Not allocated'}
                         </p>
                         {leaveBalances.length > 0 && (
                           <div className="mt-2 space-y-1">
@@ -947,8 +954,8 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Current balance</p>
-                      <p className="text-lg font-semibold text-foreground">{totalLeaveBalance} days</p>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Annual Leave Balance</p>
+                      <p className="text-lg font-semibold text-foreground">{annualLeaveBalance} days</p>
                     </div>
                   </div>
                   

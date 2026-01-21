@@ -98,12 +98,17 @@ export default function EmployeePortal() {
   const leaveRecords = allLeave.filter(l => l.employee_id === employeeId);
   const employeeContract = contracts.find(c => c.employee_id === employeeId && c.status === 'Active');
 
-  // Calculate total available leave from leave_balances table
-  const totalLeaveBalance = useMemo(() => {
-    return leaveBalances.reduce((acc, balance) => {
-      const available = (balance.entitled_days + balance.carried_forward_days) - balance.used_days - balance.pending_days;
-      return acc + Math.max(0, available);
-    }, 0);
+  // Calculate Annual Leave balance only (to match card view consistency)
+  const annualLeaveBalance = useMemo(() => {
+    const annualLeave = leaveBalances.find(lb => 
+      (lb as any).leave_types?.code === 'ANNUAL' || (lb as any).leave_types?.name === 'Annual Leave'
+    );
+    if (!annualLeave) return 0;
+    const available = (annualLeave.entitled_days || 0) + 
+                      (annualLeave.carried_forward_days || 0) - 
+                      (annualLeave.used_days || 0) - 
+                      (annualLeave.pending_days || 0);
+    return Math.max(0, available);
   }, [leaveBalances]);
 
   // Calculate probation status (6 months from joining date)
@@ -290,7 +295,7 @@ export default function EmployeePortal() {
                   </div>
                   <div className="flex-1">
                     <p className="text-4xl font-bold text-purple-600">
-                      {leaveBalances.length > 0 ? totalLeaveBalance : '0'}
+                      {leaveBalances.length > 0 ? annualLeaveBalance : '0'}
                     </p>
                     <p className="text-sm text-[#5d4a36] mt-1">Annual Leave Balance</p>
                   </div>
