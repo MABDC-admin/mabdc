@@ -601,8 +601,7 @@ export function LeaveView() {
                 <div className="flex-1 min-w-0">
                   <h3 className="text-xs font-semibold text-foreground">Automatic Leave Accrual</h3>
                   <p className="text-[10px] text-muted-foreground mt-0.5">
-                    Leave is automatically calculated based on employee tenure: <strong>2 days/month</strong> for the first 6 months, 
-                    then <strong>2.5 days/month</strong> after 6 months of service.
+                    Leave is automatically calculated at <strong>2.5 days/month</strong> from the employee's joining date.
                   </p>
                   <p className="text-[10px] text-muted-foreground mt-1">
                     Click "Auto Accrue" to process this month's accrual for all active employees.

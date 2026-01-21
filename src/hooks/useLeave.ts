@@ -234,10 +234,8 @@ export function useUpdateLeaveStatus() {
                                   (joining.getFullYear() * 12 + joining.getMonth());
               
               if (totalMonths > 0) {
-                // First 6 months: 2 days/month, after: 2.5 days/month
-                entitledDays = totalMonths <= 6 
-                  ? totalMonths * 2 
-                  : (6 * 2) + ((totalMonths - 6) * 2.5);
+                // Flat rate: 2.5 days/month from joining date
+                entitledDays = totalMonths * 2.5;
               }
             }
             
@@ -498,10 +496,8 @@ export function useAddLeave() {
                                   (joining.getFullYear() * 12 + joining.getMonth());
               
               if (totalMonths > 0) {
-                // First 6 months: 2 days/month, after: 2.5 days/month
-                entitledDays = totalMonths <= 6 
-                  ? totalMonths * 2 
-                  : (6 * 2) + ((totalMonths - 6) * 2.5);
+                // Flat rate: 2.5 days/month from joining date
+                entitledDays = totalMonths * 2.5;
               }
             }
             
