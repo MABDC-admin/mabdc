@@ -2,6 +2,14 @@ import { useState, useEffect } from 'react';
 
 export const themes = [
   {
+    name: 'Tropical Beach',
+    primary: '174 60% 42%',
+    accent: '38 85% 55%',
+    ring: '174 60% 42%',
+    sidebarBg: '180 30% 6%',
+    sidebarBgLight: '174 35% 96%',
+  },
+  {
     name: 'Purple Pink',
     primary: '262 83% 58%',
     accent: '339 90% 51%',
