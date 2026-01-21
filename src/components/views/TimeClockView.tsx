@@ -170,18 +170,27 @@ export default function TimeClockView() {
     return map;
   }, [attendance]);
 
-  // Convert database status to TimeClockStatus
+  // Convert database status to TimeClockStatus - returns array for compound statuses
   const dbStatusToTimeClock = (dbStatus: string | undefined): TimeClockStatus[] => {
     if (!dbStatus) return [];
     
+    // Handle compound statuses that need multiple flags
+    const compoundStatusMap: Record<string, TimeClockStatus[]> = {
+      'Late | Undertime': ['late_entry', 'early_out'],
+      'Miss Punch In | Undertime': ['miss_punch_in', 'early_out'],
+    };
+    
+    if (compoundStatusMap[dbStatus]) {
+      return compoundStatusMap[dbStatus];
+    }
+    
+    // Single status mapping
     const statusMap: Record<string, TimeClockStatus> = {
       'Present': 'on_time',
       'Late': 'late_entry',
       'Undertime': 'early_out',
-      'Late | Undertime': 'late_entry',
       'Missed Punch': 'miss_punch_in',
       'Miss Punch In': 'miss_punch_in',
-      'Miss Punch In | Undertime': 'miss_punch_in',
       'Appealed': 'appealed',
       'Absent': 'miss_punch_in',
       'Half Day': 'early_out',

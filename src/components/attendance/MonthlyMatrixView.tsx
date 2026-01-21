@@ -54,6 +54,9 @@ const STATUS_CONFIG = {
   HDA: { label: 'HDA', name: 'Half Day Absent', bg: 'bg-pink-400', text: 'text-pink-900', pdfBg: [244, 114, 182] },
   HDSL: { label: 'HDSL', name: 'Half Day Sick Leave', bg: 'bg-lime-400', text: 'text-lime-900', pdfBg: [163, 230, 53] },
   PH: { label: 'PH', name: 'Public Holiday', bg: 'bg-cyan-300', text: 'text-cyan-800', pdfBg: [103, 232, 249] },
+  AP: { label: 'AP', name: 'Appealed', bg: 'bg-cyan-400', text: 'text-cyan-900', pdfBg: [34, 211, 238] },
+  MP: { label: 'MP', name: 'Missed Punch', bg: 'bg-orange-500', text: 'text-white', pdfBg: [249, 115, 22] },
+  UT: { label: 'UT', name: 'Undertime', bg: 'bg-purple-400', text: 'text-purple-900', pdfBg: [192, 132, 252] },
   '-': { label: '-', name: 'No Record', bg: 'bg-gray-200', text: 'text-gray-600', pdfBg: [229, 231, 235] },
 } as const;
 
@@ -72,6 +75,9 @@ const LEGEND_ITEMS = [
   { code: 'W', color: 'bg-slate-200' },
   { code: 'DO', color: 'bg-purple-400', label: 'Day Off' },
   { code: 'H', color: 'bg-orange-400', label: 'Half Day' },
+  { code: 'AP', color: 'bg-cyan-400', label: 'Appealed' },
+  { code: 'MP', color: 'bg-orange-500', label: 'Missed Punch' },
+  { code: 'UT', color: 'bg-purple-400', label: 'Undertime' },
 ];
 
 export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
@@ -222,20 +228,38 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       return 'A'; // Absent if no record for past working day after system start
     }
 
-    // Map attendance status
+    // Map attendance status - check DB status FIRST before raw punch data
     const status = attendance.status?.toLowerCase() || '';
+    
+    // Appealed - Cyan
+    if (status === 'appealed') return 'AP';
+    
+    // Missed Punch statuses - Orange
+    if (status.includes('miss punch') || status === 'missed punch') return 'MP';
+    
+    // Undertime - Purple (but Late | Undertime should be Late)
+    if (status === 'undertime') return 'UT';
+    
+    // Late (includes Late | Undertime) - Yellow
+    if (status.includes('late')) return 'L';
+    
+    // Other statuses
     if (status === 'present') return 'P';
-    if (status === 'late' || status.includes('undertime')) return 'L';
     if (status === 'absent') return 'A';
     if (status === 'day off') return 'DO';
     if (status === 'sick leave') return 'SL';
-    if (status === 'vacation leave') return 'VL';
+    if (status === 'vacation leave' || status === 'on leave') return 'VL';
     if (status === 'holiday') return 'PH';
     if (status === 'spring break') return 'SB';
     if (status === 'winter break') return 'WB';
     if (status === 'half day absent') return 'HDA';
     if (status === 'half day sick leave') return 'HDSL';
+    if (status === 'half day') return 'H';
     if (status === 'no record') return '-';
+    
+    // Fallback: check raw punch data for missed punch
+    const isMissedPunch = (attendance.check_in && !attendance.check_out) || (!attendance.check_in && attendance.check_out);
+    if (isMissedPunch) return 'MP';
     
     return 'P';
   };
