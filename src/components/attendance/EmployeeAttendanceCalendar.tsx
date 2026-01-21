@@ -89,6 +89,8 @@ export function EmployeeAttendanceCalendar({
     let late = 0;
     let absent = 0;
     let missedPunch = 0;
+    let appealed = 0;
+    let undertime = 0;
 
     // Count holidays in month
     const monthStart = startOfMonth(new Date(selectedYear, selectedMonth));
@@ -99,17 +101,32 @@ export function EmployeeAttendanceCalendar({
     }).length;
 
     monthAttendance.forEach(record => {
-      if (record.status === 'Present') present++;
-      else if (record.status === 'Late' || record.status === 'Late | Undertime') late++;
-      else if (record.status === 'Absent') absent++;
+      const status = record.status?.toLowerCase() || '';
       
-      // Check for missed punch
-      if ((record.check_in && !record.check_out) || (!record.check_in && record.check_out)) {
+      // Check database status first
+      if (status === 'appealed') {
+        appealed++;
+      } else if (status.includes('miss punch') || status === 'missed punch') {
         missedPunch++;
+      } else if (status === 'undertime') {
+        undertime++;
+      } else if (status.includes('late')) {
+        late++;
+      } else if (status === 'present' || status === 'half day' || status === 'on leave') {
+        present++;
+      } else if (status === 'absent') {
+        absent++;
+      } else {
+        // Fallback: check raw punch data for missed punch
+        if ((record.check_in && !record.check_out) || (!record.check_in && record.check_out)) {
+          missedPunch++;
+        } else if (record.check_in) {
+          present++;
+        }
       }
     });
 
-    return { present, late, absent, holidays, missedPunch };
+    return { present, late, absent, holidays, missedPunch, appealed, undertime };
   }, [monthAttendance, publicHolidays, selectedMonth, selectedYear]);
 
   // Generate calendar days
@@ -153,25 +170,53 @@ export function EmployeeAttendanceCalendar({
       return { type: 'no-record', label: 'No record', color: 'bg-card', textColor: 'text-muted-foreground', pulse: false };
     }
 
-    // Missed Punch - Red Orange with pulse
-    const isMissedPunch = (attendance.check_in && !attendance.check_out) || (!attendance.check_in && attendance.check_out);
-    if (isMissedPunch) {
+    // Check database status FIRST before raw punch data
+    const status = attendance.status?.toLowerCase() || '';
+    
+    // Appealed - Cyan
+    if (status === 'appealed') {
+      return { type: 'appealed', label: 'Appealed', color: 'bg-cyan-400/30 border-cyan-400', textColor: 'text-cyan-500', pulse: false };
+    }
+    
+    // Missed Punch statuses - Orange with pulse
+    if (status.includes('miss punch') || status === 'missed punch') {
       return { type: 'missed-punch', label: 'Missed Punch', color: 'bg-orange-500/20 border-orange-500', textColor: 'text-orange-500', pulse: true };
     }
     
+    // Undertime - Purple
+    if (status === 'undertime') {
+      return { type: 'undertime', label: 'Undertime', color: 'bg-purple-500/20 border-purple-500', textColor: 'text-purple-500', pulse: false };
+    }
+    
+    // Late (includes Late | Undertime) - Yellow with pulse
+    if (status.includes('late')) {
+      return { type: 'late', label: attendance.status || 'Late', color: 'bg-yellow-500/20 border-yellow-500', textColor: 'text-yellow-500', pulse: true };
+    }
+    
+    // Half Day - Orange
+    if (status === 'half day') {
+      return { type: 'half-day', label: 'Half Day', color: 'bg-orange-400/20 border-orange-400', textColor: 'text-orange-400', pulse: false };
+    }
+    
+    // On Leave - Blue
+    if (status === 'on leave') {
+      return { type: 'leave', label: 'On Leave', color: 'bg-blue-500/20 border-blue-500', textColor: 'text-blue-500', pulse: false };
+    }
+    
     // Present - Green
-    if (attendance.status === 'Present') {
+    if (status === 'present') {
       return { type: 'present', label: 'Present', color: 'bg-green-500/20 border-green-500', textColor: 'text-green-500', pulse: false };
     }
     
-    // Late - Yellow with pulse
-    if (attendance.status === 'Late' || attendance.status === 'Late | Undertime') {
-      return { type: 'late', label: attendance.status, color: 'bg-yellow-500/20 border-yellow-500', textColor: 'text-yellow-500', pulse: true };
+    // Absent - Red
+    if (status === 'absent') {
+      return { type: 'absent', label: 'Absent', color: 'bg-red-500/20 border-red-500', textColor: 'text-red-500', pulse: false };
     }
     
-    // Absent - Red
-    if (attendance.status === 'Absent') {
-      return { type: 'absent', label: 'Absent', color: 'bg-red-500/20 border-red-500', textColor: 'text-red-500', pulse: false };
+    // Fallback: check raw punch data only if no recognized status
+    const isMissedPunch = (attendance.check_in && !attendance.check_out) || (!attendance.check_in && attendance.check_out);
+    if (isMissedPunch) {
+      return { type: 'missed-punch', label: 'Missed Punch', color: 'bg-orange-500/20 border-orange-500', textColor: 'text-orange-500', pulse: true };
     }
     
     return { type: 'present', label: attendance.status || 'Present', color: 'bg-green-500/20 border-green-500', textColor: 'text-green-500', pulse: false };

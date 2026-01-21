@@ -79,21 +79,53 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
       return { type: 'no-record', color: 'bg-muted', textColor: 'text-muted-foreground', label: '-' };
     }
 
-    const isMissedPunch = (attendance.check_in && !attendance.check_out) || (!attendance.check_in && attendance.check_out);
-    if (isMissedPunch) {
+    // Check database status FIRST before raw punch data
+    const status = attendance.status?.toLowerCase() || '';
+    
+    // Appealed - Cyan
+    if (status === 'appealed') {
+      return { type: 'appealed', color: 'bg-cyan-500/30', textColor: 'text-cyan-600', label: 'AP' };
+    }
+    
+    // Missed Punch statuses - Orange
+    if (status.includes('miss punch') || status === 'missed punch') {
       return { type: 'missed-punch', color: 'bg-orange-500/30', textColor: 'text-orange-600', label: 'M' };
     }
     
-    if (attendance.status === 'Present') {
-      return { type: 'present', color: 'bg-green-500/30', textColor: 'text-green-600', label: 'P' };
+    // Undertime - Purple
+    if (status === 'undertime') {
+      return { type: 'undertime', color: 'bg-purple-500/30', textColor: 'text-purple-600', label: 'U' };
     }
     
-    if (attendance.status === 'Late' || attendance.status === 'Late | Undertime') {
+    // Late (includes Late | Undertime) - Yellow
+    if (status.includes('late')) {
       return { type: 'late', color: 'bg-yellow-500/30', textColor: 'text-yellow-600', label: 'L' };
     }
     
-    if (attendance.status === 'Absent') {
+    // Half Day - Orange
+    if (status === 'half day') {
+      return { type: 'half-day', color: 'bg-orange-400/30', textColor: 'text-orange-500', label: 'HD' };
+    }
+    
+    // On Leave - Blue
+    if (status === 'on leave') {
+      return { type: 'leave', color: 'bg-blue-500/30', textColor: 'text-blue-600', label: 'LV' };
+    }
+    
+    // Present - Green
+    if (status === 'present') {
+      return { type: 'present', color: 'bg-green-500/30', textColor: 'text-green-600', label: 'P' };
+    }
+    
+    // Absent - Red
+    if (status === 'absent') {
       return { type: 'absent', color: 'bg-red-500/30', textColor: 'text-red-600', label: 'A' };
+    }
+    
+    // Fallback: check raw punch data only if no recognized status
+    const isMissedPunch = (attendance.check_in && !attendance.check_out) || (!attendance.check_in && attendance.check_out);
+    if (isMissedPunch) {
+      return { type: 'missed-punch', color: 'bg-orange-500/30', textColor: 'text-orange-600', label: 'M' };
     }
     
     return { type: 'present', color: 'bg-green-500/30', textColor: 'text-green-600', label: 'P' };
@@ -102,7 +134,7 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
   // Calculate summary for each employee
   const employeeSummaries = useMemo(() => {
     return employees.map(emp => {
-      let present = 0, late = 0, absent = 0, missedPunch = 0;
+      let present = 0, late = 0, absent = 0, missedPunch = 0, appealed = 0, undertime = 0;
       
       daysInMonth.forEach(day => {
         const status = getDayStatus(emp.id, day);
@@ -110,9 +142,13 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
         else if (status.type === 'late') late++;
         else if (status.type === 'absent') absent++;
         else if (status.type === 'missed-punch') missedPunch++;
+        else if (status.type === 'appealed') appealed++;
+        else if (status.type === 'undertime') undertime++;
+        else if (status.type === 'half-day') present++; // Count half day as present
+        else if (status.type === 'leave') present++; // Count leave as present for summary
       });
       
-      return { ...emp, present, late, absent, missedPunch };
+      return { ...emp, present, late, absent, missedPunch, appealed, undertime };
     });
   }, [employees, daysInMonth, allAttendance]);
 
@@ -339,6 +375,14 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
         <div className="flex items-center gap-2">
           <span className="w-6 h-6 rounded flex items-center justify-center bg-orange-500/30 text-orange-600 text-xs font-bold">M</span>
           <span>Missed Punch</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded flex items-center justify-center bg-cyan-500/30 text-cyan-600 text-xs font-bold">AP</span>
+          <span>Appealed</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded flex items-center justify-center bg-purple-500/30 text-purple-600 text-xs font-bold">U</span>
+          <span>Undertime</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-6 h-6 rounded flex items-center justify-center bg-zinc-600 text-white text-xs font-bold">W</span>
