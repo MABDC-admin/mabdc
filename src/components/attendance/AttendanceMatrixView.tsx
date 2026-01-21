@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Download, Grid3X3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay, isWithinInterval } from 'date-fns';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useQuery } from '@tanstack/react-query';
@@ -13,7 +13,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
-
 interface AttendanceMatrixViewProps {
   onBack: () => void;
 }
@@ -33,6 +32,19 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
       const { data, error } = await supabase
         .from('public_holidays')
         .select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch approved leave records
+  const { data: leaveRecords = [] } = useQuery({
+    queryKey: ['leave_records'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('leave_records')
+        .select('*')
+        .eq('status', 'Approved');
       if (error) throw error;
       return data;
     },
@@ -60,13 +72,38 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
     );
   };
 
+  const getLeaveForEmployeeDay = (employeeId: string, date: Date) => {
+    return leaveRecords.find(l => 
+      l.employee_id === employeeId && 
+      isWithinInterval(date, { 
+        start: parseISO(l.start_date), 
+        end: parseISO(l.end_date) 
+      })
+    );
+  };
+
   const getDayStatus = (employeeId: string, date: Date) => {
     const attendance = getAttendanceForEmployeeDay(employeeId, date);
     const holiday = getHolidayForDay(date);
+    const leave = getLeaveForEmployeeDay(employeeId, date);
     const dayOfWeek = getDay(date);
     const isSat = dayOfWeek === 6;
     const isSun = dayOfWeek === 0;
     
+    // CHECK LEAVE FIRST - before weekends! So leave shows on Sat/Sun too
+    if (leave) {
+      const leaveType = leave.leave_type?.toLowerCase() || '';
+      if (leaveType.includes('maternity')) {
+        return { type: 'maternity', color: 'bg-pink-500/30', textColor: 'text-pink-600', label: 'ML' };
+      }
+      if (leaveType.includes('sick')) {
+        return { type: 'sick-leave', color: 'bg-lime-500/30', textColor: 'text-lime-600', label: 'SL' };
+      }
+      // Default to vacation/annual leave
+      return { type: 'leave', color: 'bg-blue-500/30', textColor: 'text-blue-600', label: 'VL' };
+    }
+    
+    // Weekends (only if NOT on leave)
     if (isSat || isSun) {
       return { type: 'weekend', color: 'bg-zinc-600', textColor: 'text-white', label: 'W' };
     }
@@ -134,7 +171,7 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
   // Calculate summary for each employee
   const employeeSummaries = useMemo(() => {
     return employees.map(emp => {
-      let present = 0, late = 0, absent = 0, missedPunch = 0, appealed = 0, undertime = 0;
+      let present = 0, late = 0, absent = 0, missedPunch = 0, appealed = 0, undertime = 0, onLeave = 0;
       
       daysInMonth.forEach(day => {
         const status = getDayStatus(emp.id, day);
@@ -145,12 +182,12 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
         else if (status.type === 'appealed') appealed++;
         else if (status.type === 'undertime') undertime++;
         else if (status.type === 'half-day') present++; // Count half day as present
-        else if (status.type === 'leave') present++; // Count leave as present for summary
+        else if (status.type === 'leave' || status.type === 'maternity' || status.type === 'sick-leave') onLeave++;
       });
       
-      return { ...emp, present, late, absent, missedPunch, appealed, undertime };
+      return { ...emp, present, late, absent, missedPunch, appealed, undertime, onLeave };
     });
-  }, [employees, daysInMonth, allAttendance]);
+  }, [employees, daysInMonth, allAttendance, leaveRecords]);
 
   // PDF Generation
   const generateMatrixPDF = () => {
@@ -387,6 +424,18 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
         <div className="flex items-center gap-2">
           <span className="w-6 h-6 rounded flex items-center justify-center bg-zinc-600 text-white text-xs font-bold">W</span>
           <span>Weekend</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded flex items-center justify-center bg-blue-500/30 text-blue-600 text-xs font-bold">VL</span>
+          <span>Vacation Leave</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded flex items-center justify-center bg-pink-500/30 text-pink-600 text-xs font-bold">ML</span>
+          <span>Maternity Leave</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded flex items-center justify-center bg-lime-500/30 text-lime-600 text-xs font-bold">SL</span>
+          <span>Sick Leave</span>
         </div>
       </div>
 
