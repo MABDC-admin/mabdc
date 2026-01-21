@@ -143,12 +143,28 @@ export function useDeactivateEmployee() {
           .eq('user_id', employee.user_id)
           .eq('role', 'employee');
       }
+
+      // Archive all employee contracts
+      const { data: archivedContracts, error: contractsError } = await supabase
+        .from('contracts')
+        .update({ status: 'Terminated' })
+        .eq('employee_id', employeeId)
+        .in('status', ['Draft', 'Submitted', 'Approved', 'Active'])
+        .select('id');
+
+      if (contractsError) {
+        console.error('Failed to archive contracts:', contractsError);
+      }
+
+      return { archivedContractsCount: archivedContracts?.length || 0 };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       queryClient.invalidateQueries({ queryKey: ['deactivated-employees'] });
       queryClient.invalidateQueries({ queryKey: ['eos-records'] });
-      toast.success('Employee deactivated and EOS record created');
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      const contractMsg = data?.archivedContractsCount ? ` and ${data.archivedContractsCount} contract(s) archived` : '';
+      toast.success(`Employee deactivated, EOS record created${contractMsg}`);
     },
     onError: (error: Error) => {
       toast.error(`Failed to deactivate employee: ${error.message}`);
