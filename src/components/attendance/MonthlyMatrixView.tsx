@@ -179,12 +179,11 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     }
 
     const dayOfWeek = getDay(date);
-    const isFri = dayOfWeek === 5;
     const isSat = dayOfWeek === 6;
     const isSun = dayOfWeek === 0;
     
-    // Weekend (Friday, Saturday, Sunday based on reference)
-    if (isFri || isSat || isSun) {
+    // Weekend (Saturday and Sunday only)
+    if (isSat || isSun) {
       return 'W';
     }
     
@@ -211,7 +210,12 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     if (!attendance) {
       // Check if date is in future
       if (date > currentDate) return '-';
-      return 'A'; // Absent if no record for past working day
+      
+      // Show "-" for dates before January 20, 2026 (system start date)
+      const systemStartDate = new Date(2026, 0, 20);
+      if (date < systemStartDate) return '-';
+      
+      return 'A'; // Absent if no record for past working day after system start
     }
 
     // Map attendance status
@@ -596,7 +600,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
 
   const isWeekendDay = (date: Date) => {
     const day = getDay(date);
-    return day === 0 || day === 5 || day === 6; // Sun, Fri, Sat
+    return day === 0 || day === 6; // Sun, Sat only
   };
 
   const getInitials = (name: string) => {
