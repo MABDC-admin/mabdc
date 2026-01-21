@@ -335,13 +335,12 @@ export function useCheckOutByHRMS() {
         jobPosition: employee.job_position,
         checkInTime: attendance.check_in,
         checkOutTime,
-        status: newStatus,
-        isUndertime
+        status: newStatus
       };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
-      const undertimeText = data.isUndertime ? ' (Undertime)' : '';
+      const undertimeText = data.status?.includes('Undertime') ? ' (Undertime)' : '';
       toast.success(`${data.employeeName} checked out successfully${undertimeText}`);
     },
     onError: (error: Error) => {
@@ -499,13 +498,12 @@ export function useCheckOutById() {
         jobPosition: employee.job_position,
         checkInTime: attendance.check_in,
         checkOutTime,
-        status: newStatus,
-        isUndertime
+        status: newStatus
       };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
-      const undertimeText = data.isUndertime ? ' (Undertime)' : '';
+      const undertimeText = data.status?.includes('Undertime') ? ' (Undertime)' : '';
       toast.success(`${data.employeeName} checked out successfully${undertimeText}`);
     },
     onError: (error: Error) => {
