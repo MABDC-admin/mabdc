@@ -34,6 +34,12 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { HRAssistantChat } from '@/components/admin/HRAssistantChat';
 import { toast } from 'sonner';
 import { format, parseISO, differenceInDays, addMonths } from 'date-fns';
+import { useUpdateEmployee } from '@/hooks/useEmployees';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Edit } from 'lucide-react';
 
 interface Employee {
   id: string;
@@ -61,7 +67,15 @@ export default function EmployeeSelfServicePortal() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [showLeaveModal, setShowLeaveModal] = useState(false);
-    const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    personal_phone: '',
+    personal_email: '',
+    home_address: '',
+  });
+  
+  const updateEmployee = useUpdateEmployee();
 
   // Initialize push notifications for native app
   const { isSupported: isPushSupported, isRegistered: isPushRegistered, fcmToken } = useCapacitorNotifications({ autoInitialize: true });
@@ -230,6 +244,35 @@ export default function EmployeeSelfServicePortal() {
     await signOut();
     navigate('/employee-auth');
     toast.success('Signed out successfully');
+  };
+
+  const handleOpenEditProfile = () => {
+    setProfileForm({
+      personal_phone: (employee as any)?.personal_phone || '',
+      personal_email: (employee as any)?.personal_email || '',
+      home_address: (employee as any)?.home_address || '',
+    });
+    setIsEditingProfile(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!employee) return;
+    
+    try {
+      await updateEmployee.mutateAsync({
+        id: employee.id,
+        personal_phone: profileForm.personal_phone,
+        personal_email: profileForm.personal_email,
+        home_address: profileForm.home_address,
+      });
+      
+      // Update local state
+      setEmployee(prev => prev ? { ...prev, ...profileForm } as Employee : null);
+      setIsEditingProfile(false);
+      toast.success('Profile updated successfully');
+    } catch (error) {
+      toast.error('Failed to update profile');
+    }
   };
 
   if (authLoading || isLoading) {
@@ -420,13 +463,17 @@ export default function EmployeeSelfServicePortal() {
             <div className="grid md:grid-cols-2 gap-6">
               {/* Personal Info - Enhanced */}
               <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-card dark:to-muted/20 overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 border-b border-border/50">
+                <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 border-b border-border/50 flex flex-row items-center justify-between">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <div className="p-2 bg-primary/10 rounded-lg">
                       <User className="w-4 h-4 text-primary" />
                     </div>
                     Personal Information
                   </CardTitle>
+                  <Button variant="outline" size="sm" onClick={handleOpenEditProfile}>
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit
+                  </Button>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-4">
                   <InfoItem icon={User} label="HRMS No" value={employee.hrms_no} />
@@ -434,7 +481,10 @@ export default function EmployeeSelfServicePortal() {
                   <InfoItem icon={Briefcase} label="Position" value={employee.job_position} />
                   <InfoItem icon={Mail} label="Work Email" value={employee.work_email} />
                   <InfoItem icon={Phone} label="Work Phone" value={employee.work_phone} />
+                  <InfoItem icon={Phone} label="Personal Phone" value={(employee as any)?.personal_phone || 'Not set'} />
+                  <InfoItem icon={Mail} label="Personal Email" value={(employee as any)?.personal_email || 'Not set'} />
                   <InfoItem icon={MapPin} label="Nationality" value={employee.nationality || 'Not set'} />
+                  <InfoItem icon={MapPin} label="Home Address" value={(employee as any)?.home_address || 'Not set'} />
                   <InfoItem icon={Calendar} label="Joining Date" value={format(parseISO(employee.joining_date), 'dd MMM yyyy')} />
                 </CardContent>
               </Card>
@@ -1312,6 +1362,60 @@ export default function EmployeeSelfServicePortal() {
 
       {/* HR Assistant Chat - Floating */}
       <HRAssistantChat />
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={isEditingProfile} onOpenChange={setIsEditingProfile}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="w-5 h-5 text-primary" />
+              Edit Personal Information
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="personal_phone">Personal Phone</Label>
+              <Input
+                id="personal_phone"
+                placeholder="Enter your personal phone"
+                value={profileForm.personal_phone}
+                onChange={(e) => setProfileForm({ ...profileForm, personal_phone: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="personal_email">Personal Email</Label>
+              <Input
+                id="personal_email"
+                type="email"
+                placeholder="Enter your personal email"
+                value={profileForm.personal_email}
+                onChange={(e) => setProfileForm({ ...profileForm, personal_email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="home_address">Home Address</Label>
+              <Textarea
+                id="home_address"
+                placeholder="Enter your home address"
+                value={profileForm.home_address}
+                onChange={(e) => setProfileForm({ ...profileForm, home_address: e.target.value })}
+                rows={3}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
+              Note: Work email, department, position, and other HR-managed fields cannot be edited. Please contact HR for any changes.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditingProfile(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveProfile} disabled={updateEmployee.isPending}>
+              {updateEmployee.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
