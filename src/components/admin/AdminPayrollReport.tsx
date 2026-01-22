@@ -79,7 +79,7 @@ export function AdminPayrollReport() {
         employeeId: newPayroll.employeeId,
         month: newPayroll.month,
         basicSalary: newPayroll.basicSalary,
-        allowances: newPayroll.allowances,
+        otherAllowances: newPayroll.allowances,
         deductions: newPayroll.deductions,
       });
       setIsGenerateOpen(false);

@@ -1,15 +1,36 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+interface PayrollEarning {
+  id: string;
+  earning_type: string;
+  description?: string;
+  amount: number;
+}
+
+interface PayrollDeduction {
+  id: string;
+  deduction_type: string;
+  reason: string;
+  amount: number;
+  days?: number;
+}
+
 interface PayrollRecord {
   id: string;
   employee_id: string;
   month: string;
   basic_salary: number;
+  housing_allowance?: number;
+  transportation_allowance?: number;
+  ticket_allowance?: number;
+  other_allowances?: number;
   allowances: number;
   deductions: number;
+  deduction_reason?: string;
   net_salary: number;
   wps_processed: boolean;
+  created_at?: string;
   employees?: {
     full_name: string;
     hrms_no: string;
@@ -21,7 +42,11 @@ interface PayrollRecord {
     work_email?: string;
     joining_date?: string;
     contract_type?: string;
+    photo_url?: string;
   };
+  payroll_earnings?: PayrollEarning[];
+  payroll_deductions?: PayrollDeduction[];
+  ticket_allowance_status?: 'eligible' | 'not_eligible' | 'processed' | 'pending';
 }
 
 interface CompanySettings {
@@ -33,332 +58,435 @@ interface CompanySettings {
   country?: string;
   phone?: string;
   email?: string;
+  website?: string;
+  logo_url?: string;
   work_hours_per_day?: number;
+  currency?: string;
 }
+
+// Color palette
+const COLORS = {
+  primary: [45, 90, 69] as [number, number, number],
+  primaryLight: [240, 248, 243] as [number, number, number],
+  white: [255, 255, 255] as [number, number, number],
+  text: [60, 60, 60] as [number, number, number],
+  textLight: [120, 120, 120] as [number, number, number],
+  deduction: [220, 53, 53] as [number, number, number],
+  netPayBg: [45, 90, 69] as [number, number, number],
+  ticketIcon: [59, 130, 246] as [number, number, number],
+};
 
 export function generatePayslipPDF(record: PayrollRecord, settings?: CompanySettings | null) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 15;
   
+  // Company info
   const companyName = settings?.company_name || 'MABDC';
+  const companyNameArabic = settings?.company_name_arabic || '';
   const companyAddress = settings?.address || 'Al Salam St. Al Ferdous Tower';
   const companyCity = settings?.city || settings?.emirate || 'Abu Dhabi';
   const companyCountry = settings?.country || 'United Arab Emirates';
-  const workHours = settings?.work_hours_per_day || 8;
+  const companyPhone = settings?.phone || '';
+  const companyEmail = settings?.email || '';
+  const companyWebsite = settings?.website || '';
+  const currency = settings?.currency || 'AED';
   
   const monthData = formatMonthData(record.month);
   
-  // Header with curved design
-  doc.setFillColor(45, 90, 69); // Dark green
-  doc.rect(0, 0, pageWidth, 35, 'F');
+  // ============ HEADER SECTION ============
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(0, 0, pageWidth, 40, 'F');
   
-  // Curved accent
-  doc.setFillColor(230, 243, 236); // Light green
-  doc.ellipse(-20, 20, 60, 40, 'F');
-  
-  // Company logo placeholder (circle with initials)
-  doc.setFillColor(255, 255, 255);
-  doc.circle(25, 18, 12, 'F');
-  doc.setFillColor(45, 90, 69);
-  doc.setFontSize(8);
+  // Company logo/initials circle
+  doc.setFillColor(...COLORS.white);
+  doc.circle(margin + 12, 20, 10, 'F');
+  doc.setFillColor(...COLORS.primary);
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(45, 90, 69);
-  doc.text('M.A', 25, 16, { align: 'center' });
-  doc.setFontSize(5);
-  doc.text('BRAIN', 25, 20, { align: 'center' });
-  doc.text('DEV CENTER', 25, 23, { align: 'center' });
+  doc.setTextColor(...COLORS.primary);
+  doc.text('M.A', margin + 12, 18, { align: 'center' });
+  doc.setFontSize(4);
+  doc.text('BRAIN DEV', margin + 12, 22, { align: 'center' });
+  doc.text('CENTER', margin + 12, 25, { align: 'center' });
   
   // Company info on right
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(12);
+  doc.setTextColor(...COLORS.white);
+  doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(companyName.toUpperCase(), pageWidth - 15, 12, { align: 'right' });
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text(companyAddress, pageWidth - 15, 18, { align: 'right' });
-  doc.text(companyCity, pageWidth - 15, 23, { align: 'right' });
-  doc.text(companyCountry, pageWidth - 15, 28, { align: 'right' });
+  doc.text(companyName.toUpperCase(), pageWidth - margin, 12, { align: 'right' });
   
-  // Title
-  doc.setTextColor(45, 90, 69);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`Salary Slip - ${record.employees?.full_name || 'Employee'} - ${monthData.monthName} ${monthData.year}`, pageWidth / 2, 48, { align: 'center' });
-  
-  // Two column info boxes
-  const boxY = 55;
-  const boxHeight = 45;
-  const leftBoxWidth = 90;
-  const rightBoxWidth = 90;
-  const gap = 10;
-  
-  // Employee Information Box
-  doc.setFillColor(240, 248, 243);
-  doc.roundedRect(10, boxY, leftBoxWidth, boxHeight, 3, 3, 'F');
-  doc.setDrawColor(45, 90, 69);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(10, boxY, leftBoxWidth, boxHeight, 3, 3, 'S');
-  
-  // Header bar
-  doc.setFillColor(45, 90, 69);
-  doc.rect(10, boxY, leftBoxWidth, 8, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.text('EMPLOYEE INFORMATION', 55, boxY + 5.5, { align: 'center' });
-  
-  // Employee details
-  doc.setTextColor(60, 60, 60);
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'normal');
-  let infoY = boxY + 14;
-  const lineHeight = 5.5;
-  
-  doc.setFont('helvetica', 'bold');
-  doc.text('Name:', 14, infoY);
-  doc.setFont('helvetica', 'normal');
-  doc.text(record.employees?.full_name || 'N/A', 32, infoY);
-  
-  infoY += lineHeight;
-  doc.setFont('helvetica', 'bold');
-  doc.text('ID:', 14, infoY);
-  doc.setFont('helvetica', 'normal');
-  doc.text(record.employees?.hrms_no || 'N/A', 32, infoY);
-  
-  infoY += lineHeight;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Email:', 14, infoY);
-  doc.setFont('helvetica', 'normal');
-  doc.text(record.employees?.work_email || 'N/A', 32, infoY);
-  
-  infoY += lineHeight;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Job Position:', 14, infoY);
-  doc.setFont('helvetica', 'normal');
-  doc.text(record.employees?.job_position || 'N/A', 42, infoY);
-  
-  infoY += lineHeight;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Department:', 14, infoY);
-  doc.setFont('helvetica', 'normal');
-  doc.text(record.employees?.department || 'N/A', 42, infoY);
-  
-  // Other Information Box
-  doc.setFillColor(240, 248, 243);
-  doc.roundedRect(10 + leftBoxWidth + gap, boxY, rightBoxWidth, boxHeight, 3, 3, 'F');
-  doc.setDrawColor(45, 90, 69);
-  doc.roundedRect(10 + leftBoxWidth + gap, boxY, rightBoxWidth, boxHeight, 3, 3, 'S');
-  
-  // Header bar
-  doc.setFillColor(45, 90, 69);
-  doc.rect(10 + leftBoxWidth + gap, boxY, rightBoxWidth, 8, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.text('OTHER INFORMATION', 10 + leftBoxWidth + gap + rightBoxWidth / 2, boxY + 5.5, { align: 'center' });
-  
-  // Contract details
-  doc.setTextColor(60, 60, 60);
-  doc.setFontSize(7);
-  const rightX = 10 + leftBoxWidth + gap + 4;
-  let rightY = boxY + 14;
-  
-  doc.setFont('helvetica', 'bold');
-  doc.text('Contract Wage (Monthly):', rightX, rightY);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`${record.basic_salary?.toLocaleString()} AED`, rightX + 50, rightY);
-  
-  rightY += lineHeight;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Pay Period:', rightX, rightY);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`${monthData.startDate} - ${monthData.endDate}`, rightX + 50, rightY);
-  
-  rightY += lineHeight;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Computed On:', rightX, rightY);
-  doc.setFont('helvetica', 'normal');
-  doc.text(new Date().toLocaleDateString('en-GB'), rightX + 50, rightY);
-  
-  rightY += lineHeight;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Contract Type:', rightX, rightY);
-  doc.setFont('helvetica', 'normal');
-  doc.text(record.employees?.contract_type || 'Permanent', rightX + 50, rightY);
-  
-  rightY += lineHeight;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Working Schedule:', rightX, rightY);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`${workHours * 5}.0 Hours / Week`, rightX + 50, rightY);
-  
-  // Earnings Table
-  const earningsY = boxY + boxHeight + 10;
-  autoTable(doc, {
-    startY: earningsY,
-    head: [['EARNINGS', 'HOURS', 'DAYS', 'AMOUNT']],
-    body: [
-      ['Total', '0', '0', '0.00 AED']
-    ],
-    theme: 'grid',
-    headStyles: { 
-      fillColor: [45, 90, 69],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      fontSize: 8,
-      halign: 'center'
-    },
-    bodyStyles: {
-      fontSize: 8,
-      halign: 'center'
-    },
-    columnStyles: {
-      0: { cellWidth: 70, halign: 'left' },
-      1: { cellWidth: 40, halign: 'center' },
-      2: { cellWidth: 40, halign: 'center' },
-      3: { cellWidth: 40, halign: 'right' }
-    },
-    margin: { left: 10, right: 10 }
-  });
-  
-  // Salary Breakdown Table
-  const salaryY = (doc as any).lastAutoTable.finalY + 8;
-  
-  const grossSalary = (record.basic_salary || 0) + (record.allowances || 0);
-  
-  // Parse allowances (assuming housing and transport are roughly equal portions of allowances for display)
-  const housingAllowance = Math.round((record.allowances || 0) * 0.6);
-  const transportAllowance = Math.round((record.allowances || 0) * 0.3);
-  const otherAllowances = (record.allowances || 0) - housingAllowance - transportAllowance;
-  
-  autoTable(doc, {
-    startY: salaryY,
-    head: [['NAME', 'AMOUNT', 'QUANTITY', 'RATE', 'TOTAL']],
-    body: [
-      ['Basic Salary', '', '', '', `${record.basic_salary?.toLocaleString() || 0}.00 AED`],
-      ['Housing Allowance Input', '', '', '', `${housingAllowance.toLocaleString()}.00 AED`],
-      ['Transportation Allowance', '', '', '', `${transportAllowance.toLocaleString()}.00 AED`],
-      ['Other Allowances', '', '', '', `${otherAllowances.toLocaleString()}.00 AED`],
-    ],
-    theme: 'grid',
-    headStyles: { 
-      fillColor: [45, 90, 69],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      fontSize: 8
-    },
-    bodyStyles: {
-      fontSize: 8
-    },
-    columnStyles: {
-      0: { cellWidth: 70 },
-      1: { cellWidth: 30, halign: 'center' },
-      2: { cellWidth: 30, halign: 'center' },
-      3: { cellWidth: 30, halign: 'center' },
-      4: { cellWidth: 30, halign: 'right' }
-    },
-    margin: { left: 10, right: 10 }
-  });
-  
-  // Net Salary Row
-  const netY = (doc as any).lastAutoTable.finalY;
-  doc.setFillColor(240, 248, 243);
-  doc.rect(10, netY, pageWidth - 20, 10, 'F');
-  doc.setDrawColor(45, 90, 69);
-  doc.rect(10, netY, pageWidth - 20, 10, 'S');
-  
-  doc.setTextColor(220, 53, 53); // Red for Net Salary label
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Net Salary', 14, netY + 7);
-  
-  doc.setTextColor(45, 90, 69);
-  doc.text(`${record.net_salary?.toLocaleString() || 0}.00 AED`, pageWidth - 14, netY + 7, { align: 'right' });
-  
-  // Deductions note if any
-  if ((record.deductions || 0) > 0) {
-    doc.setFontSize(8);
-    doc.setTextColor(220, 53, 53);
-    doc.text(`(Deductions: -${record.deductions?.toLocaleString()} AED applied)`, pageWidth / 2, netY + 18, { align: 'center' });
+  if (companyNameArabic) {
+    doc.setFontSize(10);
+    doc.text(companyNameArabic, pageWidth - margin, 18, { align: 'right' });
   }
   
-  // Footer
-  const footerY = netY + 30;
-  doc.setTextColor(60, 60, 60);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'italic');
-  doc.text(`To pay on xxxxxxxxxxxxxxx of ${record.employees?.full_name}: ${record.net_salary?.toLocaleString()}.00 AED`, 10, footerY);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(companyAddress, pageWidth - margin, 24, { align: 'right' });
+  doc.text(`${companyCity}, ${companyCountry}`, pageWidth - margin, 29, { align: 'right' });
   
-  // WPS Compliance note
+  if (companyPhone || companyEmail) {
+    const contactInfo = [companyPhone, companyEmail].filter(Boolean).join(' | ');
+    doc.setFontSize(7);
+    doc.text(contactInfo, pageWidth - margin, 35, { align: 'right' });
+  }
+  
+  // ============ PAYSLIP TITLE ============
+  doc.setFillColor(...COLORS.primaryLight);
+  doc.rect(0, 40, pageWidth, 18, 'F');
+  
+  doc.setTextColor(...COLORS.primary);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PAYSLIP', pageWidth / 2, 50, { align: 'center' });
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Pay Period: ${monthData.startDate} - ${monthData.endDate}`, pageWidth / 2, 55, { align: 'center' });
+  
+  // Currency indicator
+  doc.setFontSize(8);
+  doc.setTextColor(...COLORS.textLight);
+  doc.text(`Currency: ${currency}`, pageWidth - margin, 50, { align: 'right' });
+  
+  // ============ EMPLOYEE & PAYMENT INFO (TWO COLUMNS) ============
+  const infoStartY = 65;
+  const colWidth = (pageWidth - margin * 3) / 2;
+  
+  // Left Column - Employee Information
+  doc.setFillColor(...COLORS.primaryLight);
+  doc.roundedRect(margin, infoStartY, colWidth, 50, 2, 2, 'F');
+  doc.setDrawColor(...COLORS.primary);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(margin, infoStartY, colWidth, 50, 2, 2, 'S');
+  
+  // Header bar
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(margin, infoStartY, colWidth, 8, 'F');
+  doc.setTextColor(...COLORS.white);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('EMPLOYEE INFORMATION', margin + colWidth / 2, infoStartY + 5.5, { align: 'center' });
+  
+  // Employee details
+  doc.setTextColor(...COLORS.text);
+  doc.setFontSize(8);
+  let leftY = infoStartY + 16;
+  const lineHeight = 7;
+  const leftLabelX = margin + 4;
+  const leftValueX = margin + 35;
+  
+  const drawInfoRow = (label: string, value: string, y: number, leftX: number, valueX: number) => {
+    doc.setFont('helvetica', 'bold');
+    doc.text(label, leftX, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(value || 'N/A', valueX, y);
+  };
+  
+  drawInfoRow('Name:', record.employees?.full_name || 'N/A', leftY, leftLabelX, leftValueX);
+  leftY += lineHeight;
+  drawInfoRow('Employee ID:', record.employees?.hrms_no || 'N/A', leftY, leftLabelX, leftValueX);
+  leftY += lineHeight;
+  drawInfoRow('Position:', record.employees?.job_position || 'N/A', leftY, leftLabelX, leftValueX);
+  leftY += lineHeight;
+  drawInfoRow('Department:', record.employees?.department || 'N/A', leftY, leftLabelX, leftValueX);
+  leftY += lineHeight;
+  
+  const joiningDate = record.employees?.joining_date 
+    ? new Date(record.employees.joining_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : 'N/A';
+  drawInfoRow('Joined:', joiningDate, leftY, leftLabelX, leftValueX);
+  
+  // Right Column - Payment Details
+  const rightX = margin * 2 + colWidth;
+  doc.setFillColor(...COLORS.primaryLight);
+  doc.roundedRect(rightX, infoStartY, colWidth, 50, 2, 2, 'F');
+  doc.setDrawColor(...COLORS.primary);
+  doc.roundedRect(rightX, infoStartY, colWidth, 50, 2, 2, 'S');
+  
+  // Header bar
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(rightX, infoStartY, colWidth, 8, 'F');
+  doc.setTextColor(...COLORS.white);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PAYMENT DETAILS', rightX + colWidth / 2, infoStartY + 5.5, { align: 'center' });
+  
+  // Payment details
+  doc.setTextColor(...COLORS.text);
+  let rightY = infoStartY + 16;
+  const rightLabelX = rightX + 4;
+  const rightValueX = rightX + 38;
+  
+  const payDate = record.created_at 
+    ? new Date(record.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  
+  drawInfoRow('Pay Date:', payDate, rightY, rightLabelX, rightValueX);
+  rightY += lineHeight;
+  drawInfoRow('Pay Period:', `${monthData.monthName} ${monthData.year}`, rightY, rightLabelX, rightValueX);
+  rightY += lineHeight;
+  
+  // WPS Status with color
+  doc.setFont('helvetica', 'bold');
+  doc.text('Status:', rightLabelX, rightY);
+  doc.setFont('helvetica', 'bold');
+  if (record.wps_processed) {
+    doc.setTextColor(...COLORS.primary);
+    doc.text('WPS Processed ✓', rightValueX, rightY);
+  } else {
+    doc.setTextColor(245, 158, 11);
+    doc.text('Pending', rightValueX, rightY);
+  }
+  
+  rightY += lineHeight;
+  doc.setTextColor(...COLORS.text);
+  drawInfoRow('Bank:', record.employees?.bank_name || 'Not specified', rightY, rightLabelX, rightValueX);
+  rightY += lineHeight;
+  
+  const ibanDisplay = record.employees?.iban 
+    ? `${record.employees.iban.substring(0, 8)}...` 
+    : 'N/A';
+  drawInfoRow('IBAN:', ibanDisplay, rightY, rightLabelX, rightValueX);
+  
+  // ============ EARNINGS TABLE ============
+  const earningsStartY = infoStartY + 58;
+  
+  // Get itemized earnings or calculate from record
+  const earnings = getEarningsBreakdown(record);
+  const grossEarnings = earnings.reduce((sum, e) => sum + e.amount, 0);
+  
+  const earningsBody: (string | { content: string; styles?: Record<string, unknown> })[][] = earnings.map(e => [
+    e.label,
+    formatCurrency(e.amount, currency)
+  ]);
+  
+  autoTable(doc, {
+    startY: earningsStartY,
+    head: [['EARNINGS', 'AMOUNT']],
+    body: earningsBody,
+    foot: [['GROSS EARNINGS', formatCurrency(grossEarnings, currency)]],
+    theme: 'grid',
+    headStyles: { 
+      fillColor: COLORS.primary,
+      textColor: COLORS.white,
+      fontStyle: 'bold',
+      fontSize: 9,
+      halign: 'left'
+    },
+    footStyles: {
+      fillColor: COLORS.primaryLight,
+      textColor: COLORS.primary,
+      fontStyle: 'bold',
+      fontSize: 9,
+    },
+    bodyStyles: {
+      fontSize: 9,
+      textColor: COLORS.text,
+    },
+    columnStyles: {
+      0: { cellWidth: pageWidth - margin * 2 - 50, halign: 'left' },
+      1: { cellWidth: 50, halign: 'right' }
+    },
+    margin: { left: margin, right: margin },
+  });
+  
+  // ============ DEDUCTIONS TABLE ============
+  const deductionsStartY = (doc as any).lastAutoTable.finalY + 5;
+  
+  const deductions = getDeductionsBreakdown(record);
+  const totalDeductions = deductions.reduce((sum, d) => sum + d.amount, 0);
+  
+  if (deductions.length > 0 || record.deductions > 0) {
+    const deductionsBody: string[][] = deductions.length > 0 
+      ? deductions.map(d => [
+          d.label + (d.days ? ` (${d.days} day${d.days > 1 ? 's' : ''})` : ''),
+          `-${formatCurrency(d.amount, currency)}`
+        ])
+      : [[
+          record.deduction_reason || 'Deductions',
+          `-${formatCurrency(record.deductions, currency)}`
+        ]];
+    
+    autoTable(doc, {
+      startY: deductionsStartY,
+      head: [['DEDUCTIONS', 'AMOUNT']],
+      body: deductionsBody,
+      foot: [['TOTAL DEDUCTIONS', `-${formatCurrency(totalDeductions > 0 ? totalDeductions : record.deductions, currency)}`]],
+      theme: 'grid',
+      headStyles: { 
+        fillColor: COLORS.primary,
+        textColor: COLORS.white,
+        fontStyle: 'bold',
+        fontSize: 9,
+        halign: 'left'
+      },
+      footStyles: {
+        fillColor: COLORS.primaryLight,
+        textColor: COLORS.deduction,
+        fontStyle: 'bold',
+        fontSize: 9,
+      },
+      bodyStyles: {
+        fontSize: 9,
+        textColor: COLORS.deduction,
+      },
+      columnStyles: {
+        0: { cellWidth: pageWidth - margin * 2 - 50, halign: 'left', textColor: COLORS.text },
+        1: { cellWidth: 50, halign: 'right' }
+      },
+      margin: { left: margin, right: margin },
+    });
+  }
+  
+  // ============ NET PAY SECTION ============
+  const netPayY = (doc as any).lastAutoTable.finalY + 8;
+  
+  // Net pay box with prominent styling
+  doc.setFillColor(...COLORS.netPayBg);
+  doc.roundedRect(margin, netPayY, pageWidth - margin * 2, 16, 3, 3, 'F');
+  
+  doc.setTextColor(...COLORS.white);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('NET PAY', margin + 8, netPayY + 10);
+  
+  doc.setFontSize(14);
+  doc.text(`${currency} ${record.net_salary?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - margin - 8, netPayY + 10, { align: 'right' });
+  
+  // ============ TICKET ALLOWANCE STATUS ============
+  const ticketStatusY = netPayY + 24;
+  
+  if (record.ticket_allowance_status) {
+    doc.setFillColor(240, 249, 255);
+    doc.roundedRect(margin, ticketStatusY, pageWidth - margin * 2, 12, 2, 2, 'F');
+    doc.setDrawColor(...COLORS.ticketIcon);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(margin, ticketStatusY, pageWidth - margin * 2, 12, 2, 2, 'S');
+    
+    doc.setFontSize(8);
+    doc.setTextColor(...COLORS.ticketIcon);
+    doc.setFont('helvetica', 'bold');
+    doc.text('✈', margin + 6, ticketStatusY + 7.5);
+    doc.text('Ticket Allowance Status:', margin + 12, ticketStatusY + 7.5);
+    
+    let statusText = '';
+    switch (record.ticket_allowance_status) {
+      case 'processed':
+        statusText = 'PROCESSED IN THIS PAYSLIP';
+        doc.setTextColor(...COLORS.primary);
+        break;
+      case 'eligible':
+        statusText = 'ELIGIBLE - PENDING APPROVAL';
+        doc.setTextColor(245, 158, 11);
+        break;
+      case 'pending':
+        statusText = 'PENDING PROCESSING';
+        doc.setTextColor(245, 158, 11);
+        break;
+      default:
+        statusText = 'NOT YET ELIGIBLE';
+        doc.setTextColor(...COLORS.textLight);
+    }
+    doc.text(statusText, margin + 58, ticketStatusY + 7.5);
+  }
+  
+  // ============ FOOTER ============
+  const footerY = pageHeight - 25;
+  
+  // Divider line
+  doc.setDrawColor(...COLORS.textLight);
+  doc.setLineWidth(0.2);
+  doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
+  
+  // Disclaimer
   doc.setFontSize(7);
-  doc.setTextColor(150, 150, 150);
-  doc.text('This is a computer-generated payslip. UAE WPS Compliant.', pageWidth / 2, pageHeight - 10, { align: 'center' });
+  doc.setTextColor(...COLORS.textLight);
+  doc.setFont('helvetica', 'italic');
+  doc.text('This is a system-generated payslip. No signature required.', pageWidth / 2, footerY, { align: 'center' });
+  doc.text('Confidential - For employee use only', pageWidth / 2, footerY + 4, { align: 'center' });
+  
+  // WPS compliance and timestamp
+  doc.setFont('helvetica', 'normal');
+  doc.text('UAE WPS Compliant', margin, footerY + 10);
+  doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, pageWidth - margin, footerY + 10, { align: 'right' });
   
   // Save
-  doc.save(`payslip-${record.employees?.hrms_no}-${record.month}.pdf`);
+  const fileName = `payslip-${record.employees?.hrms_no || 'employee'}-${record.month}.pdf`;
+  doc.save(fileName);
 }
 
 export function generateBulkPayrollPDF(records: PayrollRecord[], month: string, settings?: CompanySettings | null) {
   const doc = new jsPDF('landscape');
   const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 15;
   
   const companyName = settings?.company_name || 'MABDC';
+  const currency = settings?.currency || 'AED';
   const monthData = formatMonthData(month);
   
   // Header
-  doc.setFillColor(45, 90, 69);
-  doc.rect(0, 0, pageWidth, 30, 'F');
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(0, 0, pageWidth, 28, 'F');
   
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
+  doc.setTextColor(...COLORS.white);
+  doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(`${companyName} - Monthly Payroll Report`, 20, 18);
+  doc.text(`${companyName} - Monthly Payroll Report`, margin, 16);
   
-  doc.setFontSize(12);
-  doc.text(`${monthData.monthName} ${monthData.year}`, pageWidth - 20, 18, { align: 'right' });
+  doc.setFontSize(11);
+  doc.text(`${monthData.monthName} ${monthData.year}`, pageWidth - margin, 16, { align: 'right' });
   
   // Summary Stats
-  doc.setTextColor(60, 60, 60);
-  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.text);
+  doc.setFontSize(9);
   const totalBasic = records.reduce((sum, r) => sum + (r.basic_salary || 0), 0);
   const totalAllowances = records.reduce((sum, r) => sum + (r.allowances || 0), 0);
   const totalDeductions = records.reduce((sum, r) => sum + (r.deductions || 0), 0);
   const totalNet = records.reduce((sum, r) => sum + (r.net_salary || 0), 0);
   const paidCount = records.filter(r => r.wps_processed).length;
   
-  doc.text(`Total Employees: ${records.length}  |  Paid: ${paidCount}  |  Pending: ${records.length - paidCount}`, 20, 40);
+  doc.text(`Total Employees: ${records.length}  |  Paid: ${paidCount}  |  Pending: ${records.length - paidCount}  |  Total Net: ${currency} ${totalNet.toLocaleString()}`, margin, 38);
   
   // Table
-  const tableData = records.map(r => [
+  const tableData: (string | { content: string; styles?: Record<string, unknown> })[][] = records.map(r => [
     r.employees?.hrms_no || '',
     r.employees?.full_name || '',
     r.employees?.department || '',
-    `${r.basic_salary?.toLocaleString() || 0} AED`,
-    `${r.allowances?.toLocaleString() || 0} AED`,
-    `${r.deductions?.toLocaleString() || 0} AED`,
-    `${r.net_salary?.toLocaleString() || 0} AED`,
+    formatCurrency(r.basic_salary, currency),
+    formatCurrency(r.allowances, currency),
+    formatCurrency(r.deductions, currency),
+    formatCurrency(r.net_salary, currency),
     r.wps_processed ? 'Paid' : 'Pending',
     r.employees?.bank_name || '-'
   ]);
   
-  // Add totals row
-  tableData.push([
-    '', 'TOTAL', '',
-    `${totalBasic.toLocaleString()} AED`,
-    `${totalAllowances.toLocaleString()} AED`,
-    `${totalDeductions.toLocaleString()} AED`,
-    `${totalNet.toLocaleString()} AED`,
-    '', ''
-  ]);
-  
   autoTable(doc, {
-    startY: 48,
+    startY: 45,
     head: [['HRMS', 'Employee Name', 'Department', 'Basic Salary', 'Allowances', 'Deductions', 'Net Salary', 'Status', 'Bank']],
     body: tableData,
+    foot: [[
+      '', 
+      'TOTAL',
+      '',
+      formatCurrency(totalBasic, currency),
+      formatCurrency(totalAllowances, currency),
+      formatCurrency(totalDeductions, currency),
+      formatCurrency(totalNet, currency),
+      '', ''
+    ]],
     theme: 'grid',
     headStyles: { 
-      fillColor: [45, 90, 69],
-      textColor: [255, 255, 255],
+      fillColor: COLORS.primary,
+      textColor: COLORS.white,
+      fontStyle: 'bold',
+      fontSize: 8
+    },
+    footStyles: {
+      fillColor: COLORS.primaryLight,
+      textColor: COLORS.primary,
       fontStyle: 'bold',
       fontSize: 8
     },
@@ -376,17 +504,12 @@ export function generateBulkPayrollPDF(records: PayrollRecord[], month: string, 
       7: { cellWidth: 22, halign: 'center' },
       8: { cellWidth: 35 }
     },
-    margin: { left: 10, right: 10 },
+    margin: { left: margin, right: margin },
     didParseCell: function(data) {
-      // Style the totals row
-      if (data.row.index === tableData.length - 1) {
-        data.cell.styles.fontStyle = 'bold';
-        data.cell.styles.fillColor = [240, 248, 243];
-      }
       // Style status column
-      if (data.column.index === 7 && data.row.index < tableData.length - 1) {
+      if (data.column.index === 7 && data.section === 'body') {
         if (data.cell.raw === 'Paid') {
-          data.cell.styles.textColor = [45, 90, 69];
+          data.cell.styles.textColor = COLORS.primary;
         } else {
           data.cell.styles.textColor = [245, 158, 11];
         }
@@ -395,16 +518,17 @@ export function generateBulkPayrollPDF(records: PayrollRecord[], month: string, 
   });
   
   // Footer
-  const finalY = (doc as any).lastAutoTable.finalY + 15;
-  doc.setFontSize(8);
-  doc.setTextColor(150, 150, 150);
-  doc.text(`Generated: ${new Date().toLocaleString()}`, 10, finalY);
-  doc.text('UAE WPS Compliant Report', pageWidth - 10, finalY, { align: 'right' });
+  const finalY = (doc as any).lastAutoTable.finalY + 12;
+  doc.setFontSize(7);
+  doc.setTextColor(...COLORS.textLight);
+  doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, margin, finalY);
+  doc.text('UAE WPS Compliant Report | Confidential', pageWidth - margin, finalY, { align: 'right' });
   
   // Save
   doc.save(`payroll-report-${month}.pdf`);
 }
 
+// Helper functions
 function formatMonthData(month: string) {
   const [year, monthNum] = month.split('-');
   const date = new Date(parseInt(year), parseInt(monthNum) - 1);
@@ -414,7 +538,109 @@ function formatMonthData(month: string) {
     year,
     monthNum,
     monthName: date.toLocaleDateString('en-US', { month: 'long' }),
-    startDate: `${monthNum}/01/${year}`,
-    endDate: `${monthNum}/${lastDay}/${year}`
+    startDate: `01 ${date.toLocaleDateString('en-US', { month: 'short' })} ${year}`,
+    endDate: `${lastDay} ${date.toLocaleDateString('en-US', { month: 'short' })} ${year}`
   };
+}
+
+function formatCurrency(amount: number, currency: string = 'AED'): string {
+  return `${currency} ${(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function getEarningsBreakdown(record: PayrollRecord): Array<{ label: string; amount: number }> {
+  // If we have itemized earnings from the database, use those
+  if (record.payroll_earnings && record.payroll_earnings.length > 0) {
+    return record.payroll_earnings.map(e => ({
+      label: formatEarningLabel(e.earning_type),
+      amount: e.amount
+    }));
+  }
+  
+  // Otherwise, use the stored breakdown or calculate from totals
+  const earnings: Array<{ label: string; amount: number }> = [];
+  
+  if (record.basic_salary > 0) {
+    earnings.push({ label: 'Basic Salary', amount: record.basic_salary });
+  }
+  
+  if (record.housing_allowance && record.housing_allowance > 0) {
+    earnings.push({ label: 'Housing Rental Allowance', amount: record.housing_allowance });
+  }
+  
+  if (record.transportation_allowance && record.transportation_allowance > 0) {
+    earnings.push({ label: 'Transportation Allowance', amount: record.transportation_allowance });
+  }
+  
+  if (record.ticket_allowance && record.ticket_allowance > 0) {
+    earnings.push({ label: '✈️ Ticket Allowance', amount: record.ticket_allowance });
+  }
+  
+  if (record.other_allowances && record.other_allowances > 0) {
+    earnings.push({ label: 'Other Allowances', amount: record.other_allowances });
+  }
+  
+  // If no breakdown available, estimate from totals
+  if (earnings.length === 0 || (earnings.length === 1 && record.allowances > 0)) {
+    const basicSalary = record.basic_salary || 0;
+    const allowances = record.allowances || 0;
+    
+    earnings.length = 0; // Clear
+    earnings.push({ label: 'Basic Salary', amount: basicSalary });
+    
+    if (allowances > 0) {
+      // Estimate typical UAE breakdown: 60% housing, 25% transport, 15% other
+      const housing = Math.round(allowances * 0.60);
+      const transport = Math.round(allowances * 0.25);
+      const other = allowances - housing - transport;
+      
+      if (housing > 0) earnings.push({ label: 'Housing Rental Allowance', amount: housing });
+      if (transport > 0) earnings.push({ label: 'Transportation Allowance', amount: transport });
+      if (other > 0) earnings.push({ label: 'Other Allowances', amount: other });
+    }
+  }
+  
+  return earnings;
+}
+
+function getDeductionsBreakdown(record: PayrollRecord): Array<{ label: string; amount: number; days?: number }> {
+  // If we have itemized deductions from the database, use those
+  if (record.payroll_deductions && record.payroll_deductions.length > 0) {
+    return record.payroll_deductions.map(d => ({
+      label: d.reason || formatDeductionLabel(d.deduction_type),
+      amount: d.amount,
+      days: d.days
+    }));
+  }
+  
+  // If there's a deduction with reason, use that
+  if (record.deductions > 0 && record.deduction_reason) {
+    return [{
+      label: record.deduction_reason,
+      amount: record.deductions
+    }];
+  }
+  
+  return [];
+}
+
+function formatEarningLabel(type: string): string {
+  const labels: Record<string, string> = {
+    'basic_salary': 'Basic Salary',
+    'housing_allowance': 'Housing Rental Allowance',
+    'transport_allowance': 'Transportation Allowance',
+    'transportation_allowance': 'Transportation Allowance',
+    'ticket_allowance': '✈️ Ticket Allowance',
+    'other_allowances': 'Other Allowances',
+    'other': 'Other Allowances',
+  };
+  return labels[type] || type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function formatDeductionLabel(type: string): string {
+  const labels: Record<string, string> = {
+    'lop': 'Loss of Pay',
+    'custom': 'Deduction',
+    'absence': 'Absence Deduction',
+  };
+  return labels[type] || type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }

@@ -123,15 +123,18 @@ export function PayrollView() {
   const handleGeneratePayroll = async () => {
     if (!newPayroll.employeeId) return;
     const ticketAmount = newPayroll.includeTicketAllowance ? newPayroll.ticketAllowance : 0;
-    const totalAllowances = newPayroll.housingAllowance + newPayroll.transportAllowance + newPayroll.otherAllowances + ticketAmount;
     
     try {
       await generatePayroll.mutateAsync({
         employeeId: newPayroll.employeeId,
         month: newPayroll.month,
         basicSalary: newPayroll.basicSalary,
-        allowances: totalAllowances,
+        housingAllowance: newPayroll.housingAllowance,
+        transportationAllowance: newPayroll.transportAllowance,
+        ticketAllowance: ticketAmount,
+        otherAllowances: newPayroll.otherAllowances,
         deductions: newPayroll.deductions,
+        deductionReason: newPayroll.deductionReason,
       });
       setIsGenerateOpen(false);
       setNewPayroll({
@@ -167,15 +170,17 @@ export function PayrollView() {
       const housingAllowance = contract?.housing_allowance || 0;
       const transportAllowance = contract?.transportation_allowance || 0;
       const otherAllowances = emp.allowance || 0;
-      const totalAllowances = housingAllowance + transportAllowance + otherAllowances;
 
       try {
         await generatePayroll.mutateAsync({
           employeeId: emp.id,
           month: selectedMonth,
           basicSalary,
-          allowances: totalAllowances,
-          deductions: 0, // Default to 0, user can edit later
+          housingAllowance,
+          transportationAllowance: transportAllowance,
+          otherAllowances,
+          deductions: 0,
+          deductionReason: '',
         });
         successCount++;
       } catch (error) {

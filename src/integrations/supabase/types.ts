@@ -1654,39 +1654,54 @@ export type Database = {
           allowances: number | null
           basic_salary: number
           created_at: string
+          deduction_reason: string | null
           deductions: number | null
           employee_id: string
+          housing_allowance: number | null
           id: string
           lop_days: number | null
           lop_deduction: number | null
           month: string
           net_salary: number
+          other_allowances: number | null
+          ticket_allowance: number | null
+          transportation_allowance: number | null
           wps_processed: boolean | null
         }
         Insert: {
           allowances?: number | null
           basic_salary: number
           created_at?: string
+          deduction_reason?: string | null
           deductions?: number | null
           employee_id: string
+          housing_allowance?: number | null
           id?: string
           lop_days?: number | null
           lop_deduction?: number | null
           month: string
           net_salary: number
+          other_allowances?: number | null
+          ticket_allowance?: number | null
+          transportation_allowance?: number | null
           wps_processed?: boolean | null
         }
         Update: {
           allowances?: number | null
           basic_salary?: number
           created_at?: string
+          deduction_reason?: string | null
           deductions?: number | null
           employee_id?: string
+          housing_allowance?: number | null
           id?: string
           lop_days?: number | null
           lop_deduction?: number | null
           month?: string
           net_salary?: number
+          other_allowances?: number | null
+          ticket_allowance?: number | null
+          transportation_allowance?: number | null
           wps_processed?: boolean | null
         }
         Relationships: [
