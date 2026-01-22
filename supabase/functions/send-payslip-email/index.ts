@@ -11,6 +11,7 @@ interface PayslipEmailRequest {
   employeeName: string;
   employeeEmail: string;
   employeeId?: string;
+  employeeHrmsNo?: string;
   month: string;
   pdfBase64: string;
   companyName?: string;
@@ -37,10 +38,11 @@ const handler = async (req: Request): Promise<Response> => {
     const {
       employeeName,
       employeeId,
+      employeeHrmsNo,
       month,
       pdfBase64,
       companyName = "M.A Brain Development Center",
-      hrManagerName = "HR Department",
+      hrManagerName = "Myranel D. Plaza",
       hrManagerTitle = "Human Resource Manager",
     } = requestData;
 
@@ -77,8 +79,10 @@ const handler = async (req: Request): Promise<Response> => {
     const firstName = nameParts[0];
     const filename = `Payslip-${employeeName.replace(/\s+/g, '-')}-${month.replace(/\s+/g, '-')}.pdf`;
 
-    // Convert base64 to Uint8Array
-    const pdfBuffer = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
+    // Password hint - show first 2 chars and last char
+    const passwordHint = employeeHrmsNo 
+      ? `${employeeHrmsNo.substring(0, 2)}**${employeeHrmsNo.slice(-1)}`
+      : 'Your HRMS Number';
 
     const emailHtml = `
       <!DOCTYPE html>
@@ -111,6 +115,22 @@ const handler = async (req: Request): Promise<Response> => {
           .header p { margin: 8px 0 0 0; opacity: 0.9; font-size: 14px; }
           .content { padding: 40px 30px; }
           .content p { margin: 0 0 20px 0; font-size: 15px; }
+          .password-notice {
+            background: #dbeafe;
+            border: 1px solid #3b82f6;
+            border-radius: 6px;
+            padding: 15px 20px;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #1e40af;
+          }
+          .password-notice strong {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
           .confidential {
             background: #fff8e1;
             border-left: 4px solid #f59e0b;
@@ -152,10 +172,15 @@ const handler = async (req: Request): Promise<Response> => {
             <p>Dear ${firstName},</p>
             <p>Please find the attached payslip for the month of <strong>${month}</strong>.</p>
             <div class="attachment-notice">
-              📎 Attachment: ${filename}
+              Attachment: ${filename}
+            </div>
+            <div class="password-notice">
+              <strong>PDF Password Required</strong>
+              The attached payslip is password-protected for your security.<br>
+              <strong>Password:</strong> Your HRMS Number (${passwordHint})
             </div>
             <div class="confidential">
-              <strong>⚠️ Confidentiality Notice:</strong><br>
+              <strong>Confidentiality Notice:</strong><br>
               Please note that the details of your salary are strictly confidential and must not be shared with anyone within the company.
             </div>
             <div class="signature">
@@ -167,7 +192,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
           <div class="footer">
             <p>This is a system-generated email. Please do not reply directly to this message.</p>
-            <p>© ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
+            <p>${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -177,6 +202,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Get the from email - use SMTP_FROM_EMAIL if set, otherwise use Resend's test domain
     const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "onboarding@resend.dev";
 
+    // Pass base64 string directly - Resend SDK handles the conversion
     const emailResponse = await resend.emails.send({
       from: `${companyName} <${fromEmail}>`,
       to: [employeeEmail],
@@ -185,7 +211,7 @@ const handler = async (req: Request): Promise<Response> => {
       attachments: [
         {
           filename: filename,
-          content: pdfBuffer,
+          content: pdfBase64,
         },
       ],
     });

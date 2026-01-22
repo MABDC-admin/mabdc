@@ -77,21 +77,42 @@ const COLORS = {
 };
 
 export async function generatePayslipPDF(record: PayrollRecord, settings?: CompanySettings | null, returnDoc: boolean = false, skipLogo: boolean = false): Promise<jsPDF | void> {
-  const doc = new jsPDF({ compress: true });
+  // Employee's HRMS number as password for security
+  const userPassword = record.employees?.hrms_no || 'payslip';
+  
+  const doc = new jsPDF({ 
+    compress: true,
+    encryption: {
+      userPassword: userPassword,
+      ownerPassword: 'MABDC_HR_2024_ADMIN',
+      userPermissions: ['print'] // Only allow printing, no copy/edit
+    }
+  });
+  
+  // Set document metadata for audit trail
+  const companyName = settings?.company_name || 'MABDC';
+  const employeeName = record.employees?.full_name || 'Employee';
+  const monthData = formatMonthData(record.month);
+  
+  doc.setProperties({
+    title: `Payslip - ${employeeName} - ${monthData.monthName} ${monthData.year}`,
+    subject: 'Monthly Payslip - Confidential',
+    author: companyName,
+    keywords: 'payslip, confidential, salary',
+    creator: 'MABDC HRMS'
+  });
+  
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
   
-  // Company info
-  const companyName = settings?.company_name || 'MABDC';
+  // Company info (use already declared companyName)
   const companyAddress = settings?.address || 'Al Salam St. Al Ferdous Tower';
   const companyCity = settings?.city || settings?.emirate || 'Abu Dhabi';
   const companyCountry = settings?.country || 'United Arab Emirates';
   const companyPhone = settings?.phone || '';
   const companyEmail = settings?.email || '';
   const currency = settings?.currency || 'AED';
-  
-  const monthData = formatMonthData(record.month);
   
   // ============ HEADER SECTION ============
   doc.setFillColor(...COLORS.primary);
@@ -413,6 +434,25 @@ export async function generatePayslipPDF(record: PayrollRecord, settings?: Compa
     doc.text(statusText, margin + 58, ticketStatusY + 7.5);
   }
   
+  // ============ WATERMARK ============
+  // Add semi-transparent diagonal watermark with employee name
+  doc.saveGraphicsState();
+  const gState = new (doc as any).GState({ opacity: 0.06 });
+  doc.setGState(gState);
+  doc.setTextColor(100, 100, 100);
+  doc.setFontSize(45);
+  doc.setFont('helvetica', 'bold');
+  
+  const watermarkText = (record.employees?.full_name || 'CONFIDENTIAL').toUpperCase();
+  // Position watermark diagonally across the page
+  const centerX = pageWidth / 2;
+  const centerY = pageHeight / 2;
+  doc.text(watermarkText, centerX, centerY, { 
+    align: 'center',
+    angle: 45
+  });
+  doc.restoreGraphicsState();
+  
   // ============ FOOTER ============
   const footerY = pageHeight - 25;
   
@@ -426,11 +466,11 @@ export async function generatePayslipPDF(record: PayrollRecord, settings?: Compa
   doc.setTextColor(...COLORS.textLight);
   doc.setFont('helvetica', 'italic');
   doc.text('This is a system-generated payslip. No signature required.', pageWidth / 2, footerY, { align: 'center' });
-  doc.text('Confidential - For employee use only', pageWidth / 2, footerY + 4, { align: 'center' });
+  doc.text('Confidential - For employee use only. Password protected.', pageWidth / 2, footerY + 4, { align: 'center' });
   
   // WPS compliance and timestamp
   doc.setFont('helvetica', 'normal');
-  doc.text('UAE WPS Compliant', margin, footerY + 10);
+  doc.text('UAE WPS Compliant | Encrypted', margin, footerY + 10);
   doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, pageWidth - margin, footerY + 10, { align: 'right' });
   
   // Return or save

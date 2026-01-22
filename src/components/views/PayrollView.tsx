@@ -221,6 +221,11 @@ export function PayrollView() {
 
   const handlePrintPayslip = async (record: any) => {
     await generatePayslipPDF(record, settings);
+    const hrmsNo = record.employees?.hrms_no || 'payslip';
+    toast.info(`PDF Password: ${hrmsNo}`, {
+      duration: 10000,
+      description: 'Use this password to open the payslip'
+    });
   };
 
   const handleExportAll = () => {
@@ -262,15 +267,18 @@ export function PayrollView() {
       const monthDate = new Date(parseInt(year), parseInt(monthNum) - 1);
       const formattedMonth = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-      // Call edge function
+      // Call edge function with HR Manager info
       const { data, error } = await supabase.functions.invoke('send-payslip-email', {
         body: {
           employeeName: record.employees?.full_name || 'Employee',
           employeeEmail: workEmail,
           employeeId: record.employee_id,
+          employeeHrmsNo: record.employees?.hrms_no || '',
           month: formattedMonth,
           pdfBase64,
           companyName: settings?.company_name || 'M.A Brain Development Center',
+          hrManagerName: 'Myranel D. Plaza',
+          hrManagerTitle: 'Human Resource Manager',
         }
       });
 
