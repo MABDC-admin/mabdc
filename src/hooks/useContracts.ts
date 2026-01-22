@@ -205,3 +205,40 @@ export function useDeleteContract() {
     },
   });
 }
+
+export function useUpdateContractImages() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      contractId, 
+      page1Url, 
+      page2Url 
+    }: { 
+      contractId: string; 
+      page1Url?: string | null; 
+      page2Url?: string | null;
+    }) => {
+      const updates: Record<string, string | null> = {};
+      if (page1Url !== undefined) updates.page1_url = page1Url;
+      if (page2Url !== undefined) updates.page2_url = page2Url;
+      
+      const { data, error } = await supabase
+        .from('contracts')
+        .update(updates)
+        .eq('id', contractId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      toast.success('Contract images updated successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update contract images: ${error.message}`);
+    },
+  });
+}
