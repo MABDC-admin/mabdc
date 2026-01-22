@@ -62,7 +62,7 @@ export function AdminContractsSection() {
 
   const handleConfirmDelete = async () => {
     if (!contractToDelete) return;
-    await deleteContract.mutateAsync({ contractId: contractToDelete.id });
+    await deleteContract.mutateAsync(contractToDelete.id);
     setContractToDelete(null);
   };
 

@@ -856,7 +856,7 @@ export function PayrollView() {
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction 
-                                onClick={() => deletePayroll.mutate({ payrollId: record.id })}
+                                onClick={() => deletePayroll.mutate(record.id)}
                                 className="bg-destructive hover:bg-destructive/90"
                               >
                                 Delete

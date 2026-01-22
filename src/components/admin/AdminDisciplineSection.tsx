@@ -283,7 +283,7 @@ export function AdminDisciplineSection() {
                   )}
                 </td>
                 <td className="p-3 text-right">
-                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteDiscipline.mutate({ id: record.id })}>
+                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteDiscipline.mutate(record.id)}>
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </td>

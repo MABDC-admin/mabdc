@@ -136,10 +136,10 @@ export function AdminPayrollReport() {
   const handleDeletePayroll = async () => {
     if (!deleteConfirmId) return;
     try {
-      await deletePayroll.mutateAsync({ payrollId: deleteConfirmId });
+      await deletePayroll.mutateAsync(deleteConfirmId);
       setDeleteConfirmId(null);
     } catch (error) {
-      console.error('Failed to request deletion:', error);
+      console.error('Failed to delete payroll:', error);
     }
   };
 

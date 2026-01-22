@@ -135,7 +135,7 @@ export function EmployeesView() {
 
   const handleDelete = () => {
     if (deleteId) {
-      deleteEmployee.mutate({ id: deleteId });
+      deleteEmployee.mutate(deleteId);
       setDeleteId(null);
     }
   };

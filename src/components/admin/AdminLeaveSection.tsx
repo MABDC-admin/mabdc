@@ -104,9 +104,9 @@ export function AdminLeaveSection() {
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteLeave.mutateAsync({ id });
+      await deleteLeave.mutateAsync(id);
     } catch (error) {
-      console.error('Failed to request deletion:', error);
+      console.error('Failed to delete leave:', error);
     }
   };
 
