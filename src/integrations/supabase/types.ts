@@ -2137,25 +2137,32 @@ export type Database = {
           current_stage: string
           daman_applied_at: string | null
           daman_approved_at: string | null
+          daman_cost: number | null
           daman_policy_no: string | null
+          daman_required: boolean | null
           daman_status: string | null
           emirates_id_applied: boolean | null
           emirates_id_ref_no: string | null
           employee_id: string
           id: string
           immigration_approved_at: string | null
+          immigration_cost: number | null
           immigration_expected_date: string | null
+          immigration_required: boolean | null
           immigration_status: string | null
           immigration_submitted_at: string | null
           labour_card_amount: number | null
           labour_card_paid: boolean | null
           labour_card_payment_date: string | null
           medical_completed_at: string | null
+          medical_cost: number | null
+          medical_required: boolean | null
           medical_result: string | null
           medical_scheduled_date: string | null
           medical_status: string | null
           mohre_application_no: string | null
           mohre_approved_at: string | null
+          mohre_cost: number | null
           mohre_status: string | null
           mohre_submitted_at: string | null
           notes: string | null
@@ -2163,12 +2170,14 @@ export type Database = {
           onboarding_completed: boolean | null
           onboarding_completed_at: string | null
           residence_visa_applied_at: string | null
+          residence_visa_cost: number | null
           residence_visa_no: string | null
           residence_visa_stamped_at: string | null
           residence_visa_status: string | null
           stage_entered_at: string
           tawjeeh_completed: boolean | null
           tawjeeh_completed_at: string | null
+          tawjeeh_cost: number | null
           tawjeeh_required: boolean | null
           updated_at: string
           visa_type: string
@@ -2179,25 +2188,32 @@ export type Database = {
           current_stage?: string
           daman_applied_at?: string | null
           daman_approved_at?: string | null
+          daman_cost?: number | null
           daman_policy_no?: string | null
+          daman_required?: boolean | null
           daman_status?: string | null
           emirates_id_applied?: boolean | null
           emirates_id_ref_no?: string | null
           employee_id: string
           id?: string
           immigration_approved_at?: string | null
+          immigration_cost?: number | null
           immigration_expected_date?: string | null
+          immigration_required?: boolean | null
           immigration_status?: string | null
           immigration_submitted_at?: string | null
           labour_card_amount?: number | null
           labour_card_paid?: boolean | null
           labour_card_payment_date?: string | null
           medical_completed_at?: string | null
+          medical_cost?: number | null
+          medical_required?: boolean | null
           medical_result?: string | null
           medical_scheduled_date?: string | null
           medical_status?: string | null
           mohre_application_no?: string | null
           mohre_approved_at?: string | null
+          mohre_cost?: number | null
           mohre_status?: string | null
           mohre_submitted_at?: string | null
           notes?: string | null
@@ -2205,12 +2221,14 @@ export type Database = {
           onboarding_completed?: boolean | null
           onboarding_completed_at?: string | null
           residence_visa_applied_at?: string | null
+          residence_visa_cost?: number | null
           residence_visa_no?: string | null
           residence_visa_stamped_at?: string | null
           residence_visa_status?: string | null
           stage_entered_at?: string
           tawjeeh_completed?: boolean | null
           tawjeeh_completed_at?: string | null
+          tawjeeh_cost?: number | null
           tawjeeh_required?: boolean | null
           updated_at?: string
           visa_type?: string
@@ -2221,25 +2239,32 @@ export type Database = {
           current_stage?: string
           daman_applied_at?: string | null
           daman_approved_at?: string | null
+          daman_cost?: number | null
           daman_policy_no?: string | null
+          daman_required?: boolean | null
           daman_status?: string | null
           emirates_id_applied?: boolean | null
           emirates_id_ref_no?: string | null
           employee_id?: string
           id?: string
           immigration_approved_at?: string | null
+          immigration_cost?: number | null
           immigration_expected_date?: string | null
+          immigration_required?: boolean | null
           immigration_status?: string | null
           immigration_submitted_at?: string | null
           labour_card_amount?: number | null
           labour_card_paid?: boolean | null
           labour_card_payment_date?: string | null
           medical_completed_at?: string | null
+          medical_cost?: number | null
+          medical_required?: boolean | null
           medical_result?: string | null
           medical_scheduled_date?: string | null
           medical_status?: string | null
           mohre_application_no?: string | null
           mohre_approved_at?: string | null
+          mohre_cost?: number | null
           mohre_status?: string | null
           mohre_submitted_at?: string | null
           notes?: string | null
@@ -2247,12 +2272,14 @@ export type Database = {
           onboarding_completed?: boolean | null
           onboarding_completed_at?: string | null
           residence_visa_applied_at?: string | null
+          residence_visa_cost?: number | null
           residence_visa_no?: string | null
           residence_visa_stamped_at?: string | null
           residence_visa_status?: string | null
           stage_entered_at?: string
           tawjeeh_completed?: boolean | null
           tawjeeh_completed_at?: string | null
+          tawjeeh_cost?: number | null
           tawjeeh_required?: boolean | null
           updated_at?: string
           visa_type?: string

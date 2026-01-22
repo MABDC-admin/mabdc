@@ -1,66 +1,99 @@
 export interface VisaStage {
   id: string;
   name: string;
+  shortName: string;
   description: string;
   color: string;
   order: number;
   conditional?: boolean;
+  hasCost?: boolean;
+  costField?: string;
+  canBeSkipped?: boolean;
+  requiredField?: string;
 }
 
 export const VISA_STAGES: VisaStage[] = [
   {
     id: 'mohre_application',
     name: 'MOHRE Application',
+    shortName: 'MOHRE',
     description: 'Ministry of Human Resources & Emiratisation application',
     color: 'blue',
-    order: 1
+    order: 1,
+    hasCost: true,
+    costField: 'mohre_cost'
   },
   {
     id: 'labour_card_payment',
     name: 'Labour Card Payment',
+    shortName: 'Labour Card',
     description: 'Labour card fee payment',
     color: 'purple',
-    order: 2
+    order: 2,
+    hasCost: true,
+    costField: 'labour_card_amount'
   },
   {
     id: 'immigration_processing',
     name: 'Immigration Processing',
+    shortName: 'Immigration',
     description: 'Immigration approval (up to 2 months)',
     color: 'orange',
-    order: 3
+    order: 3,
+    hasCost: true,
+    costField: 'immigration_cost',
+    canBeSkipped: true,
+    requiredField: 'immigration_required'
   },
   {
     id: 'tawjeeh',
     name: 'Tawjeeh',
+    shortName: 'Tawjeeh',
     description: 'Required for non-skilled positions only',
     color: 'yellow',
     order: 4,
-    conditional: true
+    conditional: true,
+    hasCost: true,
+    costField: 'tawjeeh_cost'
   },
   {
     id: 'medical_examination',
     name: 'Medical Examination',
+    shortName: 'Medical',
     description: 'Medical test scheduling and results',
     color: 'red',
-    order: 5
+    order: 5,
+    hasCost: true,
+    costField: 'medical_cost',
+    canBeSkipped: true,
+    requiredField: 'medical_required'
   },
   {
     id: 'daman_insurance',
     name: 'Daman Insurance',
+    shortName: 'Daman',
     description: 'Health insurance application',
     color: 'green',
-    order: 6
+    order: 6,
+    hasCost: true,
+    costField: 'daman_cost',
+    canBeSkipped: true,
+    requiredField: 'daman_required'
   },
   {
     id: 'residence_visa',
     name: 'Residence Visa & Emirates ID',
+    shortName: 'Visa & EID',
     description: 'Visa stamping and Emirates ID registration',
     color: 'indigo',
-    order: 7
+    order: 7,
+    hasCost: true,
+    costField: 'residence_visa_cost'
   },
   {
     id: 'onboarding',
     name: 'Onboarding',
+    shortName: 'Onboarding',
     description: 'Final employee onboarding',
     color: 'emerald',
     order: 8
@@ -120,5 +153,18 @@ export const NON_SKILLED_POSITIONS = [
 export const isNonSkilledPosition = (position: string): boolean => {
   return NON_SKILLED_POSITIONS.some(p => 
     position.toLowerCase().includes(p.toLowerCase())
+  );
+};
+
+// Calculate total cost from application
+export const calculateTotalCost = (application: Record<string, any>): number => {
+  return (
+    (application.mohre_cost || 0) +
+    (application.labour_card_amount || 0) +
+    (application.immigration_cost || 0) +
+    (application.tawjeeh_cost || 0) +
+    (application.medical_cost || 0) +
+    (application.daman_cost || 0) +
+    (application.residence_visa_cost || 0)
   );
 };
