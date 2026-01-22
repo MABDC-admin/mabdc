@@ -591,39 +591,28 @@ export function useBulkAutoApproveTicketAllowances() {
   });
 }
 
-// Delete a ticket allowance record (admin only) - requires approval
+// Delete a ticket allowance record (admin only)
 export function useDeleteTicketAllowance() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
-      // Get record details for approval email
-      const { data: record, error: fetchError } = await supabase
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
         .from('ticket_allowance_records')
-        .select('*, employees(full_name, hrms_no)')
-        .eq('id', id)
-        .single();
+        .delete()
+        .eq('id', id);
 
-      if (fetchError) throw fetchError;
-
-      // Send deletion request for approval
-      const { error } = await supabase.functions.invoke('send-deletion-approval', {
-        body: {
-          recordType: 'ticket_allowance',
-          recordId: id,
-          recordData: record,
-          reason,
-        },
-      });
-
-      if (error) throw new Error(error.message || 'Failed to request deletion approval');
+      if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pending-deletions'] });
-      toast.info('Deletion request sent for approval');
+      queryClient.invalidateQueries({ queryKey: ['ticket-allowance-reminders'] });
+      queryClient.invalidateQueries({ queryKey: ['ticket-allowance-records'] });
+      queryClient.invalidateQueries({ queryKey: ['approved-ticket-allowances'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-ticket-allowance'] });
+      toast.success('Ticket allowance record deleted successfully');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to request deletion: ${error.message}`);
+      toast.error(`Failed to delete: ${error.message}`);
     },
   });
 }

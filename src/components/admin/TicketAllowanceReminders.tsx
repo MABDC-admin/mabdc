@@ -119,9 +119,9 @@ export function TicketAllowanceReminders() {
   };
 
   const handleDelete = () => {
-    if (selectedReminder && deleteReason) {
+    if (selectedReminder) {
       deleteAllowance.mutate(
-        { id: selectedReminder.id, reason: deleteReason },
+        selectedReminder.id,
         {
           onSuccess: () => {
             setDeleteDialogOpen(false);

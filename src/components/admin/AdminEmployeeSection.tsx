@@ -3,19 +3,9 @@ import { useEmployees, useDeleteEmployee, useUpdateEmployee } from '@/hooks/useE
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash2, Edit, Search, RefreshCw, Save, X, AlertTriangle, UserCheck } from 'lucide-react';
-import { toast } from 'sonner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { Trash2, Edit, Search, RefreshCw, Save, X, UserCheck } from 'lucide-react';
 import { BulkAccountGeneration } from './BulkAccountGeneration';
+import { PincodeConfirmDialog } from './PincodeConfirmDialog';
 
 export function AdminEmployeeSection() {
   const { data: employees = [], isLoading, refetch } = useEmployees();
@@ -56,10 +46,10 @@ export function AdminEmployeeSection() {
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteEmployee.mutateAsync({ id });
+      await deleteEmployee.mutateAsync(id);
       setDeleteConfirm(null);
     } catch (error) {
-      console.error('Failed to request deletion:', error);
+      console.error('Failed to delete employee:', error);
     }
   };
 
@@ -196,25 +186,14 @@ export function AdminEmployeeSection() {
         </Table>
       </div>
 
-      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-destructive" />
-              Delete Employee
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this employee and all related records (attendance, leave, payroll, contracts). This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteConfirm && handleDelete(deleteConfirm)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <PincodeConfirmDialog
+        open={!!deleteConfirm}
+        onOpenChange={() => setDeleteConfirm(null)}
+        title="Delete Employee"
+        description="This will permanently delete this employee and all related records (attendance, leave, payroll, contracts). Enter admin pincode to confirm."
+        onConfirm={() => deleteConfirm && handleDelete(deleteConfirm)}
+        isLoading={deleteEmployee.isPending}
+      />
     </div>
   );
 }

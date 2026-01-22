@@ -343,34 +343,21 @@ export function useDeleteLeave() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
-      // Get leave record for approval email
-      const { data: leaveRecord, error: fetchError } = await supabase
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
         .from('leave_records')
-        .select('*, employees(full_name, hrms_no)')
-        .eq('id', id)
-        .single();
+        .delete()
+        .eq('id', id);
       
-      if (fetchError) throw fetchError;
-      
-      // Send deletion request for approval
-      const { error } = await supabase.functions.invoke('send-deletion-approval', {
-        body: {
-          recordType: 'leave',
-          recordId: id,
-          recordData: leaveRecord,
-          reason,
-        },
-      });
-      
-      if (error) throw new Error(error.message || 'Failed to request deletion approval');
+      if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pending-deletions'] });
-      toast.info('Deletion request sent for approval');
+      queryClient.invalidateQueries({ queryKey: ['leave'] });
+      queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
+      toast.success('Leave record deleted successfully');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to request deletion: ${error.message}`);
+      toast.error(`Failed to delete leave: ${error.message}`);
     },
   });
 }

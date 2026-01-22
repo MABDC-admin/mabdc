@@ -169,8 +169,8 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
   };
 
   const handleDelete = () => {
-    if (confirm(`Are you sure you want to request deletion of ${currentEmployee.full_name}? This will require admin approval.`)) {
-      deleteEmployee.mutate({ id: currentEmployee.id });
+    if (confirm(`Are you sure you want to delete ${currentEmployee.full_name}? This action cannot be undone.`)) {
+      deleteEmployee.mutate(currentEmployee.id);
       setCurrentEmployee(null);
       onClose();
     }

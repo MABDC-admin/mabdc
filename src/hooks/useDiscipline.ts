@@ -93,32 +93,18 @@ export function useUpdateDiscipline() {
 export function useDeleteDiscipline() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
-      // Get discipline record for the approval email
-      const { data: discipline, error: fetchError } = await supabase
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
         .from('employee_discipline')
-        .select('*')
-        .eq('id', id)
-        .single();
+        .delete()
+        .eq('id', id);
       
-      if (fetchError) throw fetchError;
-      
-      // Send deletion request for approval
-      const { error } = await supabase.functions.invoke('send-deletion-approval', {
-        body: {
-          recordType: 'discipline',
-          recordId: id,
-          recordData: discipline,
-          reason,
-        },
-      });
-      
-      if (error) throw new Error(error.message || 'Failed to request deletion approval');
+      if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pending-deletions'] });
-      toast.info('Deletion request sent for approval');
+      queryClient.invalidateQueries({ queryKey: ['employee-discipline'] });
+      toast.success('Discipline record deleted successfully');
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(`Failed to delete: ${error.message}`),
   });
 }
