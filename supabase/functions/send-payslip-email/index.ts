@@ -44,12 +44,11 @@ const handler = async (req: Request): Promise<Response> => {
     const firstName = nameParts[0];
     const filename = `Payslip-${employeeName.replace(/\s+/g, '-')}-${month.replace(/\s+/g, '-')}.pdf`;
 
-    // Convert base64 to Uint8Array for attachment
+    // Convert base64 to Uint8Array efficiently using TextEncoder
     const binaryString = atob(pdfBase64);
-    const pdfBuffer = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      pdfBuffer[i] = binaryString.charCodeAt(i);
-    }
+    const bytes = new TextEncoder().encode(binaryString);
+    // Fix encoding: atob returns latin1, need to map correctly
+    const pdfBuffer = Uint8Array.from(binaryString, c => c.charCodeAt(0));
 
     const emailHtml = `
       <!DOCTYPE html>
