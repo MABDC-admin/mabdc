@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format, formatDistanceToNow } from 'date-fns';
-import { Plane, Check, X, Eye, AlertCircle, RefreshCw, CheckCheck, Trash2 } from 'lucide-react';
+import { Plane, Check, X, Eye, AlertCircle, RefreshCw, CheckCheck, Trash2, Mail, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +27,8 @@ import {
   usePastPendingCount,
 } from '@/hooks/useTicketAllowance';
 import { useEmployees } from '@/hooks/useEmployees';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export function TicketAllowanceReminders() {
   const { data: reminders, isLoading } = useTicketAllowanceReminders();
@@ -49,6 +51,7 @@ export function TicketAllowanceReminders() {
   const [cancelReason, setCancelReason] = useState('');
   const [defaultAmount, setDefaultAmount] = useState('3000');
   const [deleteReason, setDeleteReason] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const handleCheckEligibility = () => {
     if (employees) {
@@ -130,6 +133,32 @@ export function TicketAllowanceReminders() {
     }
   };
 
+  const handleSendHRReminder = async () => {
+    setSendingEmail(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-ticket-allowance-notification', {
+        body: { daysThreshold: 30 },
+      });
+      
+      if (error) throw error;
+      
+      if (data?.success) {
+        if (data.count > 0) {
+          toast.success(`Email sent to HR with ${data.count} employee(s) approaching eligibility`);
+        } else {
+          toast.info('No employees with upcoming eligibility within 30 days');
+        }
+      } else {
+        throw new Error(data?.error || 'Failed to send email');
+      }
+    } catch (error: any) {
+      console.error('Error sending HR reminder:', error);
+      toast.error(error.message || 'Failed to send HR reminder email');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   if (isLoading) {
     return null;
   }
@@ -151,6 +180,16 @@ export function TicketAllowanceReminders() {
               </Badge>
             </CardTitle>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSendHRReminder}
+                disabled={sendingEmail}
+                className="text-blue-600 border-blue-300 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-700 dark:hover:bg-blue-950"
+              >
+                <Mail className={`h-4 w-4 mr-2 ${sendingEmail ? 'animate-pulse' : ''}`} />
+                {sendingEmail ? 'Sending...' : 'Send HR Reminder'}
+              </Button>
               {(pastPendingCount ?? 0) > 0 && (
                 <Button
                   variant="default"
