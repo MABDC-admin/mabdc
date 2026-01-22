@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash2, Edit, Plus, Search, RefreshCw, Save, X, Calendar, AlertCircle } from 'lucide-react';
+import { Trash2, Edit, Plus, Search, RefreshCw, Save, X, Calendar, AlertCircle, Paperclip } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
@@ -189,13 +189,14 @@ export function AdminLeaveSection() {
               <TableHead>End Date</TableHead>
               <TableHead>Days</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Attachment</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredLeave.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No leave records found
                 </TableCell>
               </TableRow>
@@ -280,6 +281,21 @@ export function AdminLeaveSection() {
                         )}>
                           {leave.status}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        {leave.attachment_url ? (
+                          <a 
+                            href={leave.attachment_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                          >
+                            <Paperclip size={12} />
+                            View
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">

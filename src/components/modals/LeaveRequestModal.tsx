@@ -18,8 +18,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { differenceInDays, parseISO } from 'date-fns';
-import { AlertCircle, CalendarX2 } from 'lucide-react';
+import { AlertCircle, CalendarX2, Camera, Upload, X, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 // Leave types visible to employees (gender-filtered)
 const EMPLOYEE_VISIBLE_CODES = ['ANNUAL', 'LOP', 'SICK', 'MATERNITY', 'PATERNITY'];
@@ -60,6 +61,10 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName, e
     reason: '',
   });
 
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
   // Reset form when modal opens with correct default type
   useEffect(() => {
     if (isOpen && filteredLeaveTypes.length > 0) {
@@ -67,8 +72,36 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName, e
         ...prev,
         leave_type: filteredLeaveTypes[0].name,
       }));
+      // Reset attachment state when modal opens
+      setAttachmentFile(null);
+      setAttachmentPreview(null);
     }
   }, [isOpen, filteredLeaveTypes]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('File size must be less than 10MB');
+        return;
+      }
+      setAttachmentFile(file);
+      // Create preview for images
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => setAttachmentPreview(e.target?.result as string);
+        reader.readAsDataURL(file);
+      } else {
+        setAttachmentPreview(null);
+      }
+    }
+  };
+
+  const clearAttachment = () => {
+    setAttachmentFile(null);
+    setAttachmentPreview(null);
+  };
 
   // Check for overlapping leaves
   const overlappingLeave = useMemo(() => {
@@ -117,7 +150,7 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName, e
   const hasOverlap = !!overlappingLeave;
   const canSubmit = requestedDays > 0 && !hasInsufficientBalance && !hasOverlap && !addLeave.isPending;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const daysCount = calculateDays();
     
@@ -140,6 +173,37 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName, e
       return;
     }
 
+    let attachmentUrl: string | undefined;
+
+    // Upload attachment if present
+    if (attachmentFile) {
+      setIsUploading(true);
+      try {
+        const fileName = `${employeeId}/${Date.now()}-${attachmentFile.name}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('leave-attachments')
+          .upload(fileName, attachmentFile);
+        
+        if (uploadError) {
+          toast.error('Failed to upload attachment: ' + uploadError.message);
+          setIsUploading(false);
+          return;
+        }
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('leave-attachments')
+          .getPublicUrl(fileName);
+        
+        attachmentUrl = publicUrl;
+      } catch (error) {
+        toast.error('Failed to upload attachment');
+        setIsUploading(false);
+        return;
+      }
+      setIsUploading(false);
+    }
+
     addLeave.mutate({
       employee_id: employeeId,
       leave_type: formData.leave_type,
@@ -148,6 +212,7 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName, e
       days_count: daysCount,
       reason: formData.reason || undefined,
       status: 'Pending',
+      attachment_url: attachmentUrl,
     }, {
       onSuccess: () => {
         onClose();
@@ -157,6 +222,7 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName, e
           end_date: '',
           reason: '',
         });
+        clearAttachment();
       }
     });
   };
@@ -290,13 +356,95 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName, e
             />
           </div>
 
+          {/* Attachment Section */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">
+              Supporting Document (Optional)
+            </Label>
+            
+            {!attachmentFile ? (
+              <div className="flex gap-2">
+                {/* File Upload Button */}
+                <label className="flex-1 cursor-pointer">
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*,.pdf,.doc,.docx"
+                    onChange={handleFileSelect}
+                  />
+                  <div className="flex items-center justify-center gap-2 p-3 border border-dashed border-border rounded-lg hover:bg-secondary/50 transition-colors">
+                    <Upload className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Upload File</span>
+                  </div>
+                </label>
+                
+                {/* Camera Capture Button */}
+                <label className="shrink-0 cursor-pointer">
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFileSelect}
+                  />
+                  <div className="flex items-center justify-center gap-2 p-3 border border-border rounded-lg hover:bg-secondary/50 transition-colors">
+                    <Camera className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Camera</span>
+                  </div>
+                </label>
+              </div>
+            ) : (
+              /* Attachment Preview */
+              <div className="flex items-center gap-3 p-3 bg-secondary/50 rounded-lg border border-border">
+                {attachmentPreview ? (
+                  <img 
+                    src={attachmentPreview} 
+                    alt="Preview" 
+                    className="w-12 h-12 object-cover rounded"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded bg-primary/10 flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-primary" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate text-foreground">{attachmentFile.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(attachmentFile.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={clearAttachment}
+                  className="shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              Accepted: Images, PDF, DOC (max 10MB)
+            </p>
+          </div>
+
           <div className="flex gap-2 pt-2">
             <Button 
               type="submit" 
               className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
-              disabled={!canSubmit}
+              disabled={!canSubmit || isUploading}
             >
-              {addLeave.isPending ? 'Submitting...' : 'Submit Request'}
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : addLeave.isPending ? (
+                'Submitting...'
+              ) : (
+                'Submit Request'
+              )}
             </Button>
             <Button 
               type="button" 
