@@ -76,8 +76,8 @@ const COLORS = {
   ticketIcon: [59, 130, 246] as [number, number, number],
 };
 
-export async function generatePayslipPDF(record: PayrollRecord, settings?: CompanySettings | null, returnDoc: boolean = false): Promise<jsPDF | void> {
-  const doc = new jsPDF();
+export async function generatePayslipPDF(record: PayrollRecord, settings?: CompanySettings | null, returnDoc: boolean = false, skipLogo: boolean = false): Promise<jsPDF | void> {
+  const doc = new jsPDF({ compress: true });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
@@ -98,10 +98,11 @@ export async function generatePayslipPDF(record: PayrollRecord, settings?: Compa
   doc.rect(0, 0, pageWidth, 40, 'F');
   
   // Company logo - try to load from URL, fallback to initials
+  // Skip logo loading for email to reduce PDF size
   const logoUrl = settings?.logo_url;
   let logoLoaded = false;
   
-  if (logoUrl) {
+  if (logoUrl && !skipLogo) {
     try {
       const response = await fetch(logoUrl);
       const blob = await response.blob();
