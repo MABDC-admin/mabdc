@@ -25,7 +25,7 @@ import uaeVisa from '@/assets/uae-visa.png';
 import passportIcon from '@/assets/passport-icon.png';
 import contractIcon from '@/assets/contract-icon.png';
 import photoPlaceholder from '@/assets/photo-placeholder.png';
-import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase, MessageCircle, Link2, Copy, HeartPulse, CreditCard, Plane, BookOpen, FileCheck, CheckCircle, FileX, Calendar } from 'lucide-react';
+import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase, MessageCircle, Link2, Copy, HeartPulse, CreditCard, Plane, BookOpen, FileCheck, CheckCircle, FileX, Calendar, Phone } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { toast } from 'sonner';
 import { GenerateEmployeeAccountButton } from '@/components/employee/GenerateEmployeeAccountButton';
@@ -58,11 +58,14 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
     birthday: '',
     personal_email: '',
     personal_phone: '',
-    home_address: '',
+    current_address: '',
     place_of_birth: '',
     country_of_birth: '',
     family_status: '',
     number_of_children: 0,
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    emergency_contact_relationship: '',
   });
 
   // Education state
@@ -257,11 +260,14 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
       birthday: emp.birthday || '',
       personal_email: emp.personal_email || '',
       personal_phone: emp.personal_phone || '',
-      home_address: emp.home_address || '',
+      current_address: emp.current_address || '',
       place_of_birth: emp.place_of_birth || '',
       country_of_birth: emp.country_of_birth || '',
       family_status: emp.family_status || '',
       number_of_children: emp.number_of_children || 0,
+      emergency_contact_name: emp.emergency_contact_name || '',
+      emergency_contact_phone: emp.emergency_contact_phone || '',
+      emergency_contact_relationship: emp.emergency_contact_relationship || '',
     });
     setIsEditingPrivate(true);
   };
@@ -808,6 +814,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                   </div>
 
                   {!isEditingPrivate ? (
+                    <>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-4">
                         <div>
@@ -860,11 +867,45 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                           <p className="text-lg font-semibold text-foreground">{emp.country_of_birth || 'Not specified'}</p>
                         </div>
                         <div>
-                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Home Address</p>
-                          <p className="text-sm font-semibold text-foreground">{emp.home_address || 'Not specified'}</p>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Current Address</p>
+                          <p className="text-sm font-semibold text-foreground">{emp.current_address || 'Not specified'}</p>
                         </div>
                       </div>
                     </div>
+                    
+                    {/* Emergency Contact Section */}
+                    <div className="mt-6 pt-6 border-t border-border">
+                      <h4 className="text-md font-semibold text-destructive flex items-center gap-2 mb-4">
+                        <Phone className="w-5 h-5" />
+                        EMERGENCY CONTACT
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Contact Name</p>
+                          <p className="text-lg font-semibold text-foreground">{emp.emergency_contact_name || 'Not specified'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Phone Number</p>
+                          <p className="text-lg font-semibold text-foreground flex items-center gap-2">
+                            {emp.emergency_contact_phone || 'Not specified'}
+                            {emp.emergency_contact_phone && (
+                              <button 
+                                onClick={() => window.open(`tel:${emp.emergency_contact_phone}`, '_blank')}
+                                className="text-primary hover:text-primary/80 transition-colors"
+                                title="Call emergency contact"
+                              >
+                                <Phone className="w-4 h-4" />
+                              </button>
+                            )}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Relationship</p>
+                          <p className="text-lg font-semibold text-foreground">{emp.emergency_contact_relationship || 'Not specified'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-4">
@@ -956,13 +997,57 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                           />
                         </div>
                         <div>
-                          <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Home Address</Label>
+                          <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Current Address</Label>
                           <Input
-                            value={privateInfo.home_address}
-                            onChange={(e) => setPrivateInfo({ ...privateInfo, home_address: e.target.value })}
+                            value={privateInfo.current_address}
+                            onChange={(e) => setPrivateInfo({ ...privateInfo, current_address: e.target.value })}
                             placeholder="Full address"
                             className="bg-secondary/50 border-border"
                           />
+                        </div>
+                        {/* Emergency Contact Edit Section */}
+                        <div className="col-span-full mt-4 pt-4 border-t border-border">
+                          <p className="text-sm font-semibold text-destructive mb-3 flex items-center gap-2">
+                            <Phone className="w-4 h-4" />
+                            EMERGENCY CONTACT
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Contact Name</Label>
+                              <Input
+                                value={privateInfo.emergency_contact_name}
+                                onChange={(e) => setPrivateInfo({ ...privateInfo, emergency_contact_name: e.target.value })}
+                                placeholder="e.g., John Doe"
+                                className="bg-secondary/50 border-border"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Phone Number</Label>
+                              <Input
+                                type="tel"
+                                value={privateInfo.emergency_contact_phone}
+                                onChange={(e) => setPrivateInfo({ ...privateInfo, emergency_contact_phone: e.target.value })}
+                                placeholder="+971 50 XXX XXXX"
+                                className="bg-secondary/50 border-border"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Relationship</Label>
+                              <select
+                                value={privateInfo.emergency_contact_relationship}
+                                onChange={(e) => setPrivateInfo({ ...privateInfo, emergency_contact_relationship: e.target.value })}
+                                className="w-full p-2 rounded-lg bg-secondary/50 border border-border text-foreground"
+                              >
+                                <option value="">Select...</option>
+                                <option value="Spouse">Spouse</option>
+                                <option value="Parent">Parent</option>
+                                <option value="Sibling">Sibling</option>
+                                <option value="Child">Child</option>
+                                <option value="Friend">Friend</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>

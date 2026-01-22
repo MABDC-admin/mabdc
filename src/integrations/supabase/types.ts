@@ -861,16 +861,19 @@ export type Database = {
           contract_type: string | null
           country_of_birth: string | null
           created_at: string
+          current_address: string | null
           deactivated_at: string | null
           deactivated_by: string | null
           deactivation_reason: string | null
           department: string
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
           emirates_id: string | null
           emirates_id_expiry: string | null
           family_status: string | null
           full_name: string
           gender: string | null
-          home_address: string | null
           hrms_no: string
           iban: string | null
           id: string
@@ -904,16 +907,19 @@ export type Database = {
           contract_type?: string | null
           country_of_birth?: string | null
           created_at?: string
+          current_address?: string | null
           deactivated_at?: string | null
           deactivated_by?: string | null
           deactivation_reason?: string | null
           department: string
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           emirates_id?: string | null
           emirates_id_expiry?: string | null
           family_status?: string | null
           full_name: string
           gender?: string | null
-          home_address?: string | null
           hrms_no: string
           iban?: string | null
           id?: string
@@ -947,16 +953,19 @@ export type Database = {
           contract_type?: string | null
           country_of_birth?: string | null
           created_at?: string
+          current_address?: string | null
           deactivated_at?: string | null
           deactivated_by?: string | null
           deactivation_reason?: string | null
           department?: string
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           emirates_id?: string | null
           emirates_id_expiry?: string | null
           family_status?: string | null
           full_name?: string
           gender?: string | null
-          home_address?: string | null
           hrms_no?: string
           iban?: string | null
           id?: string
@@ -1645,6 +1654,8 @@ export type Database = {
           deductions: number | null
           employee_id: string
           id: string
+          lop_days: number | null
+          lop_deduction: number | null
           month: string
           net_salary: number
           wps_processed: boolean | null
@@ -1656,6 +1667,8 @@ export type Database = {
           deductions?: number | null
           employee_id: string
           id?: string
+          lop_days?: number | null
+          lop_deduction?: number | null
           month: string
           net_salary: number
           wps_processed?: boolean | null
@@ -1667,6 +1680,8 @@ export type Database = {
           deductions?: number | null
           employee_id?: string
           id?: string
+          lop_days?: number | null
+          lop_deduction?: number | null
           month?: string
           net_salary?: number
           wps_processed?: boolean | null

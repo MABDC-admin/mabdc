@@ -72,7 +72,10 @@ export default function EmployeeSelfServicePortal() {
   const [profileForm, setProfileForm] = useState({
     personal_phone: '',
     personal_email: '',
-    home_address: '',
+    current_address: '',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    emergency_contact_relationship: '',
   });
   
   const updateEmployee = useUpdateEmployee();
@@ -250,7 +253,10 @@ export default function EmployeeSelfServicePortal() {
     setProfileForm({
       personal_phone: (employee as any)?.personal_phone || '',
       personal_email: (employee as any)?.personal_email || '',
-      home_address: (employee as any)?.home_address || '',
+      current_address: (employee as any)?.current_address || '',
+      emergency_contact_name: (employee as any)?.emergency_contact_name || '',
+      emergency_contact_phone: (employee as any)?.emergency_contact_phone || '',
+      emergency_contact_relationship: (employee as any)?.emergency_contact_relationship || '',
     });
     setIsEditingProfile(true);
   };
@@ -263,8 +269,11 @@ export default function EmployeeSelfServicePortal() {
         id: employee.id,
         personal_phone: profileForm.personal_phone,
         personal_email: profileForm.personal_email,
-        home_address: profileForm.home_address,
-      });
+        current_address: profileForm.current_address,
+        emergency_contact_name: profileForm.emergency_contact_name,
+        emergency_contact_phone: profileForm.emergency_contact_phone,
+        emergency_contact_relationship: profileForm.emergency_contact_relationship,
+      } as any);
       
       // Update local state
       setEmployee(prev => prev ? { ...prev, ...profileForm } as Employee : null);
@@ -1393,15 +1402,60 @@ export default function EmployeeSelfServicePortal() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="home_address">Home Address</Label>
+              <Label htmlFor="current_address">Current Address</Label>
               <Textarea
-                id="home_address"
-                placeholder="Enter your home address"
-                value={profileForm.home_address}
-                onChange={(e) => setProfileForm({ ...profileForm, home_address: e.target.value })}
+                id="current_address"
+                placeholder="Enter your current address"
+                value={profileForm.current_address}
+                onChange={(e) => setProfileForm({ ...profileForm, current_address: e.target.value })}
                 rows={3}
               />
             </div>
+            
+            {/* Emergency Contact Section */}
+            <div className="pt-4 border-t">
+              <p className="text-sm font-semibold text-destructive mb-3 flex items-center gap-2">
+                Emergency Contact
+              </p>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="emergency_name">Contact Name</Label>
+                  <Input
+                    id="emergency_name"
+                    placeholder="Enter emergency contact name"
+                    value={profileForm.emergency_contact_name}
+                    onChange={(e) => setProfileForm({ ...profileForm, emergency_contact_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="emergency_phone">Phone Number</Label>
+                  <Input
+                    id="emergency_phone"
+                    placeholder="Enter emergency contact phone"
+                    value={profileForm.emergency_contact_phone}
+                    onChange={(e) => setProfileForm({ ...profileForm, emergency_contact_phone: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="emergency_relationship">Relationship</Label>
+                  <select
+                    id="emergency_relationship"
+                    value={profileForm.emergency_contact_relationship}
+                    onChange={(e) => setProfileForm({ ...profileForm, emergency_contact_relationship: e.target.value })}
+                    className="w-full p-2 rounded-lg bg-background border border-input text-foreground"
+                  >
+                    <option value="">Select relationship...</option>
+                    <option value="Spouse">Spouse</option>
+                    <option value="Parent">Parent</option>
+                    <option value="Sibling">Sibling</option>
+                    <option value="Child">Child</option>
+                    <option value="Friend">Friend</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            
             <p className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
               Note: Work email, department, position, and other HR-managed fields cannot be edited. Please contact HR for any changes.
             </p>

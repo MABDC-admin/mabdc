@@ -44,6 +44,9 @@ export function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
     bank_name: '',
     iban: '',
     bank_account_no: '',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    emergency_contact_relationship: '',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -69,6 +72,9 @@ export function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
       bank_name: formData.bank_name || undefined,
       iban: formData.iban || undefined,
       bank_account_no: formData.bank_account_no || undefined,
+      emergency_contact_name: formData.emergency_contact_name || undefined,
+      emergency_contact_phone: formData.emergency_contact_phone || undefined,
+      emergency_contact_relationship: formData.emergency_contact_relationship || undefined,
     }, {
       onSuccess: () => {
         onClose();
@@ -92,6 +98,9 @@ export function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
           bank_name: '',
           iban: '',
           bank_account_no: '',
+          emergency_contact_name: '',
+          emergency_contact_phone: '',
+          emergency_contact_relationship: '',
         });
       }
     });
@@ -293,6 +302,49 @@ export function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
                   placeholder="1234567890123"
                   className="bg-secondary/50 border-border"
                 />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-border">
+            <h3 className="text-sm font-semibold text-destructive mb-3">Emergency Contact</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Contact Name</Label>
+                <Input
+                  value={formData.emergency_contact_name}
+                  onChange={(e) => setFormData({ ...formData, emergency_contact_name: e.target.value })}
+                  placeholder="John Doe"
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Phone Number</Label>
+                <Input
+                  value={formData.emergency_contact_phone}
+                  onChange={(e) => setFormData({ ...formData, emergency_contact_phone: e.target.value })}
+                  placeholder="+971 50 XXX XXXX"
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Relationship</Label>
+                <Select
+                  value={formData.emergency_contact_relationship}
+                  onValueChange={(value) => setFormData({ ...formData, emergency_contact_relationship: value })}
+                >
+                  <SelectTrigger className="bg-secondary/50 border-border">
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Spouse">Spouse</SelectItem>
+                    <SelectItem value="Parent">Parent</SelectItem>
+                    <SelectItem value="Sibling">Sibling</SelectItem>
+                    <SelectItem value="Child">Child</SelectItem>
+                    <SelectItem value="Friend">Friend</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
