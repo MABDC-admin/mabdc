@@ -43,6 +43,7 @@ interface PayrollRecord {
     joining_date?: string;
     contract_type?: string;
     photo_url?: string;
+    birthday?: string;
   };
   payroll_earnings?: PayrollEarning[];
   payroll_deductions?: PayrollDeduction[];
@@ -77,8 +78,12 @@ const COLORS = {
 };
 
 export async function generatePayslipPDF(record: PayrollRecord, settings?: CompanySettings | null, returnDoc: boolean = false, skipLogo: boolean = false): Promise<jsPDF | void> {
-  // Employee's HRMS number as password for security
-  const userPassword = record.employees?.hrms_no || 'payslip';
+  // Password: Last 4 digits of HRMS + Birth Year (e.g., MYRA0001 + 1990 = 00011990)
+  const hrmsNo = record.employees?.hrms_no || '';
+  const birthday = record.employees?.birthday || '';
+  const last4Hrms = hrmsNo.slice(-4) || '0000';
+  const birthYear = birthday ? new Date(birthday).getFullYear().toString() : '0000';
+  const userPassword = `${last4Hrms}${birthYear}`;
   
   const doc = new jsPDF({ 
     compress: true,

@@ -221,10 +221,11 @@ export function PayrollView() {
 
   const handlePrintPayslip = async (record: any) => {
     await generatePayslipPDF(record, settings);
-    const hrmsNo = record.employees?.hrms_no || 'payslip';
-    toast.info(`PDF Password: ${hrmsNo}`, {
+    const hrmsNo = record.employees?.hrms_no || '';
+    const last4Hrms = hrmsNo.slice(-4) || '0000';
+    toast.info(`Password: Last 4 HRMS (${last4Hrms}) + Birth Year`, {
       duration: 10000,
-      description: 'Use this password to open the payslip'
+      description: 'Example: 00011990 (if HRMS ends in 0001 and born 1990)'
     });
   };
 

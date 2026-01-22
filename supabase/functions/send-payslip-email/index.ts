@@ -79,10 +79,9 @@ const handler = async (req: Request): Promise<Response> => {
     const firstName = nameParts[0];
     const filename = `Payslip-${employeeName.replace(/\s+/g, '-')}-${month.replace(/\s+/g, '-')}.pdf`;
 
-    // Password hint - show first 2 chars and last char
-    const passwordHint = employeeHrmsNo 
-      ? `${employeeHrmsNo.substring(0, 2)}**${employeeHrmsNo.slice(-1)}`
-      : 'Your HRMS Number';
+    // Password hint - show last 4 of HRMS masked
+    const last4Hrms = employeeHrmsNo ? employeeHrmsNo.slice(-4) : '****';
+    const passwordHint = `${last4Hrms.substring(0, 2)}**`;
 
     const emailHtml = `
       <!DOCTYPE html>
@@ -177,7 +176,8 @@ const handler = async (req: Request): Promise<Response> => {
             <div class="password-notice">
               <strong>PDF Password Required</strong>
               The attached payslip is password-protected for your security.<br>
-              <strong>Password:</strong> Your HRMS Number (${passwordHint})
+              <strong>Password:</strong> Last 4 digits of your HRMS number + Your birth year<br>
+              <em style="font-size: 12px; color: #3b82f6;">Example: If HRMS ends in ${passwordHint}** and born in 1990, password is: ${passwordHint}**1990</em>
             </div>
             <div class="confidential">
               <strong>Confidentiality Notice:</strong><br>
