@@ -190,7 +190,19 @@ export default function EmployeeSelfServicePortal() {
     [disciplineQuery.data, employee?.id]
   );
 
-  const activeContract = employeeContracts.find(c => c.status === 'Active');
+  // Get the newest active contract (sorted by end_date DESC, then created_at DESC)
+  const activeContract = useMemo(() => {
+    return employeeContracts
+      .filter(c => c.status === 'Active')
+      .sort((a, b) => {
+        const dateA = a.end_date ? new Date(a.end_date).getTime() : Infinity;
+        const dateB = b.end_date ? new Date(b.end_date).getTime() : Infinity;
+        if (dateB !== dateA) return dateB - dateA;
+        const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return createdB - createdA;
+      })[0];
+  }, [employeeContracts]);
 
   // Calculate Annual Leave balance only (linked to employee via leave_balances table)
   const annualLeaveBalance = useMemo(() => {

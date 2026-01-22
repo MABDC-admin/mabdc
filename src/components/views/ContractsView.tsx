@@ -259,7 +259,14 @@ export function ContractsView() {
     setIsUploading(true);
     
     try {
-      // First create the contract
+      // Archive previous active contracts before creating new one
+      const { archivePreviousContracts } = await import('@/utils/contractArchiver');
+      const archivedCount = await archivePreviousContracts(formData.employee_id);
+      if (archivedCount > 0) {
+        console.log(`Archived ${archivedCount} previous contracts`);
+      }
+
+      // Create the new contract
       const contractData = {
         employee_id: formData.employee_id,
         mohre_contract_no: formData.mohre_contract_no,
@@ -276,7 +283,7 @@ export function ContractsView() {
         notice_period: parseInt(formData.notice_period),
         annual_leave_days: parseInt(formData.annual_leave_days),
         probation_period: parseInt(formData.probation_period),
-        status: 'Draft' as const,
+        status: 'Active' as const, // Set to Active since we already archived previous
       };
 
       const { data: newContract, error: contractError } = await supabase

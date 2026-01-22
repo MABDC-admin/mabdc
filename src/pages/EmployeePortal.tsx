@@ -96,7 +96,19 @@ export default function EmployeePortal() {
   // Filter data for this employee
   const attendance = allAttendance.filter(a => a.employee_id === employeeId);
   const leaveRecords = allLeave.filter(l => l.employee_id === employeeId);
-  const employeeContract = contracts.find(c => c.employee_id === employeeId && c.status === 'Active');
+  // Get the newest active contract (sorted by end_date DESC, then created_at DESC)
+  const employeeContract = useMemo(() => {
+    return contracts
+      .filter(c => c.employee_id === employeeId && c.status === 'Active')
+      .sort((a, b) => {
+        const dateA = a.end_date ? new Date(a.end_date).getTime() : Infinity;
+        const dateB = b.end_date ? new Date(b.end_date).getTime() : Infinity;
+        if (dateB !== dateA) return dateB - dateA;
+        const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return createdB - createdA;
+      })[0];
+  }, [contracts, employeeId]);
 
   // Calculate Annual Leave balance only (to match card view consistency)
   const annualLeaveBalance = useMemo(() => {

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useHRStore } from '@/store/hrStore';
 import { useDeleteEmployee, useEmployees, useUpdateEmployee } from '@/hooks/useEmployees';
 import { useEmployeeDocuments, useUploadDocument, useDeleteDocument, useUploadEmployeePhoto } from '@/hooks/useDocuments';
@@ -106,7 +106,21 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
   // Hooks for contracts
   const { data: contracts = [], refetch: refetchContracts } = useContracts();
   const updateContractImages = useUpdateContractImages();
-  const employeeContract = contracts.find(c => c.employee_id === currentEmployee?.id && c.status === 'Active');
+  
+  // Get the newest active contract (sorted by end_date DESC, then created_at DESC)
+  const employeeContract = useMemo(() => {
+    return contracts
+      .filter(c => c.employee_id === currentEmployee?.id && c.status === 'Active')
+      .sort((a, b) => {
+        const dateA = a.end_date ? new Date(a.end_date).getTime() : Infinity;
+        const dateB = b.end_date ? new Date(b.end_date).getTime() : Infinity;
+        if (dateB !== dateA) return dateB - dateA;
+        const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return createdB - createdA;
+      })[0];
+  }, [contracts, currentEmployee?.id]);
+  
   
   // Contract image upload state
   const [isUploadingContractPages, setIsUploadingContractPages] = useState(false);
