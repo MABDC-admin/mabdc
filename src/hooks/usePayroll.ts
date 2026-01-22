@@ -43,6 +43,7 @@ interface Payroll {
     photo_url?: string;
     work_email?: string;
     joining_date?: string;
+    birthday?: string;
   };
   payroll_earnings?: PayrollEarning[];
   payroll_deductions?: PayrollDeduction[];
@@ -59,7 +60,7 @@ export function usePayroll() {
           *,
           employees (
             full_name, hrms_no, bank_name, iban, bank_account_no, 
-            department, job_position, photo_url, work_email, joining_date
+            department, job_position, photo_url, work_email, joining_date, birthday
           ),
           payroll_earnings (id, earning_type, description, amount),
           payroll_deductions (id, deduction_type, reason, amount, days)
