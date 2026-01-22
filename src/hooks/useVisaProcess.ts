@@ -15,6 +15,7 @@ export interface VisaApplication {
   mohre_application_no: string | null;
   mohre_submitted_at: string | null;
   mohre_approved_at: string | null;
+  mohre_cost: number | null;
   
   // Labour Card
   labour_card_paid: boolean | null;
@@ -26,23 +27,30 @@ export interface VisaApplication {
   immigration_submitted_at: string | null;
   immigration_approved_at: string | null;
   immigration_expected_date: string | null;
+  immigration_cost: number | null;
+  immigration_required: boolean | null;
   
   // Tawjeeh
   tawjeeh_required: boolean | null;
   tawjeeh_completed: boolean | null;
   tawjeeh_completed_at: string | null;
+  tawjeeh_cost: number | null;
   
   // Medical
   medical_status: string | null;
   medical_scheduled_date: string | null;
   medical_completed_at: string | null;
   medical_result: string | null;
+  medical_cost: number | null;
+  medical_required: boolean | null;
   
   // Daman
   daman_status: string | null;
   daman_policy_no: string | null;
   daman_applied_at: string | null;
   daman_approved_at: string | null;
+  daman_cost: number | null;
+  daman_required: boolean | null;
   
   // Residence Visa
   residence_visa_status: string | null;
@@ -51,6 +59,7 @@ export interface VisaApplication {
   residence_visa_stamped_at: string | null;
   emirates_id_applied: boolean | null;
   emirates_id_ref_no: string | null;
+  residence_visa_cost: number | null;
   
   // Onboarding
   onboarding_completed: boolean | null;
@@ -235,11 +244,33 @@ export const useMoveToNextStage = () => {
       notes?: string;
       skipTawjeeh?: boolean;
     }) => {
+      // Get current application to check required flags
+      const { data: app } = await supabase
+        .from('visa_applications')
+        .select('*')
+        .eq('id', applicationId)
+        .single();
+      
       let nextStage = getNextStage(currentStage);
       
       // Skip tawjeeh if not required
-      if (nextStage?.id === 'tawjeeh' && skipTawjeeh) {
+      if (nextStage?.id === 'tawjeeh' && (skipTawjeeh || !app?.tawjeeh_required)) {
         nextStage = getNextStage('tawjeeh');
+      }
+      
+      // Skip medical if not required
+      if (nextStage?.id === 'medical_examination' && app?.medical_required === false) {
+        nextStage = getNextStage('medical_examination');
+      }
+      
+      // Skip daman if not required
+      if (nextStage?.id === 'daman_insurance' && app?.daman_required === false) {
+        nextStage = getNextStage('daman_insurance');
+      }
+      
+      // Skip immigration if not required
+      if (nextStage?.id === 'immigration_processing' && app?.immigration_required === false) {
+        nextStage = getNextStage('immigration_processing');
       }
       
       if (!nextStage) {
@@ -312,6 +343,10 @@ export const canMoveToNextStage = (application: VisaApplication): { canMove: boo
       }
       break;
     case 'immigration_processing':
+      // Skip validation if not required
+      if (application.immigration_required === false) {
+        return { canMove: true };
+      }
       if (application.immigration_status !== 'Approved') {
         return { canMove: false, reason: 'Immigration must be approved' };
       }
@@ -322,11 +357,19 @@ export const canMoveToNextStage = (application: VisaApplication): { canMove: boo
       }
       break;
     case 'medical_examination':
+      // Skip validation if not required
+      if (application.medical_required === false) {
+        return { canMove: true };
+      }
       if (application.medical_status !== 'Passed') {
         return { canMove: false, reason: 'Medical examination must be passed' };
       }
       break;
     case 'daman_insurance':
+      // Skip validation if not required
+      if (application.daman_required === false) {
+        return { canMove: true };
+      }
       if (application.daman_status !== 'Approved') {
         return { canMove: false, reason: 'Daman insurance must be approved' };
       }

@@ -3,16 +3,16 @@ import { CSS } from '@dnd-kit/utilities';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Clock, AlertTriangle, AlertCircle, GripVertical } from 'lucide-react';
+import { Clock, AlertTriangle, AlertCircle, GripVertical, DollarSign, MessageSquare, Ban } from 'lucide-react';
 import { VisaApplication, getDaysInStage, getDelayStatus } from '@/hooks/useVisaProcess';
+import { calculateTotalCost } from '@/constants/visaStages';
 import { cn } from '@/lib/utils';
 
 interface VisaApplicationCardProps {
   application: VisaApplication;
-  onClick?: () => void;
 }
 
-export const VisaApplicationCard = ({ application, onClick }: VisaApplicationCardProps) => {
+export const VisaApplicationCard = ({ application }: VisaApplicationCardProps) => {
   const {
     attributes,
     listeners,
@@ -30,6 +30,7 @@ export const VisaApplicationCard = ({ application, onClick }: VisaApplicationCar
   const daysInStage = getDaysInStage(application.stage_entered_at);
   const delayStatus = getDelayStatus(application);
   const employee = application.employees;
+  const totalCost = calculateTotalCost(application);
 
   const getInitials = (name: string) => {
     return name
@@ -59,20 +60,29 @@ export const VisaApplicationCard = ({ application, onClick }: VisaApplicationCar
 
   const status = getStatusBadge();
 
+  // Check if current stage is marked as not required
+  const isStageNotRequired = () => {
+    const stage = application.current_stage;
+    if (stage === 'medical_examination' && application.medical_required === false) return true;
+    if (stage === 'daman_insurance' && application.daman_required === false) return true;
+    if (stage === 'immigration_processing' && application.immigration_required === false) return true;
+    return false;
+  };
+
   return (
     <Card
       ref={setNodeRef}
       style={style}
       className={cn(
-        'p-3 cursor-pointer hover:shadow-md transition-all border-l-4',
+        'p-2 transition-all border-l-4',
         isDragging && 'opacity-50 shadow-lg rotate-2',
         delayStatus === 'critical' && 'border-l-red-500 bg-red-50 dark:bg-red-950/20',
         delayStatus === 'warning' && 'border-l-yellow-500 bg-yellow-50 dark:bg-yellow-950/20',
-        !delayStatus && 'border-l-primary/50'
+        !delayStatus && 'border-l-primary/50',
+        isStageNotRequired() && 'opacity-60 bg-muted/50'
       )}
-      onClick={onClick}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2">
         <div
           {...attributes}
           {...listeners}
@@ -81,7 +91,7 @@ export const VisaApplicationCard = ({ application, onClick }: VisaApplicationCar
           <GripVertical className="h-4 w-4" />
         </div>
         
-        <Avatar className="h-10 w-10 flex-shrink-0">
+        <Avatar className="h-8 w-8 flex-shrink-0">
           <AvatarImage src={employee?.photo_url || undefined} alt={employee?.full_name} />
           <AvatarFallback className="text-xs">
             {employee?.full_name ? getInitials(employee.full_name) : '??'}
@@ -96,8 +106,8 @@ export const VisaApplicationCard = ({ application, onClick }: VisaApplicationCar
             {employee?.job_position || 'No position'}
           </p>
           
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <Badge variant="outline" className="text-xs">
+          <div className="flex items-center gap-1 mt-1 flex-wrap">
+            <Badge variant="outline" className="text-[10px] px-1 py-0">
               {application.visa_type}
             </Badge>
             
@@ -105,7 +115,7 @@ export const VisaApplicationCard = ({ application, onClick }: VisaApplicationCar
               <Badge 
                 variant="secondary" 
                 className={cn(
-                  'text-xs',
+                  'text-[10px] px-1 py-0',
                   status === 'Approved' && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
                   status === 'Pending' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
                   status === 'Rejected' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
@@ -118,9 +128,24 @@ export const VisaApplicationCard = ({ application, onClick }: VisaApplicationCar
                 {status}
               </Badge>
             )}
+            
+            {isStageNotRequired() && (
+              <Badge variant="secondary" className="text-[10px] px-1 py-0 gap-0.5">
+                <Ban className="h-2.5 w-2.5" />
+                Skip
+              </Badge>
+            )}
           </div>
           
-          <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+          {/* Cost display */}
+          {totalCost > 0 && (
+            <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+              <DollarSign className="h-3 w-3" />
+              <span>AED {totalCost.toLocaleString()}</span>
+            </div>
+          )}
+          
+          <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
             {delayStatus === 'critical' ? (
               <AlertCircle className="h-3 w-3 text-red-500" />
             ) : delayStatus === 'warning' ? (
@@ -132,9 +157,21 @@ export const VisaApplicationCard = ({ application, onClick }: VisaApplicationCar
               delayStatus === 'critical' && 'text-red-600 font-medium',
               delayStatus === 'warning' && 'text-yellow-600 font-medium'
             )}>
-              {daysInStage} day{daysInStage !== 1 ? 's' : ''} in stage
+              {daysInStage} day{daysInStage !== 1 ? 's' : ''}
             </span>
           </div>
+          
+          {/* Notes/Comments display */}
+          {application.notes && (
+            <div className="mt-2 pt-2 border-t">
+              <div className="flex items-start gap-1">
+                <MessageSquare className="h-3 w-3 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-muted-foreground italic line-clamp-2">
+                  {application.notes}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Card>

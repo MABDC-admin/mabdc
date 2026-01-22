@@ -265,7 +265,6 @@ export const VisaProcessView = () => {
                   key={stage.id}
                   stage={stage}
                   applications={applicationsByStage[stage.id] || []}
-                  onCardClick={(app) => setSelectedApplication(app)}
                 />
               ))}
             </div>

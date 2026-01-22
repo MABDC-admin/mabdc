@@ -168,6 +168,15 @@ export const VisaApplicationModal = ({
                 placeholder="Enter MOHRE application number"
               />
             </FormItem>
+            <FormItem>
+              <FormLabel>Cost (AED)</FormLabel>
+              <Input
+                type="number"
+                value={application.mohre_cost || ''}
+                onChange={(e) => handleUpdateField('mohre_cost', parseFloat(e.target.value) || 0)}
+                placeholder="0.00"
+              />
+            </FormItem>
           </div>
         );
 
@@ -204,37 +213,62 @@ export const VisaApplicationModal = ({
       case 'immigration_processing':
         return (
           <div className="space-y-4">
-            <FormItem>
-              <FormLabel>Immigration Status</FormLabel>
-              <Select
-                value={application.immigration_status || 'Pending'}
-                onValueChange={(v) => handleUpdateField('immigration_status', v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pending">Pending</SelectItem>
-                  <SelectItem value="In Progress">In Progress</SelectItem>
-                  <SelectItem value="Approved">Approved</SelectItem>
-                  <SelectItem value="On Hold">On Hold</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormItem>
-            <FormItem>
-              <FormLabel>Expected Completion Date</FormLabel>
-              <Input
-                type="date"
-                value={application.immigration_expected_date || ''}
-                onChange={(e) => handleUpdateField('immigration_expected_date', e.target.value)}
+            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+              <div>
+                <FormLabel>Stage Required</FormLabel>
+                <p className="text-xs text-muted-foreground">
+                  Skip this stage if not required
+                </p>
+              </div>
+              <Switch
+                checked={application.immigration_required !== false}
+                onCheckedChange={(v) => handleUpdateField('immigration_required', v)}
               />
-            </FormItem>
-            <div className="p-3 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                <AlertTriangle className="h-4 w-4 inline mr-1" />
-                Immigration processing typically takes up to 2 months
-              </p>
             </div>
+            {application.immigration_required !== false && (
+              <>
+                <FormItem>
+                  <FormLabel>Immigration Status</FormLabel>
+                  <Select
+                    value={application.immigration_status || 'Pending'}
+                    onValueChange={(v) => handleUpdateField('immigration_status', v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="In Progress">In Progress</SelectItem>
+                      <SelectItem value="Approved">Approved</SelectItem>
+                      <SelectItem value="On Hold">On Hold</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+                <FormItem>
+                  <FormLabel>Expected Completion Date</FormLabel>
+                  <Input
+                    type="date"
+                    value={application.immigration_expected_date || ''}
+                    onChange={(e) => handleUpdateField('immigration_expected_date', e.target.value)}
+                  />
+                </FormItem>
+                <FormItem>
+                  <FormLabel>Cost (AED)</FormLabel>
+                  <Input
+                    type="number"
+                    value={application.immigration_cost || ''}
+                    onChange={(e) => handleUpdateField('immigration_cost', parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                  />
+                </FormItem>
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    <AlertTriangle className="h-4 w-4 inline mr-1" />
+                    Immigration processing typically takes up to 2 months
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         );
 
@@ -249,13 +283,24 @@ export const VisaApplicationModal = ({
               />
             </div>
             {application.tawjeeh_required && (
-              <div className="flex items-center justify-between">
-                <FormLabel>Tawjeeh Completed</FormLabel>
-                <Switch
-                  checked={application.tawjeeh_completed || false}
-                  onCheckedChange={(v) => handleUpdateField('tawjeeh_completed', v)}
-                />
-              </div>
+              <>
+                <div className="flex items-center justify-between">
+                  <FormLabel>Tawjeeh Completed</FormLabel>
+                  <Switch
+                    checked={application.tawjeeh_completed || false}
+                    onCheckedChange={(v) => handleUpdateField('tawjeeh_completed', v)}
+                  />
+                </div>
+                <FormItem>
+                  <FormLabel>Cost (AED)</FormLabel>
+                  <Input
+                    type="number"
+                    value={application.tawjeeh_cost || ''}
+                    onChange={(e) => handleUpdateField('tawjeeh_cost', parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                  />
+                </FormItem>
+              </>
             )}
           </div>
         );
@@ -263,69 +308,82 @@ export const VisaApplicationModal = ({
       case 'medical_examination':
         return (
           <div className="space-y-4">
-            <FormItem>
-              <FormLabel>Medical Status</FormLabel>
-              <Select
-                value={application.medical_status || 'Pending'}
-                onValueChange={(v) => handleUpdateField('medical_status', v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pending">Pending</SelectItem>
-                  <SelectItem value="Scheduled">Scheduled</SelectItem>
-                  <SelectItem value="Passed">Passed</SelectItem>
-                  <SelectItem value="Failed">Failed</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormItem>
-            <FormItem>
-              <FormLabel>Scheduled Date</FormLabel>
-              <Input
-                type="date"
-                value={application.medical_scheduled_date || ''}
-                onChange={(e) => handleUpdateField('medical_scheduled_date', e.target.value)}
+            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+              <div>
+                <FormLabel>Stage Required</FormLabel>
+                <p className="text-xs text-muted-foreground">Skip if not required</p>
+              </div>
+              <Switch
+                checked={application.medical_required !== false}
+                onCheckedChange={(v) => handleUpdateField('medical_required', v)}
               />
-            </FormItem>
-            <FormItem>
-              <FormLabel>Result Notes</FormLabel>
-              <Textarea
-                value={application.medical_result || ''}
-                onChange={(e) => handleUpdateField('medical_result', e.target.value)}
-                placeholder="Enter medical examination results"
-              />
-            </FormItem>
+            </div>
+            {application.medical_required !== false && (
+              <>
+                <FormItem>
+                  <FormLabel>Medical Status</FormLabel>
+                  <Select
+                    value={application.medical_status || 'Pending'}
+                    onValueChange={(v) => handleUpdateField('medical_status', v)}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Scheduled">Scheduled</SelectItem>
+                      <SelectItem value="Passed">Passed</SelectItem>
+                      <SelectItem value="Failed">Failed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+                <FormItem>
+                  <FormLabel>Scheduled Date</FormLabel>
+                  <Input type="date" value={application.medical_scheduled_date || ''} onChange={(e) => handleUpdateField('medical_scheduled_date', e.target.value)} />
+                </FormItem>
+                <FormItem>
+                  <FormLabel>Cost (AED)</FormLabel>
+                  <Input type="number" value={application.medical_cost || ''} onChange={(e) => handleUpdateField('medical_cost', parseFloat(e.target.value) || 0)} placeholder="0.00" />
+                </FormItem>
+              </>
+            )}
           </div>
         );
 
       case 'daman_insurance':
         return (
           <div className="space-y-4">
-            <FormItem>
-              <FormLabel>Daman Status</FormLabel>
-              <Select
-                value={application.daman_status || 'Pending'}
-                onValueChange={(v) => handleUpdateField('daman_status', v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pending">Pending</SelectItem>
-                  <SelectItem value="Applied">Applied</SelectItem>
-                  <SelectItem value="Approved">Approved</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormItem>
-            <FormItem>
-              <FormLabel>Policy Number</FormLabel>
-              <Input
-                value={application.daman_policy_no || ''}
-                onChange={(e) => handleUpdateField('daman_policy_no', e.target.value)}
-                placeholder="Enter Daman policy number"
+            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+              <div>
+                <FormLabel>Stage Required</FormLabel>
+                <p className="text-xs text-muted-foreground">Skip if not required</p>
+              </div>
+              <Switch
+                checked={application.daman_required !== false}
+                onCheckedChange={(v) => handleUpdateField('daman_required', v)}
               />
-            </FormItem>
+            </div>
+            {application.daman_required !== false && (
+              <>
+                <FormItem>
+                  <FormLabel>Daman Status</FormLabel>
+                  <Select value={application.daman_status || 'Pending'} onValueChange={(v) => handleUpdateField('daman_status', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Applied">Applied</SelectItem>
+                      <SelectItem value="Approved">Approved</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+                <FormItem>
+                  <FormLabel>Policy Number</FormLabel>
+                  <Input value={application.daman_policy_no || ''} onChange={(e) => handleUpdateField('daman_policy_no', e.target.value)} placeholder="Enter policy number" />
+                </FormItem>
+                <FormItem>
+                  <FormLabel>Cost (AED)</FormLabel>
+                  <Input type="number" value={application.daman_cost || ''} onChange={(e) => handleUpdateField('daman_cost', parseFloat(e.target.value) || 0)} placeholder="0.00" />
+                </FormItem>
+              </>
+            )}
           </div>
         );
 
@@ -334,13 +392,8 @@ export const VisaApplicationModal = ({
           <div className="space-y-4">
             <FormItem>
               <FormLabel>Residence Visa Status</FormLabel>
-              <Select
-                value={application.residence_visa_status || 'Pending'}
-                onValueChange={(v) => handleUpdateField('residence_visa_status', v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={application.residence_visa_status || 'Pending'} onValueChange={(v) => handleUpdateField('residence_visa_status', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Pending">Pending</SelectItem>
                   <SelectItem value="Applied">Applied</SelectItem>
@@ -350,27 +403,20 @@ export const VisaApplicationModal = ({
             </FormItem>
             <FormItem>
               <FormLabel>Visa Number</FormLabel>
-              <Input
-                value={application.residence_visa_no || ''}
-                onChange={(e) => handleUpdateField('residence_visa_no', e.target.value)}
-                placeholder="Enter residence visa number"
-              />
+              <Input value={application.residence_visa_no || ''} onChange={(e) => handleUpdateField('residence_visa_no', e.target.value)} placeholder="Enter visa number" />
+            </FormItem>
+            <FormItem>
+              <FormLabel>Cost (AED)</FormLabel>
+              <Input type="number" value={application.residence_visa_cost || ''} onChange={(e) => handleUpdateField('residence_visa_cost', parseFloat(e.target.value) || 0)} placeholder="0.00" />
             </FormItem>
             <Separator />
             <div className="flex items-center justify-between">
               <FormLabel>Emirates ID Applied</FormLabel>
-              <Switch
-                checked={application.emirates_id_applied || false}
-                onCheckedChange={(v) => handleUpdateField('emirates_id_applied', v)}
-              />
+              <Switch checked={application.emirates_id_applied || false} onCheckedChange={(v) => handleUpdateField('emirates_id_applied', v)} />
             </div>
             <FormItem>
               <FormLabel>Emirates ID Reference</FormLabel>
-              <Input
-                value={application.emirates_id_ref_no || ''}
-                onChange={(e) => handleUpdateField('emirates_id_ref_no', e.target.value)}
-                placeholder="Enter Emirates ID reference number"
-              />
+              <Input value={application.emirates_id_ref_no || ''} onChange={(e) => handleUpdateField('emirates_id_ref_no', e.target.value)} placeholder="Enter EID reference" />
             </FormItem>
           </div>
         );
