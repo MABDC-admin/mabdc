@@ -9,8 +9,10 @@ import { useEmployeeEducation, useAddEducation, useDeleteEducation } from '@/hoo
 import { useDocumentCompleteness } from '@/hooks/useDocumentCompleteness';
 import { 
   useEmployeeTicketAllowance, 
-  calculateTicketEligibilityDate, 
-  isEligibleForTicketAllowance 
+  getAllTicketCycles,
+  calculateYearsOfService,
+  useCreateTicketAllowance,
+  type TicketCycle,
 } from '@/hooks/useTicketAllowance';
 import { EditEmployeeModal } from './EditEmployeeModal';
 import { LeaveRequestModal } from './LeaveRequestModal';
@@ -122,42 +124,42 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
   // Ticket allowance hook
   const { data: ticketAllowanceRecords = [] } = useEmployeeTicketAllowance(currentEmployee?.id || '');
 
-  // Ticket allowance status helper
-  const getTicketAllowanceInfo = () => {
+  // Ticket allowance creation hook
+  const createTicketAllowance = useCreateTicketAllowance();
+
+  // Get all ticket cycles with proper biennial calculation
+  const getTicketAllowanceInfo = (): { 
+    joiningDate: Date;
+    serviceLength: { years: number; months: number };
+    cycles: TicketCycle[];
+    nextCycle: TicketCycle | null;
+  } | null => {
     if (!currentEmployee?.joining_date) return null;
     
     const joiningDate = new Date(currentEmployee.joining_date);
-    const eligibilityDate = calculateTicketEligibilityDate(joiningDate);
-    const isEligible = isEligibleForTicketAllowance(joiningDate);
-    const currentYear = new Date().getFullYear();
-    
-    // Check if there's a record for the current year
-    const currentYearRecord = ticketAllowanceRecords.find(
-      r => r.eligibility_year === currentYear
-    );
-    
-    // Get the most recent record
-    const latestRecord = ticketAllowanceRecords[0];
-    
-    let status: 'not_eligible' | 'eligible_no_record' | 'pending' | 'approved' | 'processed' | 'cancelled';
-    
-    if (!isEligible) {
-      status = 'not_eligible';
-    } else if (!currentYearRecord) {
-      status = 'eligible_no_record';
-    } else {
-      status = currentYearRecord.status;
-    }
+    const serviceLength = calculateYearsOfService(joiningDate);
+    const cycles = getAllTicketCycles(joiningDate, ticketAllowanceRecords);
+    const nextCycle = cycles.find(c => !c.isPast) || null;
     
     return {
       joiningDate,
-      eligibilityDate,
-      isEligible,
-      currentYearRecord,
-      latestRecord,
-      status,
-      amount: currentYearRecord?.amount || latestRecord?.amount || null,
+      serviceLength,
+      cycles,
+      nextCycle,
     };
+  };
+
+  // Create missing ticket allowance record
+  const handleCreateMissingRecord = async (cycle: TicketCycle) => {
+    if (!currentEmployee) return;
+    
+    const eligibilityDateStr = cycle.eligibilityDate.toISOString().split('T')[0];
+    
+    await createTicketAllowance.mutateAsync({
+      employee_id: currentEmployee.id,
+      eligibility_year: cycle.eligibilityYear,
+      eligibility_start_date: eligibilityDateStr,
+    });
   };
 
   if (!currentEmployee) return null;
@@ -748,7 +750,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                     </div>
                   </div>
 
-                  {/* Ticket Allowance Status Card */}
+                  {/* Ticket Allowance Status Card with History */}
                   <div className="glass-card rounded-2xl border border-border p-5">
                     <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-3 flex items-center gap-2">
                       <Plane className="w-4 h-4" />
@@ -759,122 +761,138 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                       const info = getTicketAllowanceInfo();
                       if (!info) return <p className="text-sm text-muted-foreground">No joining date available</p>;
                       
+                      const { joiningDate, serviceLength, cycles, nextCycle } = info;
+                      
                       return (
-                        <div className="space-y-3">
-                          {/* Eligibility Date */}
-                          <div>
-                            <p className="text-xs text-muted-foreground">Eligibility Date</p>
-                            <p className="text-lg font-semibold">
-                              {format(info.eligibilityDate, 'dd MMM yyyy')}
-                            </p>
+                        <div className="space-y-4">
+                          {/* Joining Date & Service Length */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Joining Date</p>
+                              <p className="text-sm font-semibold">
+                                {format(joiningDate, 'dd MMM yyyy')}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Service Length</p>
+                              <p className="text-sm font-semibold">
+                                {serviceLength.years} yrs {serviceLength.months} mos
+                              </p>
+                            </div>
                           </div>
                           
-                          {/* Status Indicator */}
-                          <div className={cn(
-                            "flex items-center gap-2 p-3 rounded-lg border",
-                            info.status === 'processed' && "bg-emerald-500/10 border-emerald-500/30",
-                            info.status === 'approved' && "bg-blue-500/10 border-blue-500/30",
-                            info.status === 'pending' && "bg-amber-500/10 border-amber-500/30",
-                            info.status === 'cancelled' && "bg-muted/30 border-border",
-                            (info.status === 'not_eligible' || info.status === 'eligible_no_record') && 
-                              "bg-muted/30 border-border"
-                          )}>
-                            {info.status === 'processed' && (
-                              <>
-                                <CheckCircle className="w-4 h-4 text-emerald-500" />
-                                <div>
-                                  <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                                    Processed
-                                  </span>
-                                  {info.amount && (
-                                    <p className="text-xs text-muted-foreground">
-                                      AED {info.amount.toLocaleString()}
-                                    </p>
-                                  )}
-                                </div>
-                              </>
-                            )}
-                            
-                            {info.status === 'approved' && (
-                              <>
-                                <CheckCircle className="w-4 h-4 text-blue-500" />
-                                <div>
-                                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                                    Approved - Awaiting Payroll
-                                  </span>
-                                  {info.amount && (
-                                    <p className="text-xs text-muted-foreground">
-                                      AED {info.amount.toLocaleString()}
-                                    </p>
-                                  )}
-                                </div>
-                              </>
-                            )}
-                            
-                            {info.status === 'pending' && (
-                              <>
-                                <Clock className="w-4 h-4 text-amber-500" />
-                                <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                                  Pending HR Approval
-                                </span>
-                              </>
-                            )}
-                            
-                            {info.status === 'not_eligible' && (
-                              <>
-                                <Calendar className="w-4 h-4 text-muted-foreground" />
-                                <div>
-                                  <span className="text-sm font-medium text-muted-foreground">
-                                    Not Yet Eligible
-                                  </span>
-                                  <p className="text-xs text-muted-foreground">
-                                    {differenceInDays(info.eligibilityDate, new Date())} days remaining
-                                  </p>
-                                </div>
-                              </>
-                            )}
-                            
-                            {info.status === 'eligible_no_record' && (
-                              <>
-                                <Plane className="w-4 h-4 text-primary" />
-                                <span className="text-sm font-medium text-primary">
-                                  Eligible - Record Pending
-                                </span>
-                              </>
-                            )}
-                            
-                            {info.status === 'cancelled' && (
-                              <>
-                                <X className="w-4 h-4 text-muted-foreground" />
-                                <span className="text-sm font-medium text-muted-foreground">
-                                  Cancelled
-                                </span>
-                              </>
-                            )}
-                          </div>
-                          
-                          {/* History (if any previous records) */}
-                          {ticketAllowanceRecords.length > 1 && (
-                            <div className="pt-2 border-t border-border">
-                              <p className="text-xs text-muted-foreground mb-2">Previous Years</p>
-                              <div className="space-y-1">
-                                {ticketAllowanceRecords.slice(1, 4).map(record => (
-                                  <div key={record.id} className="flex justify-between text-xs">
-                                    <span>{record.eligibility_year}</span>
-                                    <span className={cn(
-                                      record.status === 'processed' && "text-emerald-500",
-                                      record.status === 'approved' && "text-blue-500",
-                                      record.status === 'cancelled' && "text-muted-foreground",
-                                      record.status === 'pending' && "text-amber-500"
-                                    )}>
-                                      {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-                                      {record.amount && ` - AED ${record.amount.toLocaleString()}`}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
+                          {/* Next Eligibility */}
+                          {nextCycle && (
+                            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                              <p className="text-xs text-muted-foreground">Next Eligibility</p>
+                              <p className="text-lg font-bold text-primary">
+                                {format(nextCycle.eligibilityDate, 'dd MMM yyyy')}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {nextCycle.cycleNumber === 1 ? '1st' : 
+                                 nextCycle.cycleNumber === 2 ? '2nd' : 
+                                 nextCycle.cycleNumber === 3 ? '3rd' : 
+                                 `${nextCycle.cycleNumber}th`} Ticket • {differenceInDays(nextCycle.eligibilityDate, new Date())} days remaining
+                              </p>
                             </div>
                           )}
+                          
+                          {/* Ticket History */}
+                          <div className="pt-2 border-t border-border">
+                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">TICKET HISTORY</p>
+                            <div className="space-y-2">
+                              {cycles.map((cycle) => {
+                                const cycleLabel = cycle.cycleNumber === 1 ? '1st Ticket' : 
+                                                   cycle.cycleNumber === 2 ? '2nd Ticket' : 
+                                                   cycle.cycleNumber === 3 ? '3rd Ticket' : 
+                                                   `${cycle.cycleNumber}th Ticket`;
+                                
+                                return (
+                                  <div 
+                                    key={cycle.cycleNumber} 
+                                    className={cn(
+                                      "flex items-center justify-between p-2 rounded-lg border text-sm",
+                                      cycle.status === 'processed' && "bg-emerald-500/10 border-emerald-500/30",
+                                      cycle.status === 'approved' && "bg-blue-500/10 border-blue-500/30",
+                                      cycle.status === 'pending' && "bg-amber-500/10 border-amber-500/30",
+                                      cycle.status === 'cancelled' && "bg-muted/30 border-border",
+                                      cycle.status === 'missing' && "bg-destructive/10 border-destructive/30",
+                                      cycle.status === 'not_yet_eligible' && "bg-muted/30 border-border",
+                                    )}
+                                  >
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{cycleLabel}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {format(cycle.eligibilityDate, 'dd MMM yyyy')}
+                                      </span>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2">
+                                      {cycle.status === 'processed' && (
+                                        <div className="flex items-center gap-1.5">
+                                          <CheckCircle className="w-4 h-4 text-emerald-500" />
+                                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                                            Processed
+                                            {cycle.record?.amount && ` - AED ${cycle.record.amount.toLocaleString()}`}
+                                          </span>
+                                        </div>
+                                      )}
+                                      
+                                      {cycle.status === 'approved' && (
+                                        <div className="flex items-center gap-1.5">
+                                          <CheckCircle className="w-4 h-4 text-blue-500" />
+                                          <span className="text-blue-600 dark:text-blue-400 font-medium">
+                                            Approved
+                                            {cycle.record?.amount && ` - AED ${cycle.record.amount.toLocaleString()}`}
+                                          </span>
+                                        </div>
+                                      )}
+                                      
+                                      {cycle.status === 'pending' && (
+                                        <div className="flex items-center gap-1.5">
+                                          <Clock className="w-4 h-4 text-amber-500" />
+                                          <span className="text-amber-600 dark:text-amber-400 font-medium">
+                                            Pending
+                                          </span>
+                                        </div>
+                                      )}
+                                      
+                                      {cycle.status === 'cancelled' && (
+                                        <div className="flex items-center gap-1.5">
+                                          <X className="w-4 h-4 text-muted-foreground" />
+                                          <span className="text-muted-foreground font-medium">
+                                            Cancelled
+                                          </span>
+                                        </div>
+                                      )}
+                                      
+                                      {cycle.status === 'missing' && (
+                                        <Button 
+                                          size="sm" 
+                                          variant="outline"
+                                          className="h-7 text-xs border-destructive/50 text-destructive hover:bg-destructive/10"
+                                          onClick={() => handleCreateMissingRecord(cycle)}
+                                          disabled={createTicketAllowance.isPending}
+                                        >
+                                          <Plus className="w-3 h-3 mr-1" />
+                                          Create Record
+                                        </Button>
+                                      )}
+                                      
+                                      {cycle.status === 'not_yet_eligible' && (
+                                        <div className="flex items-center gap-1.5">
+                                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                                          <span className="text-muted-foreground font-medium">
+                                            Not Yet Eligible
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
                       );
                     })()}

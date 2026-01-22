@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-interface TicketAllowanceRecord {
+export interface TicketAllowanceRecord {
   id: string;
   employee_id: string;
   eligibility_year: number;
@@ -35,31 +35,125 @@ interface TicketAllowanceAuditLog {
   created_at: string;
 }
 
-// Calculate ticket allowance eligibility date (2 years from joining, then Jan 1st of that year)
-export function calculateTicketEligibilityDate(joiningDate: Date): Date {
-  const eligibilityDate = new Date(joiningDate);
-  eligibilityDate.setFullYear(eligibilityDate.getFullYear() + 2);
-  // Return January 1st of the eligibility year
-  return new Date(eligibilityDate.getFullYear(), 0, 1);
+// Ticket Cycle interface for UI
+export interface TicketCycle {
+  cycleNumber: number; // 1st, 2nd, 3rd...
+  eligibilityDate: Date;
+  eligibilityYear: number;
+  isPast: boolean; // Has the eligibility date passed?
+  record: TicketAllowanceRecord | null;
+  status: 'processed' | 'approved' | 'pending' | 'cancelled' | 'missing' | 'not_yet_eligible';
 }
 
-// Check if employee is eligible for ticket allowance
+// Calculate the exact eligibility date for a specific cycle (1st, 2nd, 3rd...)
+// 1st cycle = joining + 2 years, 2nd cycle = joining + 4 years, etc.
+export function getTicketEligibilityDate(joiningDate: Date, cycleNumber: number): Date {
+  const eligibilityDate = new Date(joiningDate);
+  eligibilityDate.setFullYear(eligibilityDate.getFullYear() + (cycleNumber * 2));
+  return eligibilityDate;
+}
+
+// Get all ticket cycles for an employee (past + 1 future)
+export function getAllTicketCycles(
+  joiningDate: Date, 
+  records: TicketAllowanceRecord[]
+): TicketCycle[] {
+  const cycles: TicketCycle[] = [];
+  const today = new Date();
+  let cycleNumber = 1;
+  
+  // Create a map of records by eligibility_year for quick lookup
+  const recordsByYear = new Map<number, TicketAllowanceRecord>();
+  records.forEach(r => recordsByYear.set(r.eligibility_year, r));
+  
+  while (true) {
+    const eligibilityDate = getTicketEligibilityDate(joiningDate, cycleNumber);
+    const eligibilityYear = eligibilityDate.getFullYear();
+    const isPast = eligibilityDate <= today;
+    
+    // Find matching record
+    const record = recordsByYear.get(eligibilityYear) || null;
+    
+    // Determine status
+    let status: TicketCycle['status'];
+    if (!isPast) {
+      status = 'not_yet_eligible';
+    } else if (!record) {
+      status = 'missing';
+    } else {
+      status = record.status;
+    }
+    
+    cycles.push({
+      cycleNumber,
+      eligibilityDate,
+      eligibilityYear,
+      isPast,
+      record,
+      status,
+    });
+    
+    // Stop after adding one future cycle
+    if (!isPast) {
+      break;
+    }
+    
+    cycleNumber++;
+    
+    // Safety limit to prevent infinite loops
+    if (cycleNumber > 25) break;
+  }
+  
+  return cycles;
+}
+
+// Get the next upcoming eligibility date
+export function getNextTicketEligibilityDate(
+  joiningDate: Date, 
+  records: TicketAllowanceRecord[]
+): { cycleNumber: number; date: Date; year: number } | null {
+  const cycles = getAllTicketCycles(joiningDate, records);
+  const nextCycle = cycles.find(c => !c.isPast);
+  
+  if (nextCycle) {
+    return {
+      cycleNumber: nextCycle.cycleNumber,
+      date: nextCycle.eligibilityDate,
+      year: nextCycle.eligibilityYear,
+    };
+  }
+  
+  return null;
+}
+
+// Check if employee is currently eligible for ticket allowance (has at least 2 years of service)
 export function isEligibleForTicketAllowance(joiningDate: Date): boolean {
   const today = new Date();
-  const eligibilityDate = calculateTicketEligibilityDate(joiningDate);
-  return today >= eligibilityDate;
+  const firstEligibilityDate = getTicketEligibilityDate(joiningDate, 1);
+  return today >= firstEligibilityDate;
 }
 
-// Get current eligibility year for an employee
-export function getEligibilityYear(joiningDate: Date): number | null {
-  if (!isEligibleForTicketAllowance(joiningDate)) return null;
-  
+// Calculate years of service from joining date
+export function calculateYearsOfService(joiningDate: Date): { years: number; months: number } {
   const today = new Date();
-  const twoYearsFromJoining = new Date(joiningDate);
-  twoYearsFromJoining.setFullYear(twoYearsFromJoining.getFullYear() + 2);
+  let years = today.getFullYear() - joiningDate.getFullYear();
+  let months = today.getMonth() - joiningDate.getMonth();
   
-  // The eligibility year is the year that starts on Jan 1st after completing 2 years
-  return twoYearsFromJoining.getFullYear();
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+  
+  // Adjust for day of month
+  if (today.getDate() < joiningDate.getDate()) {
+    months--;
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+  }
+  
+  return { years, months };
 }
 
 // Fetch all pending ticket allowance reminders (for HR dashboard)
@@ -184,6 +278,7 @@ export function useCreateTicketAllowance() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ticket-allowance-reminders'] });
       queryClient.invalidateQueries({ queryKey: ['ticket-allowance-records'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-ticket-allowance'] });
       toast.success('Ticket allowance record created');
     },
     onError: (error: Error) => {
@@ -225,6 +320,7 @@ export function useApproveTicketAllowance() {
       queryClient.invalidateQueries({ queryKey: ['ticket-allowance-reminders'] });
       queryClient.invalidateQueries({ queryKey: ['ticket-allowance-records'] });
       queryClient.invalidateQueries({ queryKey: ['approved-ticket-allowances'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-ticket-allowance'] });
       toast.success('Ticket allowance approved');
     },
     onError: (error: Error) => {
@@ -265,6 +361,7 @@ export function useProcessTicketAllowance() {
       queryClient.invalidateQueries({ queryKey: ['ticket-allowance-reminders'] });
       queryClient.invalidateQueries({ queryKey: ['ticket-allowance-records'] });
       queryClient.invalidateQueries({ queryKey: ['approved-ticket-allowances'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-ticket-allowance'] });
       toast.success('Ticket allowance processed into payroll');
     },
     onError: (error: Error) => {
@@ -303,6 +400,7 @@ export function useCancelTicketAllowance() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ticket-allowance-reminders'] });
       queryClient.invalidateQueries({ queryKey: ['ticket-allowance-records'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-ticket-allowance'] });
       toast.success('Ticket allowance cancelled');
     },
     onError: (error: Error) => {
@@ -364,46 +462,54 @@ export function useTicketAllowanceAuditLog(ticketAllowanceId: string) {
   });
 }
 
-// Check and create ticket allowance records for eligible employees
+// Check and create ticket allowance records for ALL eligible cycles for employees
 export function useCheckTicketEligibility() {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: async (employees: Array<{ id: string; joining_date: string; full_name: string }>) => {
-      const currentYear = new Date().getFullYear();
+      const today = new Date();
       const results: { created: number; skipped: number } = { created: 0, skipped: 0 };
       
       for (const employee of employees) {
         const joiningDate = new Date(employee.joining_date);
         
-        if (isEligibleForTicketAllowance(joiningDate)) {
-          const eligibilityYear = getEligibilityYear(joiningDate);
+        // Get existing records for this employee
+        const { data: existingRecords } = await supabase
+          .from('ticket_allowance_records')
+          .select('eligibility_year')
+          .eq('employee_id', employee.id);
+        
+        const existingYears = new Set((existingRecords || []).map(r => r.eligibility_year));
+        
+        // Calculate all cycles
+        const cycles = getAllTicketCycles(joiningDate, []);
+        
+        // Create records for all past cycles that are missing
+        for (const cycle of cycles) {
+          if (!cycle.isPast) continue; // Skip future cycles
           
-          if (eligibilityYear && eligibilityYear <= currentYear) {
-            // Check if record already exists for this year
-            const { data: existing } = await supabase
-              .from('ticket_allowance_records')
-              .select('id')
-              .eq('employee_id', employee.id)
-              .eq('eligibility_year', eligibilityYear)
-              .single();
-            
-            if (!existing) {
-              // Create new record
-              await supabase
-                .from('ticket_allowance_records')
-                .insert({
-                  employee_id: employee.id,
-                  eligibility_year: eligibilityYear,
-                  eligibility_start_date: `${eligibilityYear}-01-01`,
-                  status: 'pending',
-                  reminder_active: true,
-                });
-              
-              results.created++;
-            } else {
-              results.skipped++;
-            }
+          if (existingYears.has(cycle.eligibilityYear)) {
+            results.skipped++;
+            continue;
+          }
+          
+          // Format the eligibility date correctly
+          const eligibilityDateStr = cycle.eligibilityDate.toISOString().split('T')[0];
+          
+          // Create new record with exact anniversary date
+          const { error } = await supabase
+            .from('ticket_allowance_records')
+            .insert({
+              employee_id: employee.id,
+              eligibility_year: cycle.eligibilityYear,
+              eligibility_start_date: eligibilityDateStr,
+              status: 'pending',
+              reminder_active: true,
+            });
+          
+          if (!error) {
+            results.created++;
           }
         }
       }
@@ -413,6 +519,7 @@ export function useCheckTicketEligibility() {
     onSuccess: (results) => {
       queryClient.invalidateQueries({ queryKey: ['ticket-allowance-reminders'] });
       queryClient.invalidateQueries({ queryKey: ['ticket-allowance-records'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-ticket-allowance'] });
       if (results.created > 0) {
         toast.success(`Created ${results.created} ticket allowance reminder(s)`);
       } else {

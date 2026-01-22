@@ -12,17 +12,41 @@ interface Employee {
   status: string;
 }
 
-function isEligibleForTicketAllowance(joiningDate: Date): boolean {
-  const today = new Date();
-  const twoYearsAgo = new Date(today);
-  twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-  return joiningDate <= twoYearsAgo;
+// Calculate the exact eligibility date for a specific cycle (1st, 2nd, 3rd...)
+// 1st cycle = joining + 2 years, 2nd cycle = joining + 4 years, etc.
+function getTicketEligibilityDate(joiningDate: Date, cycleNumber: number): Date {
+  const eligibilityDate = new Date(joiningDate);
+  eligibilityDate.setFullYear(eligibilityDate.getFullYear() + (cycleNumber * 2));
+  return eligibilityDate;
 }
 
-function getEligibilityYear(joiningDate: Date): number {
-  const twoYearsFromJoining = new Date(joiningDate);
-  twoYearsFromJoining.setFullYear(twoYearsFromJoining.getFullYear() + 2);
-  return twoYearsFromJoining.getFullYear();
+// Get all past ticket cycles for an employee
+function getAllPastTicketCycles(joiningDate: Date): Array<{ cycleNumber: number; eligibilityDate: Date; eligibilityYear: number }> {
+  const cycles: Array<{ cycleNumber: number; eligibilityDate: Date; eligibilityYear: number }> = [];
+  const today = new Date();
+  let cycleNumber = 1;
+  
+  while (true) {
+    const eligibilityDate = getTicketEligibilityDate(joiningDate, cycleNumber);
+    
+    // Only include past cycles (eligibility date has passed)
+    if (eligibilityDate > today) {
+      break;
+    }
+    
+    cycles.push({
+      cycleNumber,
+      eligibilityDate,
+      eligibilityYear: eligibilityDate.getFullYear(),
+    });
+    
+    cycleNumber++;
+    
+    // Safety limit
+    if (cycleNumber > 25) break;
+  }
+  
+  return cycles;
 }
 
 Deno.serve(async (req) => {
@@ -36,7 +60,6 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const currentYear = new Date().getFullYear();
     const results = {
       checked: 0,
       created: 0,
@@ -66,72 +89,72 @@ Deno.serve(async (req) => {
 
       const joiningDate = new Date(employee.joining_date);
       
-      if (!isEligibleForTicketAllowance(joiningDate)) {
-        results.skipped++;
-        continue;
-      }
-
-      const eligibilityYear = getEligibilityYear(joiningDate);
+      // Get all past cycles for this employee
+      const pastCycles = getAllPastTicketCycles(joiningDate);
       
-      // Only create records for current year or past years that haven't been processed
-      if (eligibilityYear > currentYear) {
+      if (pastCycles.length === 0) {
         results.skipped++;
         continue;
       }
 
-      // Check if record already exists for this employee and year
-      const { data: existing, error: existError } = await supabase
+      // Get existing records for this employee
+      const { data: existingRecords, error: existError } = await supabase
         .from('ticket_allowance_records')
-        .select('id')
-        .eq('employee_id', employee.id)
-        .eq('eligibility_year', currentYear)
-        .single();
+        .select('eligibility_year')
+        .eq('employee_id', employee.id);
 
-      if (existError && existError.code !== 'PGRST116') {
-        // PGRST116 = no rows returned, which is expected
-        results.errors.push(`Error checking existing record for ${employee.full_name}: ${existError.message}`);
+      if (existError) {
+        results.errors.push(`Error fetching records for ${employee.full_name}: ${existError.message}`);
         continue;
       }
 
-      if (existing) {
-        results.skipped++;
-        continue;
-      }
+      const existingYears = new Set((existingRecords || []).map(r => r.eligibility_year));
 
-      // Create new ticket allowance record
-      const { error: insertError } = await supabase
-        .from('ticket_allowance_records')
-        .insert({
-          employee_id: employee.id,
-          eligibility_year: currentYear,
-          eligibility_start_date: `${currentYear}-01-01`,
-          status: 'pending',
-          reminder_active: true,
-        });
+      // Create records for all past cycles that are missing
+      for (const cycle of pastCycles) {
+        if (existingYears.has(cycle.eligibilityYear)) {
+          results.skipped++;
+          continue;
+        }
 
-      if (insertError) {
-        results.errors.push(`Failed to create record for ${employee.full_name}: ${insertError.message}`);
-        continue;
-      }
+        // Format the eligibility date (YYYY-MM-DD)
+        const eligibilityDateStr = cycle.eligibilityDate.toISOString().split('T')[0];
 
-      // Create audit log
-      await supabase.from('ticket_allowance_audit_log').insert({
-        ticket_allowance_id: (await supabase
+        // Create new ticket allowance record with exact anniversary date
+        const { data: insertedRecord, error: insertError } = await supabase
           .from('ticket_allowance_records')
+          .insert({
+            employee_id: employee.id,
+            eligibility_year: cycle.eligibilityYear,
+            eligibility_start_date: eligibilityDateStr,
+            status: 'pending',
+            reminder_active: true,
+          })
           .select('id')
-          .eq('employee_id', employee.id)
-          .eq('eligibility_year', currentYear)
-          .single()).data?.id,
-        action: 'created',
-        details: {
-          source: 'check-ticket-allowance-function',
-          joining_date: employee.joining_date,
-          eligibility_year: currentYear,
-        },
-      });
+          .single();
 
-      results.created++;
-      console.log(`Created ticket allowance record for ${employee.full_name} (${currentYear})`);
+        if (insertError) {
+          results.errors.push(`Failed to create record for ${employee.full_name} (${cycle.eligibilityYear}): ${insertError.message}`);
+          continue;
+        }
+
+        // Create audit log
+        if (insertedRecord) {
+          await supabase.from('ticket_allowance_audit_log').insert({
+            ticket_allowance_id: insertedRecord.id,
+            action: 'created',
+            details: {
+              source: 'check-ticket-allowance-function',
+              joining_date: employee.joining_date,
+              cycle_number: cycle.cycleNumber,
+              eligibility_date: eligibilityDateStr,
+            },
+          });
+        }
+
+        results.created++;
+        console.log(`Created ticket allowance record for ${employee.full_name} - Cycle ${cycle.cycleNumber} (${eligibilityDateStr})`);
+      }
     }
 
     console.log(`Ticket allowance check complete:`, results);
