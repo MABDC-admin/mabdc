@@ -308,38 +308,6 @@ export default function TimeClockView() {
     });
   }, [employees, shiftMap, overridesMap, attendanceMap, selectedDate]);
 
-  const filteredRecords = useMemo(() => {
-    return timeClockRecords.filter(record => {
-      const matchesSearch = 
-        record.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        record.hrmsNo.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      if (!matchesSearch) return false;
-      
-      if (statusFilter === 'all') return true;
-      return record.status.includes(statusFilter as TimeClockStatus);
-    });
-  }, [timeClockRecords, searchQuery, statusFilter]);
-
-  const statusStats = useMemo(() => {
-    const stats: Record<TimeClockStatus, number> = {
-      early_in: 0,
-      late_entry: 0,
-      early_out: 0,
-      late_exit: 0,
-      miss_punch_in: 0,
-      miss_punch_out: 0,
-      on_time: 0,
-      appealed: 0
-    };
-    
-    timeClockRecords.forEach(record => {
-      record.status.forEach(s => stats[s]++);
-    });
-    
-    return stats;
-  }, [timeClockRecords]);
-
   // Get employee IDs who are on approved leave for the selected date
   const employeesOnLeave = useMemo(() => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -360,6 +328,41 @@ export default function TimeClockView() {
     
     return onLeaveIds;
   }, [leaveRecords, selectedDate]);
+
+  const filteredRecords = useMemo(() => {
+    return timeClockRecords
+      .filter(record => record.employeeId !== OWNER_EMPLOYEE_ID) // Exclude owner
+      .filter(record => !employeesOnLeave.has(record.employeeId)) // Exclude on leave
+      .filter(record => {
+        const matchesSearch = 
+          record.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          record.hrmsNo.toLowerCase().includes(searchQuery.toLowerCase());
+        
+        if (!matchesSearch) return false;
+        
+        if (statusFilter === 'all') return true;
+        return record.status.includes(statusFilter as TimeClockStatus);
+      });
+  }, [timeClockRecords, searchQuery, statusFilter, employeesOnLeave]);
+
+  const statusStats = useMemo(() => {
+    const stats: Record<TimeClockStatus, number> = {
+      early_in: 0,
+      late_entry: 0,
+      early_out: 0,
+      late_exit: 0,
+      miss_punch_in: 0,
+      miss_punch_out: 0,
+      on_time: 0,
+      appealed: 0
+    };
+    
+    timeClockRecords.forEach(record => {
+      record.status.forEach(s => stats[s]++);
+    });
+    
+    return stats;
+  }, [timeClockRecords]);
 
   // Filter missed punch records excluding owner and employees on leave
   const filteredMissedPunchIn = useMemo(() => {
