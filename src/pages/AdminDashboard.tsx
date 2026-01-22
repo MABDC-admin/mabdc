@@ -3,7 +3,7 @@ import {
   Shield, Users, Calendar, FileText, DollarSign, ClipboardList, 
   Trash2, Edit, Plus, Download, RefreshCw, Database, BarChart3,
   ChevronDown, AlertTriangle, Star, Scale, LogOut, MessageSquare, FileSignature, UserCog, Megaphone,
-  Lock, KeyRound, Mail
+  Lock, KeyRound, Mail, CalendarClock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -27,6 +27,7 @@ import { AdminUserAccountsSection } from '@/components/admin/AdminUserAccountsSe
 import { AdminAnnouncementsSection } from '@/components/admin/AdminAnnouncementsSection';
 import { HRAssistantChat } from '@/components/admin/HRAssistantChat';
 import { EmailHistorySection } from '@/components/admin/EmailHistorySection';
+import { AdminBulkAttendanceEditor } from '@/components/admin/AdminBulkAttendanceEditor';
 import { useAnnouncements } from '@/hooks/useAnnouncements';
 import { useEmailHistory } from '@/hooks/useEmailHistory';
 import { useAuth } from '@/hooks/useAuth';
@@ -213,6 +214,9 @@ export default function AdminDashboard() {
             <TabsTrigger value="attendance-report" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <ClipboardList className="w-4 h-4 mr-2" />Attendance Report
             </TabsTrigger>
+            <TabsTrigger value="bulk-attendance" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <CalendarClock className="w-4 h-4 mr-2" />Bulk Attendance
+            </TabsTrigger>
             <TabsTrigger value="payroll-report" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <DollarSign className="w-4 h-4 mr-2" />Payroll Report
             </TabsTrigger>
@@ -301,6 +305,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="attendance-report">
             <AdminAttendanceReport />
+          </TabsContent>
+
+          <TabsContent value="bulk-attendance">
+            <AdminBulkAttendanceEditor />
           </TabsContent>
 
           <TabsContent value="payroll-report">
