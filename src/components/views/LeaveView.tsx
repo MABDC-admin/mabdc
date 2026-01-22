@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Check, X, Clock, RefreshCw, Plus, Calendar, FileText, AlertCircle, CalendarDays, Users, Wallet, LayoutGrid, Pencil, CalendarX2, Trash2, Sparkles, History } from 'lucide-react';
+import { Check, X, Clock, RefreshCw, Plus, Calendar, FileText, AlertCircle, CalendarDays, Users, Wallet, LayoutGrid, Pencil, CalendarX2, Trash2, Sparkles, History, Paperclip } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -511,6 +511,17 @@ export function LeaveView() {
                           <p className="text-xs text-muted-foreground mt-2 bg-secondary/30 rounded-lg px-3 py-2">
                             <span className="font-medium">Reason:</span> {record.reason}
                           </p>
+                        )}
+                        {record.attachment_url && (
+                          <a 
+                            href={record.attachment_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 mt-2 text-xs text-primary hover:underline bg-primary/10 px-2 py-1 rounded-md"
+                          >
+                            <Paperclip className="w-3 h-3" />
+                            View Attachment
+                          </a>
                         )}
                       </div>
                       {record.status === 'Pending' && (
