@@ -492,7 +492,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
           <div className="p-6 space-y-6">
             {/* Summary Tab */}
             {activeTab === 'summary' && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="glass-card rounded-2xl border border-border p-5">
                     <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-2">CONTRACT</p>
@@ -972,7 +972,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
 
             {/* Private Information Tab */}
             {activeTab === 'private' && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6">
                 <div className="glass-card rounded-2xl border border-border p-5">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
@@ -1254,7 +1254,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
 
             {/* Education Tab */}
             {activeTab === 'education' && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6">
                 <div className="glass-card rounded-2xl border border-border p-5">
                   <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                     <GraduationCap className="w-5 h-5 text-primary" />
@@ -1355,7 +1355,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
 
             {/* Contract Tab */}
             {activeTab === 'contract' && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6">
                 <div className="glass-card rounded-2xl border border-border p-5">
                   <h3 className="text-lg font-semibold text-foreground mb-4">CONTRACT DETAILS</h3>
                   {employeeContract ? (
@@ -1398,7 +1398,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
 
             {/* Visa & ID Tab */}
             {activeTab === 'visa' && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6">
                 <div className="glass-card rounded-2xl border border-border p-5">
                   <h3 className="text-lg font-semibold text-foreground mb-4">VISA & IDENTIFICATION</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1445,7 +1445,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
 
             {/* Leave Tab */}
             {activeTab === 'leave' && (
-                <div className="space-y-6 animate-fade-in">
+                <div className="space-y-6">
                 <div className="glass-card rounded-2xl border border-border p-5">
                   <h3 className="text-lg font-semibold text-foreground mb-4">LEAVE HISTORY</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -1503,7 +1503,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
 
             {/* Documents Tab */}
             {activeTab === 'documents' && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6">
                 <div className="glass-card rounded-2xl border border-border p-5">
                   <h3 className="text-lg font-semibold text-foreground mb-6 text-center">EMPLOYEE DOCUMENTS</h3>
                   
@@ -2086,7 +2086,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
 
             {/* EOS Tab */}
             {activeTab === 'eos' && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6">
                 <div className="glass-card rounded-2xl border border-border p-5">
                   <h3 className="text-lg font-semibold text-foreground mb-4">END OF SERVICE GRATUITY</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
