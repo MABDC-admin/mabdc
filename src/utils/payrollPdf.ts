@@ -76,7 +76,7 @@ const COLORS = {
   ticketIcon: [59, 130, 246] as [number, number, number],
 };
 
-export function generatePayslipPDF(record: PayrollRecord, settings?: CompanySettings | null) {
+export async function generatePayslipPDF(record: PayrollRecord, settings?: CompanySettings | null) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -84,13 +84,11 @@ export function generatePayslipPDF(record: PayrollRecord, settings?: CompanySett
   
   // Company info
   const companyName = settings?.company_name || 'MABDC';
-  const companyNameArabic = settings?.company_name_arabic || '';
   const companyAddress = settings?.address || 'Al Salam St. Al Ferdous Tower';
   const companyCity = settings?.city || settings?.emirate || 'Abu Dhabi';
   const companyCountry = settings?.country || 'United Arab Emirates';
   const companyPhone = settings?.phone || '';
   const companyEmail = settings?.email || '';
-  const companyWebsite = settings?.website || '';
   const currency = settings?.currency || 'AED';
   
   const monthData = formatMonthData(record.month);
@@ -99,28 +97,45 @@ export function generatePayslipPDF(record: PayrollRecord, settings?: CompanySett
   doc.setFillColor(...COLORS.primary);
   doc.rect(0, 0, pageWidth, 40, 'F');
   
-  // Company logo/initials circle
-  doc.setFillColor(...COLORS.white);
-  doc.circle(margin + 12, 20, 10, 'F');
-  doc.setFillColor(...COLORS.primary);
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLORS.primary);
-  doc.text('M.A', margin + 12, 18, { align: 'center' });
-  doc.setFontSize(4);
-  doc.text('BRAIN DEV', margin + 12, 22, { align: 'center' });
-  doc.text('CENTER', margin + 12, 25, { align: 'center' });
+  // Company logo - try to load from URL, fallback to initials
+  const logoUrl = settings?.logo_url;
+  let logoLoaded = false;
+  
+  if (logoUrl) {
+    try {
+      const response = await fetch(logoUrl);
+      const blob = await response.blob();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      
+      // Add logo image (20x20 size, positioned in header)
+      doc.addImage(base64, 'PNG', margin + 2, 10, 20, 20);
+      logoLoaded = true;
+    } catch (error) {
+      console.warn('Failed to load company logo:', error);
+    }
+  }
+  
+  // Fallback to initials if logo didn't load
+  if (!logoLoaded) {
+    const initials = companyName.split(' ').map(w => w[0]).join('').substring(0, 3);
+    doc.setFillColor(...COLORS.white);
+    doc.circle(margin + 12, 20, 10, 'F');
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...COLORS.primary);
+    doc.text(initials, margin + 12, 22, { align: 'center' });
+  }
   
   // Company info on right
   doc.setTextColor(...COLORS.white);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(companyName.toUpperCase(), pageWidth - margin, 12, { align: 'right' });
-  
-  if (companyNameArabic) {
-    doc.setFontSize(10);
-    doc.text(companyNameArabic, pageWidth - margin, 18, { align: 'right' });
-  }
+  doc.text(companyName.toUpperCase(), pageWidth - margin, 15, { align: 'right' });
   
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
@@ -235,7 +250,10 @@ export function generatePayslipPDF(record: PayrollRecord, settings?: CompanySett
   doc.setFont('helvetica', 'bold');
   if (record.wps_processed) {
     doc.setTextColor(...COLORS.primary);
-    doc.text('WPS Processed ✓', rightValueX, rightY);
+    doc.text('WPS Processed', rightValueX, rightY);
+    // Add a small green circle indicator instead of checkmark
+    doc.setFillColor(...COLORS.primary);
+    doc.circle(rightValueX + 36, rightY - 1.5, 2, 'F');
   } else {
     doc.setTextColor(245, 158, 11);
     doc.text('Pending', rightValueX, rightY);
@@ -369,8 +387,9 @@ export function generatePayslipPDF(record: PayrollRecord, settings?: CompanySett
     doc.setFontSize(8);
     doc.setTextColor(...COLORS.ticketIcon);
     doc.setFont('helvetica', 'bold');
-    doc.text('✈', margin + 6, ticketStatusY + 7.5);
-    doc.text('Ticket Allowance Status:', margin + 12, ticketStatusY + 7.5);
+    // Use text label instead of plane emoji (Unicode not supported by jsPDF default fonts)
+    doc.text('[FLIGHT]', margin + 4, ticketStatusY + 7.5);
+    doc.text('Ticket Allowance Status:', margin + 22, ticketStatusY + 7.5);
     
     let statusText = '';
     switch (record.ticket_allowance_status) {
@@ -572,7 +591,7 @@ function getEarningsBreakdown(record: PayrollRecord): Array<{ label: string; amo
   }
   
   if (record.ticket_allowance && record.ticket_allowance > 0) {
-    earnings.push({ label: '✈️ Ticket Allowance', amount: record.ticket_allowance });
+    earnings.push({ label: 'Ticket Allowance', amount: record.ticket_allowance });
   }
   
   if (record.other_allowances && record.other_allowances > 0) {
@@ -629,7 +648,7 @@ function formatEarningLabel(type: string): string {
     'housing_allowance': 'Housing Rental Allowance',
     'transport_allowance': 'Transportation Allowance',
     'transportation_allowance': 'Transportation Allowance',
-    'ticket_allowance': '✈️ Ticket Allowance',
+    'ticket_allowance': 'Ticket Allowance',
     'other_allowances': 'Other Allowances',
     'other': 'Other Allowances',
   };

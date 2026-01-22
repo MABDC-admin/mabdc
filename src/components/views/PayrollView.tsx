@@ -216,8 +216,8 @@ export function PayrollView() {
     }
   };
 
-  const handlePrintPayslip = (record: any) => {
-    generatePayslipPDF(record, settings);
+  const handlePrintPayslip = async (record: any) => {
+    await generatePayslipPDF(record, settings);
   };
 
   const handleExportAll = () => {
