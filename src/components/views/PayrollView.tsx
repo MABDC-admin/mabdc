@@ -238,12 +238,23 @@ export function PayrollView() {
     const toastId = toast.loading(`Sending payslip to ${workEmail}...`);
 
     try {
-      // Generate PDF and get base64
-      const pdfDoc = await generatePayslipPDF(record, settings, true);
+      // Generate PDF and get base64 with compression (skip logo to reduce size)
+      const pdfDoc = await generatePayslipPDF(record, settings, true, true);
       if (!pdfDoc) {
         throw new Error('Failed to generate PDF');
       }
-      const pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
+      // Use arraybuffer output and compress to reduce size
+      const pdfArrayBuffer = pdfDoc.output('arraybuffer');
+      const pdfBytes = new Uint8Array(pdfArrayBuffer);
+      
+      // Convert to base64 in chunks to avoid memory issues
+      let binary = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < pdfBytes.length; i += chunkSize) {
+        const chunk = pdfBytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      const pdfBase64 = btoa(binary);
 
       // Format month for display
       const [year, monthNum] = record.month.split('-');
