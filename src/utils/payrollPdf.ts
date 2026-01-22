@@ -76,7 +76,7 @@ const COLORS = {
   ticketIcon: [59, 130, 246] as [number, number, number],
 };
 
-export async function generatePayslipPDF(record: PayrollRecord, settings?: CompanySettings | null) {
+export async function generatePayslipPDF(record: PayrollRecord, settings?: CompanySettings | null, returnDoc: boolean = false): Promise<jsPDF | void> {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -432,7 +432,11 @@ export async function generatePayslipPDF(record: PayrollRecord, settings?: Compa
   doc.text('UAE WPS Compliant', margin, footerY + 10);
   doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, pageWidth - margin, footerY + 10, { align: 'right' });
   
-  // Save
+  // Return or save
+  if (returnDoc) {
+    return doc;
+  }
+  
   const fileName = `payslip-${record.employees?.hrms_no || 'employee'}-${record.month}.pdf`;
   doc.save(fileName);
 }

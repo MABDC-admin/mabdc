@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { DollarSign, RefreshCw, CheckCircle, Plus, Trash2, Edit2, Download, Printer, CreditCard, Users, FileSpreadsheet, Plane } from 'lucide-react';
+import { DollarSign, RefreshCw, CheckCircle, Plus, Trash2, Edit2, Download, Printer, CreditCard, Users, FileSpreadsheet, Plane, Mail, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { generatePayslipPDF, generateBulkPayrollPDF } from '@/utils/payrollPdf';
 import { toast } from 'sonner';
@@ -36,6 +37,7 @@ export function PayrollView() {
   const [isBulkGenerateOpen, setIsBulkGenerateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingPayroll, setEditingPayroll] = useState<any>(null);
+  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
 
   const [newPayroll, setNewPayroll] = useState({
@@ -223,6 +225,51 @@ export function PayrollView() {
   const handleExportAll = () => {
     if (filteredPayroll.length === 0) return;
     generateBulkPayrollPDF(filteredPayroll, selectedMonth, settings);
+  };
+
+  const handleEmailPayslip = async (record: any) => {
+    const workEmail = record.employees?.work_email;
+    if (!workEmail) {
+      toast.error('Employee does not have a work email configured');
+      return;
+    }
+
+    setSendingEmailId(record.id);
+    const toastId = toast.loading(`Sending payslip to ${workEmail}...`);
+
+    try {
+      // Generate PDF and get base64
+      const pdfDoc = await generatePayslipPDF(record, settings, true);
+      if (!pdfDoc) {
+        throw new Error('Failed to generate PDF');
+      }
+      const pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
+
+      // Format month for display
+      const [year, monthNum] = record.month.split('-');
+      const monthDate = new Date(parseInt(year), parseInt(monthNum) - 1);
+      const formattedMonth = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+      // Call edge function
+      const { data, error } = await supabase.functions.invoke('send-payslip-email', {
+        body: {
+          employeeName: record.employees?.full_name || 'Employee',
+          employeeEmail: workEmail,
+          month: formattedMonth,
+          pdfBase64,
+          companyName: settings?.company_name || 'M.A Brain Development Center',
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success(`Payslip sent to ${workEmail}`, { id: toastId });
+    } catch (error: any) {
+      console.error('Failed to send payslip email:', error);
+      toast.error(`Failed to send email: ${error.message}`, { id: toastId });
+    } finally {
+      setSendingEmailId(null);
+    }
   };
 
   const totalNet = newPayroll.basicSalary + newPayroll.housingAllowance + newPayroll.transportAllowance + newPayroll.otherAllowances - newPayroll.deductions;
@@ -547,6 +594,21 @@ export function PayrollView() {
                       className="border-border"
                     >
                       <Printer className="w-4 h-4 mr-1" /> Payslip
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleEmailPayslip(record)}
+                      disabled={!record.employees?.work_email || sendingEmailId === record.id}
+                      className="border-border"
+                      title={record.employees?.work_email ? `Send to ${record.employees.work_email}` : 'No work email configured'}
+                    >
+                      {sendingEmailId === record.id ? (
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      ) : (
+                        <Mail className="w-4 h-4 mr-1" />
+                      )}
+                      Email
                     </Button>
                     {!record.wps_processed && (
                       <>
