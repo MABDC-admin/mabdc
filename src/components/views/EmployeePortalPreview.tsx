@@ -233,7 +233,7 @@ export function EmployeePortalPreview() {
                       <InfoItem icon={Cake} label="Birthday" value={selectedEmployee.birthday ? format(parseISO(selectedEmployee.birthday), 'MMMM dd, yyyy') : 'Not set'} />
                       <InfoItem icon={Mail} label="Personal Email" value={selectedEmployee.personal_email || 'Not set'} />
                       <InfoItem icon={Phone} label="Phone" value={selectedEmployee.personal_phone || 'Not set'} />
-                      <InfoItem icon={MapPin} label="Home Address" value={selectedEmployee.home_address || 'Not set'} />
+                      <InfoItem icon={MapPin} label="Current Address" value={(selectedEmployee as any).current_address || 'Not set'} />
                       <InfoItem icon={Globe} label="Place of Birth" value={selectedEmployee.place_of_birth || 'Not set'} />
                       <InfoItem icon={Globe} label="Country of Birth" value={selectedEmployee.country_of_birth || 'Not set'} />
                       <InfoItem icon={Globe} label="Nationality" value={selectedEmployee.nationality || 'Not set'} />

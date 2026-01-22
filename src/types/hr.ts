@@ -31,11 +31,15 @@ export interface Employee {
   birthday?: string;
   personal_email?: string;
   personal_phone?: string;
-  home_address?: string;
+  current_address?: string;
   place_of_birth?: string;
   country_of_birth?: string;
   family_status?: string;
   number_of_children?: number;
+  // Emergency contact fields
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  emergency_contact_relationship?: string;
   // Deactivation fields
   deactivated_at?: string;
   deactivation_reason?: string;

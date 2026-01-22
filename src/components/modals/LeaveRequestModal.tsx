@@ -81,7 +81,9 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName }:
   }, [selectedBalance]);
 
   const requestedDays = calculateDays();
-  const hasInsufficientBalance = requestedDays > 0 && availableDays < requestedDays;
+  const isLOPLeave = selectedLeaveType?.code === 'LOP' || selectedLeaveType?.paid_type === 'Unpaid';
+  // Skip balance validation for LOP leave type
+  const hasInsufficientBalance = !isLOPLeave && requestedDays > 0 && availableDays < requestedDays;
   const hasOverlap = !!overlappingLeave;
   const canSubmit = requestedDays > 0 && !hasInsufficientBalance && !hasOverlap && !addLeave.isPending;
 
@@ -218,7 +220,17 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName }:
             </div>
           )}
 
-          {hasOverlap && overlappingLeave && (
+          {/* LOP Warning */}
+          {isLOPLeave && requestedDays > 0 && (
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <p className="text-sm font-medium text-amber-600">
+                ⚠️ Loss of Pay Leave
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                These {requestedDays} day(s) will be deducted from your salary. LOP is calculated at (Basic Salary ÷ 30) per day.
+              </p>
+            </div>
+          )}
             <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
               <CalendarX2 className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
               <div className="text-sm text-amber-700 dark:text-amber-400">

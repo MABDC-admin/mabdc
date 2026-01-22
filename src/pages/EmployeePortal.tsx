@@ -43,7 +43,7 @@ export default function EmployeePortal() {
     birthday: '',
     personal_email: '',
     personal_phone: '',
-    home_address: '',
+    current_address: '',
     place_of_birth: '',
     country_of_birth: '',
     family_status: '',
@@ -867,7 +867,7 @@ export default function EmployeePortal() {
                         birthday: employee.birthday || '',
                         personal_email: employee.personal_email || '',
                         personal_phone: employee.personal_phone || '',
-                        home_address: employee.home_address || '',
+                        current_address: (employee as any).current_address || '',
                         place_of_birth: employee.place_of_birth || '',
                         country_of_birth: employee.country_of_birth || '',
                         family_status: employee.family_status || '',
@@ -903,7 +903,7 @@ export default function EmployeePortal() {
                               birthday: personalInfo.birthday || null,
                               personal_email: personalInfo.personal_email || null,
                               personal_phone: personalInfo.personal_phone || null,
-                              home_address: personalInfo.home_address || null,
+                              current_address: personalInfo.current_address || null,
                               place_of_birth: personalInfo.place_of_birth || null,
                               country_of_birth: personalInfo.country_of_birth || null,
                               family_status: personalInfo.family_status || null,
@@ -960,8 +960,8 @@ export default function EmployeePortal() {
                       <Input type="tel" value={personalInfo.personal_phone} onChange={(e) => setPersonalInfo({ ...personalInfo, personal_phone: e.target.value })} placeholder="+971 XX XXX XXXX" />
                     </div>
                     <div>
-                      <label className="text-xs text-[#5d4a36] uppercase font-medium">Home Address</label>
-                      <Textarea value={personalInfo.home_address} onChange={(e) => setPersonalInfo({ ...personalInfo, home_address: e.target.value })} placeholder="Enter home address" rows={2} />
+                      <label className="text-xs text-[#5d4a36] uppercase font-medium">Current Address</label>
+                      <Textarea value={personalInfo.current_address} onChange={(e) => setPersonalInfo({ ...personalInfo, current_address: e.target.value })} placeholder="Enter current address" rows={2} />
                     </div>
                   </div>
                   <div className="space-y-4">
@@ -1047,8 +1047,8 @@ export default function EmployeePortal() {
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-white/60 border border-[#e8dcc8]">
                       <MapPin className="w-5 h-5 text-[#8b6f47]" />
                       <div>
-                        <p className="text-xs text-[#5d4a36] uppercase font-medium">Home Address</p>
-                        <p className="font-semibold text-[#2d2416]">{employee.home_address || 'Not specified'}</p>
+                        <p className="text-xs text-[#5d4a36] uppercase font-medium">Current Address</p>
+                        <p className="font-semibold text-[#2d2416]">{(employee as any).current_address || 'Not specified'}</p>
                       </div>
                     </div>
                   </div>
