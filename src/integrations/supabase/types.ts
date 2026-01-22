@@ -442,6 +442,59 @@ export type Database = {
         }
         Relationships: []
       }
+      email_history: {
+        Row: {
+          created_at: string
+          delivered_at: string | null
+          email_type: string
+          employee_id: string | null
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          recipient_email: string
+          resend_id: string | null
+          sent_at: string
+          status: string
+          subject: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_at?: string | null
+          email_type?: string
+          employee_id?: string | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          recipient_email: string
+          resend_id?: string | null
+          sent_at?: string
+          status?: string
+          subject: string
+        }
+        Update: {
+          created_at?: string
+          delivered_at?: string | null
+          email_type?: string
+          employee_id?: string | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          recipient_email?: string
+          resend_id?: string | null
+          sent_at?: string
+          status?: string
+          subject?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_history_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_badges: {
         Row: {
           badge_id: string

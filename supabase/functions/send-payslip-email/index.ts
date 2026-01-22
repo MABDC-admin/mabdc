@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,6 +10,7 @@ const corsHeaders = {
 interface PayslipEmailRequest {
   employeeName: string;
   employeeEmail: string;
+  employeeId?: string;
   month: string;
   pdfBase64: string;
   companyName?: string;
@@ -21,12 +23,20 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Initialize Supabase client for logging
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  let emailHistoryId: string | null = null;
+
   try {
     const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
     const {
       employeeName,
       employeeEmail,
+      employeeId,
       month,
       pdfBase64,
       companyName = "M.A Brain Development Center",
@@ -40,15 +50,32 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Missing required fields: employeeEmail or pdfBase64");
     }
 
+    const subject = `Payslip for ${month} - ${employeeName}`;
+
+    // Create email history record (pending status)
+    const { data: historyData, error: historyError } = await supabase
+      .from("email_history")
+      .insert({
+        employee_id: employeeId || null,
+        recipient_email: employeeEmail,
+        email_type: "payslip",
+        subject: subject,
+        status: "pending",
+        metadata: { month, employeeName, companyName }
+      })
+      .select("id")
+      .single();
+
+    if (historyData) {
+      emailHistoryId = historyData.id;
+    }
+
     const nameParts = employeeName.split(' ');
     const firstName = nameParts[0];
     const filename = `Payslip-${employeeName.replace(/\s+/g, '-')}-${month.replace(/\s+/g, '-')}.pdf`;
 
-    // Convert base64 to Uint8Array efficiently using TextEncoder
-    const binaryString = atob(pdfBase64);
-    const bytes = new TextEncoder().encode(binaryString);
-    // Fix encoding: atob returns latin1, need to map correctly
-    const pdfBuffer = Uint8Array.from(binaryString, c => c.charCodeAt(0));
+    // Convert base64 to Uint8Array
+    const pdfBuffer = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
 
     const emailHtml = `
       <!DOCTYPE html>
@@ -150,7 +177,7 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: `${companyName} <${fromEmail}>`,
       to: [employeeEmail],
-      subject: `Payslip for ${month} - ${employeeName}`,
+      subject: subject,
       html: emailHtml,
       attachments: [
         {
@@ -162,12 +189,43 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Email sent successfully:", emailResponse);
 
+    // Extract the email ID from the response
+    const resendEmailId = (emailResponse as any)?.data?.id || (emailResponse as any)?.id || null;
+
+    // Update email history with success
+    if (emailHistoryId) {
+      await supabase
+        .from("email_history")
+        .update({
+          status: "sent",
+          resend_id: resendEmailId,
+          delivered_at: new Date().toISOString()
+        })
+        .eq("id", emailHistoryId);
+    }
+
     return new Response(
-      JSON.stringify({ success: true, message: `Payslip sent to ${employeeEmail}` }),
+      JSON.stringify({ 
+        success: true, 
+        message: `Payslip sent to ${employeeEmail}`,
+        emailId: resendEmailId
+      }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error: any) {
     console.error("Error sending payslip email:", error);
+
+    // Update email history with failure
+    if (emailHistoryId) {
+      await supabase
+        .from("email_history")
+        .update({
+          status: "failed",
+          error_message: error.message
+        })
+        .eq("id", emailHistoryId);
+    }
+
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
