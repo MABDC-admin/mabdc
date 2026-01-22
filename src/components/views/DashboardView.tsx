@@ -86,7 +86,8 @@ export function DashboardView() {
   const onLeaveEmployees = employees.filter(e => e.status === 'On Leave').length;
   const pendingLeave = leave.filter(l => l.status === 'Pending').length;
   const activeContracts = contracts.filter(c => c.status === 'Active').length;
-  const presentToday = todayAttendance.filter(a => a.status === 'Present').length;
+  // Appealed counts as Present for statistics
+  const presentToday = todayAttendance.filter(a => a.status === 'Present' || a.status === 'Appealed').length;
   const lateToday = todayAttendance.filter(a => a.status === 'Late').length;
   
   const expiringVisas = employees.filter(e => {

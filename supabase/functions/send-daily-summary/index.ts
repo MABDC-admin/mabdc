@@ -55,7 +55,8 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const totalEmployees = employeesData?.length || 0;
-    const presentCount = attendanceData?.filter(a => a.status === 'Present').length || 0;
+    // Appealed counts as Present in daily summary
+    const presentCount = attendanceData?.filter(a => a.status === 'Present' || a.status === 'Appealed').length || 0;
     const lateCount = attendanceData?.filter(a => a.status === 'Late').length || 0;
     const absentCount = totalEmployees - (presentCount + lateCount);
 

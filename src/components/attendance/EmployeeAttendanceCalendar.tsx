@@ -158,6 +158,9 @@ export function EmployeeAttendanceCalendar({
       }
     });
 
+    // Count appealed as present for stats display
+    present += appealed;
+    
     return { present, late, absent, holidays, missedPunch, appealed, undertime, onLeave };
   }, [monthAttendance, publicHolidays, leaveRecords, selectedMonth, selectedYear]);
 

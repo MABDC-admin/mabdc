@@ -431,7 +431,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
   const employeeSummaries = useMemo(() => {
     return filteredEmployees.map((emp, index) => {
       const counts = {
-        P: 0, L: 0, A: 0, VL: 0, SL: 0, DO: 0, H: 0, SB: 0, WB: 0, HDA: 0, HDSL: 0, PH: 0
+        P: 0, L: 0, A: 0, VL: 0, SL: 0, DO: 0, H: 0, SB: 0, WB: 0, HDA: 0, HDSL: 0, PH: 0, AP: 0, MP: 0, UT: 0
       };
       
       daysInMonth.forEach(day => {
@@ -441,7 +441,10 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
         }
       });
       
-      return { ...emp, index: index + 1, ...counts };
+      // Count appealed (AP) as present in the Present total for display
+      const presentWithAppealed = counts.P + counts.AP;
+      
+      return { ...emp, index: index + 1, ...counts, presentWithAppealed };
     });
   }, [filteredEmployees, daysInMonth, allAttendance, leaveRecords, publicHolidays, manualOverrides]);
 

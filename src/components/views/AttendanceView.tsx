@@ -90,8 +90,8 @@ export function AttendanceView() {
     }
   };
 
-  // Stats
-  const presentCount = todayAttendance.filter(a => a.status === 'Present').length;
+  // Stats - Appealed counts as Present
+  const presentCount = todayAttendance.filter(a => a.status === 'Present' || a.status === 'Appealed').length;
   const lateCount = todayAttendance.filter(a => a.status?.includes('Late')).length;
   const undertimeCount = todayAttendance.filter(a => a.status?.includes('Undertime')).length;
   const checkedOutCount = todayAttendance.filter(a => a.check_out).length;
