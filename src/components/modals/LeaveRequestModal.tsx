@@ -231,6 +231,7 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName }:
               </p>
             </div>
           )}
+          {hasOverlap && overlappingLeave && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
               <CalendarX2 className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
               <div className="text-sm text-amber-700 dark:text-amber-400">
