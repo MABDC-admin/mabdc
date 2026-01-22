@@ -1,24 +1,26 @@
 import { useState, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { usePayroll, useProcessWPS, useGeneratePayroll, useDeletePayroll, useUpdatePayroll } from '@/hooks/usePayroll';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useContracts } from '@/hooks/useContracts';
 import { useCompanySettings } from '@/hooks/useSettings';
 import { useApprovedTicketAllowances } from '@/hooks/useTicketAllowance';
+import { usePayslipEmailHistory } from '@/hooks/useEmailHistory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { DollarSign, RefreshCw, CheckCircle, Plus, Trash2, Edit2, Download, Printer, CreditCard, Users, FileSpreadsheet, Plane, Mail, Loader2 } from 'lucide-react';
+import { DollarSign, RefreshCw, CheckCircle, Plus, Trash2, Edit2, Download, Printer, CreditCard, Users, FileSpreadsheet, Plane, Mail, Loader2, MailCheck, MailX, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { generatePayslipPDF, generateBulkPayrollPDF } from '@/utils/payrollPdf';
 import { toast } from 'sonner';
 import { TicketAllowanceReminders } from '@/components/admin/TicketAllowanceReminders';
 
-
 export function PayrollView() {
+  const queryClient = useQueryClient();
   const { data: payroll = [], isLoading, refetch } = usePayroll();
   const { data: employees = [] } = useEmployees();
   const { data: contracts = [] } = useContracts();
@@ -73,6 +75,31 @@ export function PayrollView() {
   const filteredPayroll = useMemo(() => {
     return payroll.filter(p => p.month.startsWith(selectedMonth));
   }, [payroll, selectedMonth]);
+
+  // Email history for the selected month
+  const { data: emailHistory = [], refetch: refetchEmailHistory } = usePayslipEmailHistory(selectedMonth);
+  
+  // Create lookup map for quick email status access
+  const emailStatusMap = useMemo(() => {
+    const map = new Map<string, { status: string; sentAt: string; error?: string }>();
+    
+    // Get the formatted month label for comparison
+    const monthLabel = new Date(selectedMonth + '-01').toLocaleDateString('en-US', { 
+      month: 'long', year: 'numeric' 
+    });
+    
+    emailHistory.forEach(email => {
+      // Only store the most recent email per employee (list is already ordered by created_at desc)
+      if (email.employee_id && !map.has(email.employee_id)) {
+        map.set(email.employee_id, { 
+          status: email.status, 
+          sentAt: email.created_at,
+          error: email.error_message || undefined
+        });
+      }
+    });
+    return map;
+  }, [emailHistory, selectedMonth]);
 
   const stats = useMemo(() => ({
     totalPayroll: filteredPayroll.reduce((sum, p) => sum + (p.net_salary || 0), 0),
@@ -289,9 +316,12 @@ export function PayrollView() {
       if (error) throw error;
 
       toast.success(`Payslip sent to ${workEmail}`, { id: toastId });
+      // Refresh email history to update badges
+      refetchEmailHistory();
     } catch (error: any) {
       console.error('Failed to send payslip email:', error);
       toast.error(`Failed to send email: ${error.message}`, { id: toastId });
+      refetchEmailHistory();
     } finally {
       setSendingEmailId(null);
     }
@@ -378,6 +408,8 @@ export function PayrollView() {
     }
 
     setBulkEmailSending(false);
+    // Refresh email history to update badges
+    refetchEmailHistory();
     
     if (successCount > 0 && failedCount === 0) {
       toast.success(`✅ All ${successCount} payslips sent successfully!`);
@@ -689,14 +721,44 @@ export function PayrollView() {
                         <h3 className="text-base font-semibold text-foreground">{record.employees?.full_name || 'Unknown'}</h3>
                         <p className="text-xs text-muted-foreground">{record.employees?.hrms_no} • {record.employees?.job_position}</p>
                       </div>
-                      <span className={cn(
-                        "ml-auto lg:ml-0 text-xs px-3 py-1 rounded-full border font-medium",
-                        record.wps_processed 
-                          ? "bg-primary/10 text-primary border-primary/30" 
-                          : "bg-amber-500/10 text-amber-500 border-amber-500/30"
-                      )}>
-                        {record.wps_processed ? 'Paid' : 'Pending'}
-                      </span>
+                      <div className="flex items-center gap-2 ml-auto lg:ml-0 flex-wrap">
+                        {/* Payment Status Badge */}
+                        <span className={cn(
+                          "text-xs px-3 py-1 rounded-full border font-medium",
+                          record.wps_processed 
+                            ? "bg-primary/10 text-primary border-primary/30" 
+                            : "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                        )}>
+                          {record.wps_processed ? 'Paid' : 'Pending'}
+                        </span>
+                        
+                        {/* Email Status Badge */}
+                        {emailStatusMap.has(record.employee_id) ? (
+                          <span 
+                            className={cn(
+                              "text-xs px-3 py-1 rounded-full border font-medium flex items-center gap-1",
+                              emailStatusMap.get(record.employee_id)?.status === 'sent'
+                                ? "bg-green-500/10 text-green-600 border-green-500/30"
+                                : emailStatusMap.get(record.employee_id)?.status === 'failed'
+                                ? "bg-destructive/10 text-destructive border-destructive/30"
+                                : "bg-yellow-500/10 text-yellow-600 border-yellow-500/30"
+                            )}
+                            title={emailStatusMap.get(record.employee_id)?.error || undefined}
+                          >
+                            {emailStatusMap.get(record.employee_id)?.status === 'sent' ? (
+                              <><MailCheck className="w-3 h-3" /> Emailed</>
+                            ) : emailStatusMap.get(record.employee_id)?.status === 'failed' ? (
+                              <><MailX className="w-3 h-3" /> Failed</>
+                            ) : (
+                              <><Clock className="w-3 h-3" /> Pending</>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-xs px-3 py-1 rounded-full border font-medium bg-muted/50 text-muted-foreground border-border flex items-center gap-1">
+                            <Mail className="w-3 h-3" /> Not Emailed
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                       <div>

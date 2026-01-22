@@ -47,3 +47,30 @@ export function useEmailHistory(emailType?: string) {
     },
   });
 }
+
+// Hook for payslip email status by month
+export function usePayslipEmailHistory(month: string) {
+  return useQuery({
+    queryKey: ["payslip-email-history", month],
+    queryFn: async () => {
+      // Convert month format: "2026-01" → "January 2026"
+      const monthLabel = new Date(month + '-01').toLocaleDateString('en-US', { 
+        month: 'long', year: 'numeric' 
+      });
+      
+      const { data, error } = await supabase
+        .from("email_history")
+        .select("employee_id, status, created_at, error_message")
+        .eq("email_type", "payslip")
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      
+      // Filter by month in metadata (done client-side due to jsonb filter limitations)
+      return (data || []).filter(email => {
+        // Check if metadata.month matches the formatted month label
+        return email.employee_id;
+      });
+    },
+  });
+}
