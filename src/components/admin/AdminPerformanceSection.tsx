@@ -222,7 +222,7 @@ export function AdminPerformanceSection() {
                     <td className="p-3 text-sm text-foreground">{record.review_period}</td>
                     <td className="p-3 text-sm text-muted-foreground">{record.reviewer || '-'}</td>
                     <td className="p-3 text-right">
-                      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deletePerformance.mutate(record.id)}>
+                      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deletePerformance.mutate({ id: record.id })}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </td>
@@ -341,7 +341,7 @@ export function AdminPerformanceSection() {
                       )}
                     </td>
                     <td className="p-3 text-right">
-                      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteCorrectiveAction.mutate(action.id)}>
+                      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteCorrectiveAction.mutate({ id: action.id })}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </td>

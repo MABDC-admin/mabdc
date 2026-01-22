@@ -73,20 +73,36 @@ export function useDeleteEmployee() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      // Get employee data for the approval email
+      const { data: employee, error: fetchError } = await supabase
         .from('employees')
-        .delete()
-        .eq('id', id);
+        .select('*')
+        .eq('id', id)
+        .single();
       
-      if (error) throw error;
+      if (fetchError) throw fetchError;
+      
+      // Send deletion request for approval
+      const { error } = await supabase.functions.invoke('send-deletion-approval', {
+        body: {
+          recordType: 'employee',
+          recordId: id,
+          recordData: employee,
+          reason,
+        },
+      });
+      
+      if (error) throw new Error(error.message || 'Failed to request deletion approval');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
-      toast.success('Employee deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['pending-deletions'] });
+      toast.info('Deletion request sent for approval', {
+        description: 'An email has been sent to the administrator.',
+      });
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete employee: ${error.message}`);
+      toast.error(`Failed to request deletion: ${error.message}`);
     },
   });
 }

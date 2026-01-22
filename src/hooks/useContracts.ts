@@ -188,20 +188,34 @@ export function useDeleteContract() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (contractId: string) => {
-      const { error } = await supabase
+    mutationFn: async ({ contractId, reason }: { contractId: string; reason?: string }) => {
+      // Get contract for approval email
+      const { data: contract, error: fetchError } = await supabase
         .from('contracts')
-        .delete()
-        .eq('id', contractId);
+        .select('*, employees(full_name)')
+        .eq('id', contractId)
+        .single();
       
-      if (error) throw error;
+      if (fetchError) throw fetchError;
+      
+      // Send deletion request for approval
+      const { error } = await supabase.functions.invoke('send-deletion-approval', {
+        body: {
+          recordType: 'contract',
+          recordId: contractId,
+          recordData: contract,
+          reason,
+        },
+      });
+      
+      if (error) throw new Error(error.message || 'Failed to request deletion approval');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contracts'] });
-      toast.success('Contract deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['pending-deletions'] });
+      toast.info('Deletion request sent for approval');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete contract: ${error.message}`);
+      toast.error(`Failed to request deletion: ${error.message}`);
     },
   });
 }

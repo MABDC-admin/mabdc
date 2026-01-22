@@ -591,49 +591,39 @@ export function useBulkAutoApproveTicketAllowances() {
   });
 }
 
-// Delete a ticket allowance record (admin only)
+// Delete a ticket allowance record (admin only) - requires approval
 export function useDeleteTicketAllowance() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
-      const { data: userData } = await supabase.auth.getUser();
-
-      // Get record details before deletion for audit
-      const { data: record } = await supabase
+      // Get record details for approval email
+      const { data: record, error: fetchError } = await supabase
         .from('ticket_allowance_records')
-        .select('*')
+        .select('*, employees(full_name, hrms_no)')
         .eq('id', id)
         .single();
 
-      // Create audit log BEFORE deletion
-      await supabase.from('ticket_allowance_audit_log').insert({
-        ticket_allowance_id: id,
-        action: 'deleted',
-        performed_by: userData.user?.id,
-        details: {
+      if (fetchError) throw fetchError;
+
+      // Send deletion request for approval
+      const { error } = await supabase.functions.invoke('send-deletion-approval', {
+        body: {
+          recordType: 'ticket_allowance',
+          recordId: id,
+          recordData: record,
           reason,
-          deleted_record: record,
         },
       });
 
-      // Delete the record
-      const { error } = await supabase
-        .from('ticket_allowance_records')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      if (error) throw new Error(error.message || 'Failed to request deletion approval');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ticket-allowance-reminders'] });
-      queryClient.invalidateQueries({ queryKey: ['ticket-allowance-records'] });
-      queryClient.invalidateQueries({ queryKey: ['employee-ticket-allowance'] });
-      queryClient.invalidateQueries({ queryKey: ['approved-ticket-allowances'] });
-      toast.success('Ticket allowance record deleted');
+      queryClient.invalidateQueries({ queryKey: ['pending-deletions'] });
+      toast.info('Deletion request sent for approval');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete: ${error.message}`);
+      toast.error(`Failed to request deletion: ${error.message}`);
     },
   });
 }

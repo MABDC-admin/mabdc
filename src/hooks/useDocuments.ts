@@ -101,27 +101,35 @@ export function useDeleteDocument() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, employeeId, fileUrl }: { id: string; employeeId: string; fileUrl: string }) => {
-      // Extract file path from URL
-      const urlParts = fileUrl.split('/employee-documents/');
-      if (urlParts.length > 1) {
-        const filePath = urlParts[1];
-        await supabase.storage.from('employee-documents').remove([filePath]);
-      }
-      
-      const { error } = await supabase
+    mutationFn: async ({ id, employeeId, fileUrl, reason }: { id: string; employeeId: string; fileUrl: string; reason?: string }) => {
+      // Get document for approval email
+      const { data: doc, error: fetchError } = await supabase
         .from('employee_documents')
-        .delete()
-        .eq('id', id);
+        .select('*, employees(full_name, hrms_no)')
+        .eq('id', id)
+        .single();
       
-      if (error) throw error;
+      if (fetchError) throw fetchError;
+      
+      // Send deletion request for approval
+      const { error } = await supabase.functions.invoke('send-deletion-approval', {
+        body: {
+          recordType: 'document',
+          recordId: id,
+          recordData: { ...doc, file_url: fileUrl },
+          reason,
+        },
+      });
+      
+      if (error) throw new Error(error.message || 'Failed to request deletion approval');
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['employee-documents', variables.employeeId] });
-      toast.success('Document deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['pending-deletions'] });
+      toast.info('Deletion request sent for approval');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete document: ${error.message}`);
+      toast.error(`Failed to request deletion: ${error.message}`);
     },
   });
 }

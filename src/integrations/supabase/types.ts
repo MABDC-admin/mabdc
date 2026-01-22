@@ -1840,6 +1840,51 @@ export type Database = {
           },
         ]
       }
+      pending_deletions: {
+        Row: {
+          approval_token: string | null
+          id: string
+          processed_at: string | null
+          processed_by: string | null
+          reason: string | null
+          record_data: Json
+          record_id: string
+          record_type: string
+          requested_at: string | null
+          requested_by: string | null
+          requested_by_email: string | null
+          status: string | null
+        }
+        Insert: {
+          approval_token?: string | null
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          record_data: Json
+          record_id: string
+          record_type: string
+          requested_at?: string | null
+          requested_by?: string | null
+          requested_by_email?: string | null
+          status?: string | null
+        }
+        Update: {
+          approval_token?: string | null
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          record_data?: Json
+          record_id?: string
+          record_type?: string
+          requested_at?: string | null
+          requested_by?: string | null
+          requested_by_email?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

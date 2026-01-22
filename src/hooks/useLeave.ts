@@ -343,95 +343,34 @@ export function useDeleteLeave() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (id: string) => {
-      // First, get the leave record to check its status
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      // Get leave record for approval email
       const { data: leaveRecord, error: fetchError } = await supabase
         .from('leave_records')
-        .select('employee_id, leave_type, days_count, status')
+        .select('*, employees(full_name, hrms_no)')
         .eq('id', id)
         .single();
       
       if (fetchError) throw fetchError;
       
-      // Find leave type - try exact match first, then partial match
-      let leaveTypeId: string | null = null;
+      // Send deletion request for approval
+      const { error } = await supabase.functions.invoke('send-deletion-approval', {
+        body: {
+          recordType: 'leave',
+          recordId: id,
+          recordData: leaveRecord,
+          reason,
+        },
+      });
       
-      if (leaveRecord) {
-        const { data: exactMatch } = await supabase
-          .from('leave_types')
-          .select('id')
-          .eq('name', leaveRecord.leave_type)
-          .maybeSingle();
-        
-        if (exactMatch) {
-          leaveTypeId = exactMatch.id;
-        } else {
-          const { data: partialMatch } = await supabase
-            .from('leave_types')
-            .select('id')
-            .ilike('name', `%${leaveRecord.leave_type}%`)
-            .limit(1)
-            .maybeSingle();
-          
-          if (partialMatch) {
-            leaveTypeId = partialMatch.id;
-          }
-        }
-        
-        if (leaveTypeId) {
-          const currentYear = new Date().getFullYear();
-          
-          const { data: currentBalance } = await supabase
-            .from('leave_balances')
-            .select('id, used_days, pending_days')
-            .eq('employee_id', leaveRecord.employee_id)
-            .eq('leave_type_id', leaveTypeId)
-            .eq('year', currentYear)
-            .maybeSingle();
-          
-          if (currentBalance) {
-            // If the leave was approved, restore used_days
-            if (leaveRecord.status === 'Approved') {
-              const newUsedDays = Math.max(0, (currentBalance.used_days || 0) - leaveRecord.days_count);
-              await supabase
-                .from('leave_balances')
-                .update({
-                  used_days: newUsedDays,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', currentBalance.id);
-            }
-            // If the leave was pending, restore pending_days
-            else if (leaveRecord.status === 'Pending') {
-              const newPendingDays = Math.max(0, (currentBalance.pending_days || 0) - leaveRecord.days_count);
-              await supabase
-                .from('leave_balances')
-                .update({
-                  pending_days: newPendingDays,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', currentBalance.id);
-            }
-          }
-        }
-      }
-      
-      // Delete the leave record
-      const { error } = await supabase
-        .from('leave_records')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
+      if (error) throw new Error(error.message || 'Failed to request deletion approval');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leave'] });
-      queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
-      queryClient.invalidateQueries({ queryKey: ['all_leave_balances'] });
-      toast.success('Leave request deleted');
+      queryClient.invalidateQueries({ queryKey: ['pending-deletions'] });
+      toast.info('Deletion request sent for approval');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete leave: ${error.message}`);
+      toast.error(`Failed to request deletion: ${error.message}`);
     },
   });
 }
