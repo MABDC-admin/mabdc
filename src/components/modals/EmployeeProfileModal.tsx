@@ -24,7 +24,7 @@ import uaeVisa from '@/assets/uae-visa.png';
 import passportIcon from '@/assets/passport-icon.png';
 import contractIcon from '@/assets/contract-icon.png';
 import photoPlaceholder from '@/assets/photo-placeholder.png';
-import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase, MessageCircle, Link2, Copy, HeartPulse, CreditCard, Plane, BookOpen, FileCheck, CheckCircle, FileX } from 'lucide-react';
+import { Pencil, Trash2, FileText, Upload, Download, X, Camera, AlertTriangle, Plus, Eye, GraduationCap, User, Briefcase, MessageCircle, Link2, Copy, HeartPulse, CreditCard, Plane, BookOpen, FileCheck, CheckCircle, FileX, Calendar } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { toast } from 'sonner';
 import { GenerateEmployeeAccountButton } from '@/components/employee/GenerateEmployeeAccountButton';
@@ -388,6 +388,55 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                       </div>
                       <span className="text-sm text-muted-foreground">{currentEmployee.hrms_no}</span>
                     </div>
+                    
+                    {/* Contract Expiry Info */}
+                    {employeeContract?.end_date ? (
+                      <div className={cn(
+                        "flex items-center justify-between p-3 rounded-lg mb-4 border",
+                        (() => {
+                          const daysUntil = differenceInDays(parseISO(employeeContract.end_date), new Date());
+                          if (daysUntil < 0) return "bg-red-500/20 border-red-500/40";
+                          if (daysUntil <= 30) return "bg-red-500/20 border-red-500/40";
+                          if (daysUntil <= 60) return "bg-amber-500/20 border-amber-500/40";
+                          if (daysUntil <= 90) return "bg-yellow-500/20 border-yellow-500/40";
+                          return "bg-green-500/20 border-green-500/40";
+                        })()
+                      )}>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          <span className="text-sm font-medium">
+                            Expires: {format(parseISO(employeeContract.end_date), 'dd MMM yyyy')}
+                          </span>
+                        </div>
+                        <span className={cn(
+                          "text-sm font-semibold",
+                          (() => {
+                            const daysUntil = differenceInDays(parseISO(employeeContract.end_date), new Date());
+                            if (daysUntil < 0) return "text-red-400";
+                            if (daysUntil <= 30) return "text-red-400";
+                            if (daysUntil <= 60) return "text-amber-400";
+                            if (daysUntil <= 90) return "text-yellow-400";
+                            return "text-green-400";
+                          })()
+                        )}>
+                          {(() => {
+                            const daysUntil = differenceInDays(parseISO(employeeContract.end_date), new Date());
+                            if (daysUntil < 0) return `Expired ${Math.abs(daysUntil)} days ago`;
+                            if (daysUntil === 0) return "Expires today";
+                            if (daysUntil === 1) return "1 day remaining";
+                            return `${daysUntil} days remaining`;
+                          })()}
+                        </span>
+                      </div>
+                    ) : currentEmployee?.contract_type === 'Unlimited' ? (
+                      <div className="flex items-center justify-between p-3 rounded-lg mb-4 bg-blue-500/20 border border-blue-500/40">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-blue-400" />
+                          <span className="text-sm font-medium text-blue-300">Unlimited Contract</span>
+                        </div>
+                        <span className="text-sm text-blue-400">No expiry date</span>
+                      </div>
+                    ) : null}
                     
                     {/* Contract Pages Side by Side */}
                     <div className="grid grid-cols-2 gap-3">
