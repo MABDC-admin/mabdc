@@ -397,6 +397,25 @@ export default function TimeClockView() {
       return;
     }
 
+    // CRITICAL: Prevent creating empty attendance records (no check-in AND no check-out)
+    if (!editDialog.record.attendanceId) {
+      // Creating a new record - require at least one punch time
+      if (!editCheckIn && !editCheckOut) {
+        toast.error('Cannot create an attendance record without at least a check-in or check-out time');
+        return;
+      }
+      // For "Miss Punch In" on new records, require check-out time
+      if (editStatus === 'miss_punch_in' && !editCheckOut) {
+        toast.error('Miss Punch In requires a check-out time for new records');
+        return;
+      }
+      // For "Miss Punch Out" on new records, require check-in time
+      if (editStatus === 'miss_punch_out' && !editCheckIn) {
+        toast.error('Miss Punch Out requires a check-in time for new records');
+        return;
+      }
+    }
+
     // Validation warnings
     if (editStatus === 'miss_punch_in' && editCheckIn) {
       toast.warning('Miss Punch In status selected but check-in time is provided. Check-in will be cleared.');
