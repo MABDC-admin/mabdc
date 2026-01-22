@@ -185,6 +185,9 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
         else if (status.type === 'leave' || status.type === 'maternity' || status.type === 'sick-leave') onLeave++;
       });
       
+      // Count appealed as present for summary stats
+      present += appealed;
+      
       return { ...emp, present, late, absent, missedPunch, appealed, undertime, onLeave };
     });
   }, [employees, daysInMonth, allAttendance, leaveRecords]);
