@@ -19,7 +19,7 @@ import { PerformanceView } from '@/components/views/PerformanceView';
 import { DisciplineView } from '@/components/views/DisciplineView';
 import { OrgChartView } from '@/components/views/OrgChartView';
 import { CompanyDocsView } from '@/components/views/CompanyDocsView';
-import { GamificationView } from '@/components/views/GamificationView';
+import { VisaProcessView } from '@/components/views/VisaProcessView';
 import { ReportsView } from '@/components/views/ReportsView';
 import { useHRStore } from '@/store/hrStore';
 
@@ -30,8 +30,8 @@ const Index = () => {
     switch (currentView) {
       case 'dashboard':
         return <DashboardView />;
-      case 'gamification':
-        return <GamificationView />;
+      case 'visa-process':
+        return <VisaProcessView />;
       case 'employees':
         return <EmployeesView />;
       case 'deactivated':
