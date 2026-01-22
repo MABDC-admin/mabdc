@@ -33,16 +33,19 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
+    const requestData = await req.json() as PayslipEmailRequest;
     const {
       employeeName,
-      employeeEmail,
       employeeId,
       month,
       pdfBase64,
       companyName = "M.A Brain Development Center",
       hrManagerName = "HR Department",
       hrManagerTitle = "Human Resource Manager",
-    }: PayslipEmailRequest = await req.json();
+    } = requestData;
+
+    // Normalize email to lowercase to prevent delivery issues
+    const employeeEmail = requestData.employeeEmail.toLowerCase().trim();
 
     console.log(`Sending payslip email to ${employeeEmail} for ${month}`);
 

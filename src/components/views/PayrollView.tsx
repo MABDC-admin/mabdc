@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { generatePayslipPDF, generateBulkPayrollPDF } from '@/utils/payrollPdf';
 import { toast } from 'sonner';
 import { TicketAllowanceReminders } from '@/components/admin/TicketAllowanceReminders';
-import { EmailHistorySection } from '@/components/admin/EmailHistorySection';
+
 
 export function PayrollView() {
   const { data: payroll = [], isLoading, refetch } = usePayroll();
@@ -317,8 +317,6 @@ export function PayrollView() {
         </div>
       </div>
 
-      {/* Email History Section */}
-      <EmailHistorySection emailType="payslip" maxHeight="300px" />
 
       {/* Main Section */}
       <section className="glass-card rounded-3xl border border-border p-4 sm:p-6">
