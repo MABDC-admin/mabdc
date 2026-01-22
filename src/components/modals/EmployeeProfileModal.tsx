@@ -370,7 +370,9 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="glass-card rounded-2xl border border-border p-5">
                     <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-2">CONTRACT</p>
-                    <div className="flex items-center justify-between">
+                    
+                    {/* Contract Info Row */}
+                    <div className="flex items-center justify-between mb-4">
                       <div>
                         <p className="text-lg font-semibold text-foreground">
                           {currentEmployee.contract_type || 'Unlimited'} contract
@@ -385,6 +387,79 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                         </span>
                       </div>
                       <span className="text-sm text-muted-foreground">{currentEmployee.hrms_no}</span>
+                    </div>
+                    
+                    {/* Contract Pages Side by Side */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Page 1 */}
+                      <div 
+                        className={cn(
+                          "relative aspect-[3/4] rounded-lg border overflow-hidden group",
+                          employeeContract?.page1_url 
+                            ? "cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all" 
+                            : "bg-muted/30 border-dashed"
+                        )}
+                        onClick={() => employeeContract?.page1_url && setPreviewImage({ 
+                          url: employeeContract.page1_url, 
+                          title: 'Contract Page 1' 
+                        })}
+                      >
+                        {employeeContract?.page1_url ? (
+                          <>
+                            <img 
+                              src={employeeContract.page1_url} 
+                              alt="Contract Page 1"
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                              <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                            <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded">
+                              Page 1
+                            </span>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                            <FileText className="w-8 h-8 mb-1 opacity-50" />
+                            <span className="text-xs">No Page 1</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Page 2 */}
+                      <div 
+                        className={cn(
+                          "relative aspect-[3/4] rounded-lg border overflow-hidden group",
+                          employeeContract?.page2_url 
+                            ? "cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all" 
+                            : "bg-muted/30 border-dashed"
+                        )}
+                        onClick={() => employeeContract?.page2_url && setPreviewImage({ 
+                          url: employeeContract.page2_url, 
+                          title: 'Contract Page 2' 
+                        })}
+                      >
+                        {employeeContract?.page2_url ? (
+                          <>
+                            <img 
+                              src={employeeContract.page2_url} 
+                              alt="Contract Page 2"
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                              <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                            <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded">
+                              Page 2
+                            </span>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                            <FileText className="w-8 h-8 mb-1 opacity-50" />
+                            <span className="text-xs">No Page 2</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
