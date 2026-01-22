@@ -799,16 +799,32 @@ export function PayrollView() {
                       variant="outline" 
                       size="sm" 
                       onClick={() => handleEmailPayslip(record)}
-                      disabled={!record.employees?.work_email || sendingEmailId === record.id}
-                      className="border-border"
-                      title={record.employees?.work_email ? `Send to ${record.employees.work_email}` : 'No work email configured'}
+                      disabled={
+                        !record.employees?.work_email || 
+                        sendingEmailId === record.id ||
+                        emailStatusMap.get(record.employee_id)?.status === 'sent'
+                      }
+                      className={cn(
+                        "border-border",
+                        emailStatusMap.get(record.employee_id)?.status === 'sent' && 
+                          "opacity-60 cursor-not-allowed bg-green-50 border-green-300 dark:bg-green-950/30 dark:border-green-800"
+                      )}
+                      title={
+                        emailStatusMap.get(record.employee_id)?.status === 'sent' 
+                          ? 'Email already sent for this month' 
+                          : record.employees?.work_email 
+                            ? `Send to ${record.employees.work_email}` 
+                            : 'No work email configured'
+                      }
                     >
                       {sendingEmailId === record.id ? (
                         <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      ) : emailStatusMap.get(record.employee_id)?.status === 'sent' ? (
+                        <CheckCircle className="w-4 h-4 mr-1 text-green-600" />
                       ) : (
                         <Mail className="w-4 h-4 mr-1" />
                       )}
-                      Email
+                      {emailStatusMap.get(record.employee_id)?.status === 'sent' ? 'Sent' : 'Email'}
                     </Button>
                     {!record.wps_processed && (
                       <>
