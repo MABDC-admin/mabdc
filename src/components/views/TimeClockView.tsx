@@ -4,6 +4,7 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { useAttendanceByDate, useUpdateAttendance, useCreateAttendance } from '@/hooks/useAttendance';
 import { useTimeShifts, SHIFT_DEFINITIONS } from '@/hooks/useTimeShifts';
 import { useShiftOverrides } from '@/hooks/useShiftOverrides';
+import { useLeave } from '@/hooks/useLeave';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -81,6 +82,9 @@ const SHIFT_TIMES = {
   default: { start: '08:00', end: '17:00' }
 };
 
+// Owner employee ID - excluded from missed punch alerts
+const OWNER_EMPLOYEE_ID = '08f6c5e8-95dd-43eb-a225-62510cb4b33a';
+
 export default function TimeClockView() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const dateString = format(selectedDate, 'yyyy-MM-dd');
@@ -90,6 +94,7 @@ export default function TimeClockView() {
   const { data: attendance = [], isLoading: loadingAttendance, refetch: refetchAttendance } = useAttendanceByDate(dateString);
   const { data: shifts = [] } = useTimeShifts();
   const { data: shiftOverrides = [] } = useShiftOverrides(dateString);
+  const { data: leaveRecords = [] } = useLeave();
   const updateAttendance = useUpdateAttendance();
   const createAttendance = useCreateAttendance();
 
@@ -335,6 +340,42 @@ export default function TimeClockView() {
     return stats;
   }, [timeClockRecords]);
 
+  // Get employee IDs who are on approved leave for the selected date
+  const employeesOnLeave = useMemo(() => {
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const onLeaveIds = new Set<string>();
+    
+    leaveRecords.forEach(leave => {
+      // Only consider approved leaves
+      if (leave.status === 'Approved' && leave.employee_id) {
+        const startDate = leave.start_date;
+        const endDate = leave.end_date;
+        
+        // Check if selected date falls within leave period
+        if (dateStr >= startDate && dateStr <= endDate) {
+          onLeaveIds.add(leave.employee_id);
+        }
+      }
+    });
+    
+    return onLeaveIds;
+  }, [leaveRecords, selectedDate]);
+
+  // Filter missed punch records excluding owner and employees on leave
+  const filteredMissedPunchIn = useMemo(() => {
+    return timeClockRecords
+      .filter(r => r.status.includes('miss_punch_in'))
+      .filter(r => r.employeeId !== OWNER_EMPLOYEE_ID)
+      .filter(r => !employeesOnLeave.has(r.employeeId));
+  }, [timeClockRecords, employeesOnLeave]);
+
+  const filteredMissedPunchOut = useMemo(() => {
+    return timeClockRecords
+      .filter(r => r.status.includes('miss_punch_out'))
+      .filter(r => r.employeeId !== OWNER_EMPLOYEE_ID)
+      .filter(r => !employeesOnLeave.has(r.employeeId));
+  }, [timeClockRecords, employeesOnLeave]);
+
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
@@ -499,8 +540,8 @@ export default function TimeClockView() {
         </div>
       </div>
 
-      {/* Missed Punch Alerts */}
-      {(statusStats.miss_punch_in > 0 || statusStats.miss_punch_out > 0) && (
+      {/* Missed Punch Alerts - Excludes owner and employees on leave */}
+      {(filteredMissedPunchIn.length > 0 || filteredMissedPunchOut.length > 0) && (
         <Alert variant="destructive" className="border-red-300 bg-red-50 dark:bg-red-950/30">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle className="flex items-center gap-2">
@@ -509,10 +550,10 @@ export default function TimeClockView() {
           </AlertTitle>
           <AlertDescription>
             <div className="mt-2 space-y-2">
-              {timeClockRecords.filter(r => r.status.includes('miss_punch_in')).length > 0 && (
+              {filteredMissedPunchIn.length > 0 && (
                 <div className="flex flex-wrap gap-2 items-center">
                   <span className="font-medium text-red-700 dark:text-red-300">Miss Punch In:</span>
-                  {timeClockRecords.filter(r => r.status.includes('miss_punch_in')).map(r => (
+                  {filteredMissedPunchIn.map(r => (
                     <Badge 
                       key={r.employeeId} 
                       variant="outline" 
@@ -523,10 +564,10 @@ export default function TimeClockView() {
                   ))}
                 </div>
               )}
-              {timeClockRecords.filter(r => r.status.includes('miss_punch_out')).length > 0 && (
+              {filteredMissedPunchOut.length > 0 && (
                 <div className="flex flex-wrap gap-2 items-center">
                   <span className="font-medium text-red-700 dark:text-red-300">Miss Punch Out:</span>
-                  {timeClockRecords.filter(r => r.status.includes('miss_punch_out')).map(r => (
+                  {filteredMissedPunchOut.map(r => (
                     <Badge 
                       key={r.employeeId} 
                       variant="outline" 
