@@ -3,7 +3,8 @@ import { useHRStore } from '@/store/hrStore';
 import { useDeleteEmployee, useEmployees, useUpdateEmployee } from '@/hooks/useEmployees';
 import { useEmployeeDocuments, useUploadDocument, useDeleteDocument, useUploadEmployeePhoto } from '@/hooks/useDocuments';
 import { useLeave, useDeleteLeave, useLeaveBalances } from '@/hooks/useLeave';
-import { useContracts } from '@/hooks/useContracts';
+import { useContracts, useUpdateContractImages } from '@/hooks/useContracts';
+import { supabase } from '@/integrations/supabase/client';
 import { useEmployeeEducation, useAddEducation, useDeleteEducation } from '@/hooks/useEducation';
 import { useDocumentCompleteness } from '@/hooks/useDocumentCompleteness';
 import { EditEmployeeModal } from './EditEmployeeModal';
@@ -93,8 +94,13 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
   })();
 
   // Hooks for contracts
-  const { data: contracts = [] } = useContracts();
+  const { data: contracts = [], refetch: refetchContracts } = useContracts();
+  const updateContractImages = useUpdateContractImages();
   const employeeContract = contracts.find(c => c.employee_id === currentEmployee?.id && c.status === 'Active');
+  
+  // Contract image upload state
+  const [isUploadingContractPages, setIsUploadingContractPages] = useState(false);
+  const contractPageInputRef = useRef<HTMLInputElement>(null);
 
   // Hooks for education
   const { data: education = [], refetch: refetchEducation } = useEmployeeEducation(currentEmployee?.id || '');
@@ -155,6 +161,72 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
     await uploadPhoto.mutateAsync({ file, employeeId: currentEmployee.id });
     refetchEmployees();
     if (photoInputRef.current) photoInputRef.current.value = '';
+  };
+
+  // Contract page upload with AI validation
+  const handleContractPageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !employeeContract) return;
+    
+    setIsUploadingContractPages(true);
+    
+    try {
+      const uploadedUrls: { page1?: string; page2?: string } = {};
+      
+      for (let i = 0; i < Math.min(files.length, 2); i++) {
+        const file = files[i];
+        
+        if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+          toast.error('Please upload images or PDFs only');
+          continue;
+        }
+        
+        if (file.size > 10 * 1024 * 1024) {
+          toast.error(`File ${file.name} is too large (max 10MB)`);
+          continue;
+        }
+        
+        // Upload to contract-documents bucket
+        const fileName = `${currentEmployee.id}/${employeeContract.id}/page${i + 1}_${Date.now()}.${file.name.split('.').pop()}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('contract-documents')
+          .upload(fileName, file, { upsert: true });
+        
+        if (uploadError) {
+          toast.error(`Failed to upload ${file.name}: ${uploadError.message}`);
+          continue;
+        }
+        
+        const { data: urlData } = supabase.storage
+          .from('contract-documents')
+          .getPublicUrl(uploadData.path);
+        
+        if (i === 0) {
+          uploadedUrls.page1 = urlData.publicUrl;
+        } else {
+          uploadedUrls.page2 = urlData.publicUrl;
+        }
+      }
+      
+      // Update contract with new image URLs
+      if (uploadedUrls.page1 || uploadedUrls.page2) {
+        await updateContractImages.mutateAsync({
+          contractId: employeeContract.id,
+          page1Url: uploadedUrls.page1 || employeeContract.page1_url,
+          page2Url: uploadedUrls.page2 || employeeContract.page2_url,
+        });
+        
+        refetchContracts();
+        toast.success('Contract pages uploaded successfully');
+      }
+    } catch (error) {
+      console.error('Error uploading contract pages:', error);
+      toast.error('Failed to upload contract pages');
+    } finally {
+      setIsUploadingContractPages(false);
+      if (contractPageInputRef.current) contractPageInputRef.current.value = '';
+    }
   };
 
   const handleDeleteDocument = async (docId: string, fileUrl: string) => {
@@ -510,6 +582,36 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                         )}
                       </div>
                     </div>
+                    
+                    {/* Upload Contract Pages Button */}
+                    {employeeContract && (!employeeContract.page1_url || !employeeContract.page2_url) && (
+                      <div className="mt-3">
+                        <input
+                          ref={contractPageInputRef}
+                          type="file"
+                          accept="image/*,.pdf"
+                          multiple
+                          className="hidden"
+                          onChange={handleContractPageUpload}
+                        />
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full"
+                          onClick={() => contractPageInputRef.current?.click()}
+                          disabled={isUploadingContractPages}
+                        >
+                          {isUploadingContractPages ? (
+                            <>Uploading...</>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4 mr-2" />
+                              Upload Contract Pages
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="glass-card rounded-2xl border border-border p-5">
