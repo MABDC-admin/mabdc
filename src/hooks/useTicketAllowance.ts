@@ -531,3 +531,127 @@ export function useCheckTicketEligibility() {
     },
   });
 }
+
+// Bulk auto-approve all past pending ticket allowances
+export function useBulkAutoApproveTicketAllowances() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ defaultAmount }: { defaultAmount: number }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const today = new Date().toISOString().split('T')[0];
+
+      // Get all past pending records
+      const { data: pendingRecords, error: fetchError } = await supabase
+        .from('ticket_allowance_records')
+        .select('id, employee_id, eligibility_year')
+        .eq('status', 'pending')
+        .lt('eligibility_start_date', today);
+
+      if (fetchError) throw fetchError;
+      if (!pendingRecords?.length) return { approved: 0 };
+
+      // Update all to approved
+      const { error: updateError } = await supabase
+        .from('ticket_allowance_records')
+        .update({
+          status: 'approved',
+          amount: defaultAmount,
+          approved_by: userData.user?.id,
+          approved_at: new Date().toISOString(),
+          notes: 'Auto-approved (past eligibility)',
+        })
+        .eq('status', 'pending')
+        .lt('eligibility_start_date', today);
+
+      if (updateError) throw updateError;
+
+      // Create audit logs for each
+      for (const record of pendingRecords) {
+        await supabase.from('ticket_allowance_audit_log').insert({
+          ticket_allowance_id: record.id,
+          action: 'auto_approved',
+          performed_by: userData.user?.id,
+          details: { amount: defaultAmount, reason: 'Bulk auto-approve past eligibility' },
+        });
+      }
+
+      return { approved: pendingRecords.length };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['ticket-allowance-reminders'] });
+      queryClient.invalidateQueries({ queryKey: ['ticket-allowance-records'] });
+      queryClient.invalidateQueries({ queryKey: ['approved-ticket-allowances'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-ticket-allowance'] });
+      toast.success(`Auto-approved ${data.approved} ticket allowances`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to auto-approve: ${error.message}`);
+    },
+  });
+}
+
+// Delete a ticket allowance record (admin only)
+export function useDeleteTicketAllowance() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const { data: userData } = await supabase.auth.getUser();
+
+      // Get record details before deletion for audit
+      const { data: record } = await supabase
+        .from('ticket_allowance_records')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      // Create audit log BEFORE deletion
+      await supabase.from('ticket_allowance_audit_log').insert({
+        ticket_allowance_id: id,
+        action: 'deleted',
+        performed_by: userData.user?.id,
+        details: {
+          reason,
+          deleted_record: record,
+        },
+      });
+
+      // Delete the record
+      const { error } = await supabase
+        .from('ticket_allowance_records')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket-allowance-reminders'] });
+      queryClient.invalidateQueries({ queryKey: ['ticket-allowance-records'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-ticket-allowance'] });
+      queryClient.invalidateQueries({ queryKey: ['approved-ticket-allowances'] });
+      toast.success('Ticket allowance record deleted');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete: ${error.message}`);
+    },
+  });
+}
+
+// Get count of past pending ticket allowances
+export function usePastPendingCount() {
+  return useQuery({
+    queryKey: ['past-pending-ticket-count'],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { count, error } = await supabase
+        .from('ticket_allowance_records')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending')
+        .lt('eligibility_start_date', today);
+
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+}
