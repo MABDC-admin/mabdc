@@ -344,6 +344,7 @@ export type Database = {
           probation_period: number | null
           start_date: string
           status: string | null
+          ticket_allowance: number | null
           total_salary: number | null
           transportation_allowance: number | null
           updated_at: string
@@ -367,6 +368,7 @@ export type Database = {
           probation_period?: number | null
           start_date: string
           status?: string | null
+          ticket_allowance?: number | null
           total_salary?: number | null
           transportation_allowance?: number | null
           updated_at?: string
@@ -390,6 +392,7 @@ export type Database = {
           probation_period?: number | null
           start_date?: string
           status?: string | null
+          ticket_allowance?: number | null
           total_salary?: number | null
           transportation_allowance?: number | null
           updated_at?: string
@@ -1696,6 +1699,79 @@ export type Database = {
           },
         ]
       }
+      payroll_deductions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          days: number | null
+          deduction_type: string
+          id: string
+          payroll_id: string
+          reason: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          days?: number | null
+          deduction_type: string
+          id?: string
+          payroll_id: string
+          reason: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          days?: number | null
+          deduction_type?: string
+          id?: string
+          payroll_id?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_deductions_payroll_id_fkey"
+            columns: ["payroll_id"]
+            isOneToOne: false
+            referencedRelation: "payroll"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_earnings: {
+        Row: {
+          amount: number
+          created_at: string | null
+          description: string | null
+          earning_type: string
+          id: string
+          payroll_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          description?: string | null
+          earning_type: string
+          id?: string
+          payroll_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          description?: string | null
+          earning_type?: string
+          id?: string
+          payroll_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_earnings_payroll_id_fkey"
+            columns: ["payroll_id"]
+            isOneToOne: false
+            referencedRelation: "payroll"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -1782,6 +1858,107 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      ticket_allowance_audit_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          performed_by: string | null
+          ticket_allowance_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          performed_by?: string | null
+          ticket_allowance_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          performed_by?: string | null
+          ticket_allowance_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_allowance_audit_log_ticket_allowance_id_fkey"
+            columns: ["ticket_allowance_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_allowance_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_allowance_records: {
+        Row: {
+          amount: number | null
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string | null
+          eligibility_start_date: string
+          eligibility_year: number
+          employee_id: string
+          id: string
+          notes: string | null
+          processed_at: string | null
+          processed_in_payroll_id: string | null
+          reminder_active: boolean | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          eligibility_start_date: string
+          eligibility_year: number
+          employee_id: string
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_in_payroll_id?: string | null
+          reminder_active?: boolean | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          eligibility_start_date?: string
+          eligibility_year?: number
+          employee_id?: string
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_in_payroll_id?: string | null
+          reminder_active?: boolean | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_allowance_records_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_allowance_records_processed_in_payroll_id_fkey"
+            columns: ["processed_in_payroll_id"]
+            isOneToOne: false
+            referencedRelation: "payroll"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_passkeys: {
         Row: {

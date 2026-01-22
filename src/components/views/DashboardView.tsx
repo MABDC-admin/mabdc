@@ -12,6 +12,7 @@ import { differenceInDays, parseISO, format, isAfter, isBefore, addDays } from '
 import { Button } from '@/components/ui/button';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
+import { TicketAllowanceReminders } from '@/components/admin/TicketAllowanceReminders';
 import type { Employee } from '@/types/hr';
 
 interface StatCardProps {
@@ -213,6 +214,9 @@ export function DashboardView() {
           </Button>
         </div>
       </div>
+
+      {/* Ticket Allowance Reminders */}
+      <TicketAllowanceReminders />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -1,0 +1,278 @@
+import { useState } from 'react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { Plane, Check, X, Eye, AlertCircle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  useTicketAllowanceReminders,
+  useApproveTicketAllowance,
+  useCancelTicketAllowance,
+  useDismissTicketReminder,
+  useCheckTicketEligibility,
+} from '@/hooks/useTicketAllowance';
+import { useEmployees } from '@/hooks/useEmployees';
+
+export function TicketAllowanceReminders() {
+  const { data: reminders, isLoading } = useTicketAllowanceReminders();
+  const { data: employees } = useEmployees();
+  const approveAllowance = useApproveTicketAllowance();
+  const cancelAllowance = useCancelTicketAllowance();
+  const dismissReminder = useDismissTicketReminder();
+  const checkEligibility = useCheckTicketEligibility();
+
+  const [selectedReminder, setSelectedReminder] = useState<typeof reminders extends (infer T)[] ? T : never | null>(null);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [notes, setNotes] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
+
+  const handleCheckEligibility = () => {
+    if (employees) {
+      checkEligibility.mutate(
+        employees.map((e) => ({
+          id: e.id,
+          joining_date: e.joining_date,
+          full_name: e.full_name,
+        }))
+      );
+    }
+  };
+
+  const handleApprove = () => {
+    if (selectedReminder && amount) {
+      approveAllowance.mutate(
+        {
+          id: selectedReminder.id,
+          amount: parseFloat(amount),
+          notes: notes || undefined,
+        },
+        {
+          onSuccess: () => {
+            setApproveDialogOpen(false);
+            setSelectedReminder(null);
+            setAmount('');
+            setNotes('');
+          },
+        }
+      );
+    }
+  };
+
+  const handleCancel = () => {
+    if (selectedReminder && cancelReason) {
+      cancelAllowance.mutate(
+        { id: selectedReminder.id, reason: cancelReason },
+        {
+          onSuccess: () => {
+            setCancelDialogOpen(false);
+            setSelectedReminder(null);
+            setCancelReason('');
+          },
+        }
+      );
+    }
+  };
+
+  const handleDismiss = (id: string) => {
+    dismissReminder.mutate(id);
+  };
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (!reminders?.length) {
+    return null;
+  }
+
+  return (
+    <>
+      <Card className="border-amber-500/30 bg-amber-500/5">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <Plane className="h-5 w-5" />
+              Ticket Allowance Reminders
+              <Badge variant="secondary" className="ml-2">
+                {reminders.length}
+              </Badge>
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCheckEligibility}
+              disabled={checkEligibility.isPending}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${checkEligibility.isPending ? 'animate-spin' : ''}`} />
+              Check Eligibility
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {reminders.map((reminder) => (
+            <div
+              key={reminder.id}
+              className="flex items-center justify-between p-3 rounded-lg bg-background border"
+            >
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={reminder.employees?.photo_url || undefined} />
+                  <AvatarFallback>
+                    {reminder.employees?.full_name
+                      ?.split(' ')
+                      .map((n) => n[0])
+                      .join('')
+                      .toUpperCase() || '?'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">{reminder.employees?.full_name}</p>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>{reminder.employees?.hrms_no}</span>
+                    <span>•</span>
+                    <span>{reminder.employees?.department}</span>
+                  </div>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                    Eligible since {format(new Date(reminder.eligibility_start_date), 'MMM yyyy')} •{' '}
+                    {formatDistanceToNow(new Date(reminder.eligibility_start_date), { addSuffix: true })}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setSelectedReminder(reminder);
+                    setApproveDialogOpen(true);
+                  }}
+                >
+                  <Check className="h-4 w-4 mr-1" />
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedReminder(reminder);
+                    setCancelDialogOpen(true);
+                  }}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleDismiss(reminder.id)}
+                  title="Dismiss reminder (will reappear next check)"
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Approve Dialog */}
+      <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve Ticket Allowance</DialogTitle>
+            <DialogDescription>
+              Approve ticket allowance for {selectedReminder?.employees?.full_name} for{' '}
+              {selectedReminder?.eligibility_year}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="amount">Ticket Allowance Amount (AED)</Label>
+              <Input
+                id="amount"
+                type="number"
+                placeholder="e.g., 3500"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Textarea
+                id="notes"
+                placeholder="Any additional notes..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+              <AlertCircle className="h-4 w-4 text-blue-500 mt-0.5" />
+              <p className="text-sm text-blue-700 dark:text-blue-400">
+                Once approved, this ticket allowance will be available for inclusion in the next
+                payroll for this employee.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApproveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleApprove} disabled={!amount || approveAllowance.isPending}>
+              {approveAllowance.isPending ? 'Approving...' : 'Approve'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Ticket Allowance</DialogTitle>
+            <DialogDescription>
+              Cancel ticket allowance for {selectedReminder?.employees?.full_name} for{' '}
+              {selectedReminder?.eligibility_year}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="cancelReason">Reason for Cancellation *</Label>
+              <Textarea
+                id="cancelReason"
+                placeholder="Please provide a reason for cancellation..."
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+              Back
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCancel}
+              disabled={!cancelReason || cancelAllowance.isPending}
+            >
+              {cancelAllowance.isPending ? 'Cancelling...' : 'Cancel Allowance'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
