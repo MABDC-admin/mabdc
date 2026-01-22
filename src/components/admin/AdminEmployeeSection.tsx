@@ -56,10 +56,10 @@ export function AdminEmployeeSection() {
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteEmployee.mutateAsync(id);
+      await deleteEmployee.mutateAsync({ id });
       setDeleteConfirm(null);
     } catch (error) {
-      console.error('Failed to delete employee:', error);
+      console.error('Failed to request deletion:', error);
     }
   };
 

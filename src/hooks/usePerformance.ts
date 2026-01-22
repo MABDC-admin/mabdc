@@ -84,13 +84,31 @@ export function useAddPerformance() {
 export function useDeletePerformance() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('employee_performance').delete().eq('id', id);
-      if (error) throw error;
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      // Get performance record for approval email
+      const { data: performance, error: fetchError } = await supabase
+        .from('employee_performance')
+        .select('*, employees(full_name, hrms_no)')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      // Send deletion request for approval
+      const { error } = await supabase.functions.invoke('send-deletion-approval', {
+        body: {
+          recordType: 'performance',
+          recordId: id,
+          recordData: performance,
+          reason,
+        },
+      });
+      
+      if (error) throw new Error(error.message || 'Failed to request deletion approval');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employee-performance'] });
-      toast.success('Performance record deleted');
+      queryClient.invalidateQueries({ queryKey: ['pending-deletions'] });
+      toast.info('Deletion request sent for approval');
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -150,13 +168,31 @@ export function useAddCorrectiveAction() {
 export function useDeleteCorrectiveAction() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('employee_corrective_actions').delete().eq('id', id);
-      if (error) throw error;
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      // Get corrective action for approval email
+      const { data: correctiveAction, error: fetchError } = await supabase
+        .from('employee_corrective_actions')
+        .select('*, employees(full_name, hrms_no)')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      // Send deletion request for approval
+      const { error } = await supabase.functions.invoke('send-deletion-approval', {
+        body: {
+          recordType: 'corrective_action',
+          recordId: id,
+          recordData: correctiveAction,
+          reason,
+        },
+      });
+      
+      if (error) throw new Error(error.message || 'Failed to request deletion approval');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['corrective-actions'] });
-      toast.success('Corrective action deleted');
+      queryClient.invalidateQueries({ queryKey: ['pending-deletions'] });
+      toast.info('Deletion request sent for approval');
     },
     onError: (error: Error) => toast.error(error.message),
   });
