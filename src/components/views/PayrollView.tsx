@@ -3,22 +3,25 @@ import { usePayroll, useProcessWPS, useGeneratePayroll, useDeletePayroll, useUpd
 import { useEmployees } from '@/hooks/useEmployees';
 import { useContracts } from '@/hooks/useContracts';
 import { useCompanySettings } from '@/hooks/useSettings';
+import { useApprovedTicketAllowances } from '@/hooks/useTicketAllowance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { DollarSign, RefreshCw, CheckCircle, Plus, Trash2, Edit2, Download, Printer, CreditCard, Users, FileSpreadsheet } from 'lucide-react';
+import { DollarSign, RefreshCw, CheckCircle, Plus, Trash2, Edit2, Download, Printer, CreditCard, Users, FileSpreadsheet, Plane } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { generatePayslipPDF, generateBulkPayrollPDF } from '@/utils/payrollPdf';
 import { toast } from 'sonner';
+import { TicketAllowanceReminders } from '@/components/admin/TicketAllowanceReminders';
 
 export function PayrollView() {
   const { data: payroll = [], isLoading, refetch } = usePayroll();
   const { data: employees = [] } = useEmployees();
   const { data: contracts = [] } = useContracts();
   const { data: settings } = useCompanySettings();
+  const { data: approvedTicketAllowances = [] } = useApprovedTicketAllowances();
   const processWPS = useProcessWPS();
   const generatePayroll = useGeneratePayroll();
   const deletePayroll = useDeletePayroll();
@@ -41,9 +44,11 @@ export function PayrollView() {
     basicSalary: 0,
     housingAllowance: 0,
     transportAllowance: 0,
+    ticketAllowance: 0,
     otherAllowances: 0,
     deductions: 0,
     deductionReason: '',
+    includeTicketAllowance: false,
   });
 
   const months = useMemo(() => {
@@ -82,6 +87,9 @@ export function PayrollView() {
 
   const handleEmployeeSelect = (employeeId: string) => {
     const contract = contracts.find(c => c.employee_id === employeeId && c.status === 'Active');
+    // Check if employee has an approved ticket allowance
+    const ticketAllowance = approvedTicketAllowances.find(t => t.employee_id === employeeId);
+    
     if (contract) {
       setNewPayroll({
         ...newPayroll,
@@ -89,9 +97,11 @@ export function PayrollView() {
         basicSalary: contract.basic_salary || 0,
         housingAllowance: contract.housing_allowance || 0,
         transportAllowance: contract.transportation_allowance || 0,
+        ticketAllowance: ticketAllowance?.amount || 0,
         otherAllowances: 0,
         deductions: 0,
         deductionReason: '',
+        includeTicketAllowance: !!ticketAllowance,
       });
     } else {
       const emp = employees.find(e => e.id === employeeId);
@@ -101,16 +111,19 @@ export function PayrollView() {
         basicSalary: emp?.basic_salary || 0,
         housingAllowance: 0,
         transportAllowance: 0,
+        ticketAllowance: ticketAllowance?.amount || 0,
         otherAllowances: emp?.allowance || 0,
         deductions: 0,
         deductionReason: '',
+        includeTicketAllowance: !!ticketAllowance,
       });
     }
   };
 
   const handleGeneratePayroll = async () => {
     if (!newPayroll.employeeId) return;
-    const totalAllowances = newPayroll.housingAllowance + newPayroll.transportAllowance + newPayroll.otherAllowances;
+    const ticketAmount = newPayroll.includeTicketAllowance ? newPayroll.ticketAllowance : 0;
+    const totalAllowances = newPayroll.housingAllowance + newPayroll.transportAllowance + newPayroll.otherAllowances + ticketAmount;
     
     try {
       await generatePayroll.mutateAsync({
@@ -127,9 +140,11 @@ export function PayrollView() {
         basicSalary: 0,
         housingAllowance: 0,
         transportAllowance: 0,
+        ticketAllowance: 0,
         otherAllowances: 0,
         deductions: 0,
         deductionReason: '',
+        includeTicketAllowance: false,
       });
     } catch (error) {
       console.error('Failed to generate payroll:', error);
