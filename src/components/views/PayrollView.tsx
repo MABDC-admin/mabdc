@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { generatePayslipPDF, generateBulkPayrollPDF } from '@/utils/payrollPdf';
 import { toast } from 'sonner';
 import { TicketAllowanceReminders } from '@/components/admin/TicketAllowanceReminders';
+import { EmailHistorySection } from '@/components/admin/EmailHistorySection';
 
 export function PayrollView() {
   const { data: payroll = [], isLoading, refetch } = usePayroll();
@@ -266,6 +267,7 @@ export function PayrollView() {
         body: {
           employeeName: record.employees?.full_name || 'Employee',
           employeeEmail: workEmail,
+          employeeId: record.employee_id,
           month: formattedMonth,
           pdfBase64,
           companyName: settings?.company_name || 'M.A Brain Development Center',
@@ -314,6 +316,9 @@ export function PayrollView() {
           <p className="text-2xl font-bold mt-1 text-amber-400">{stats.pending}</p>
         </div>
       </div>
+
+      {/* Email History Section */}
+      <EmailHistorySection emailType="payslip" maxHeight="300px" />
 
       {/* Main Section */}
       <section className="glass-card rounded-3xl border border-border p-4 sm:p-6">
