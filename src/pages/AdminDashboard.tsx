@@ -3,7 +3,7 @@ import {
   Shield, Users, Calendar, FileText, DollarSign, ClipboardList, 
   Trash2, Edit, Plus, Download, RefreshCw, Database, BarChart3,
   ChevronDown, AlertTriangle, Star, Scale, LogOut, MessageSquare, FileSignature, UserCog, Megaphone,
-  Lock, KeyRound
+  Lock, KeyRound, Mail
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -26,7 +26,9 @@ import { AdminContractsSection } from '@/components/admin/AdminContractsSection'
 import { AdminUserAccountsSection } from '@/components/admin/AdminUserAccountsSection';
 import { AdminAnnouncementsSection } from '@/components/admin/AdminAnnouncementsSection';
 import { HRAssistantChat } from '@/components/admin/HRAssistantChat';
+import { EmailHistorySection } from '@/components/admin/EmailHistorySection';
 import { useAnnouncements } from '@/hooks/useAnnouncements';
+import { useEmailHistory } from '@/hooks/useEmailHistory';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -46,6 +48,7 @@ export default function AdminDashboard() {
   const { data: contracts = [] } = useContracts();
   const { data: appeals = [] } = useAttendanceAppeals();
   const { data: announcements = [] } = useAnnouncements();
+  const { data: emailHistory = [] } = useEmailHistory();
   const { user, signOut } = useAuth();
 
   // Check sessionStorage for pincode verification on mount
@@ -142,6 +145,7 @@ export default function AdminDashboard() {
     { label: 'Attendance Records', value: attendance.length, icon: ClipboardList, color: 'text-blue-500' },
     { label: 'Announcements', value: announcements.length, icon: Megaphone, color: 'text-orange-500' },
     { label: 'Appeals', value: appeals.length, icon: MessageSquare, color: 'text-purple-500', pending: pendingAppeals },
+    { label: 'Emails Sent', value: emailHistory.length, icon: Mail, color: 'text-cyan-500' },
   ];
 
   return (
@@ -232,6 +236,9 @@ export default function AdminDashboard() {
             <TabsTrigger value="announcements" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Megaphone className="w-4 h-4 mr-2" />Announcements
             </TabsTrigger>
+            <TabsTrigger value="email-history" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Mail className="w-4 h-4 mr-2" />Email History
+            </TabsTrigger>
             <TabsTrigger value="data-reset" className="rounded-lg data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
               <Database className="w-4 h-4 mr-2" />Data Management
             </TabsTrigger>
@@ -318,6 +325,12 @@ export default function AdminDashboard() {
 
           <TabsContent value="announcements">
             <AdminAnnouncementsSection />
+          </TabsContent>
+
+          <TabsContent value="email-history">
+            <div className="glass-card rounded-3xl border border-border p-6">
+              <EmailHistorySection maxHeight="600px" />
+            </div>
           </TabsContent>
 
           <TabsContent value="data-reset">
