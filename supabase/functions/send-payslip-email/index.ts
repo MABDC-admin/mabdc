@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +22,8 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+
     const {
       employeeName,
       employeeEmail,
@@ -40,6 +43,13 @@ const handler = async (req: Request): Promise<Response> => {
     const nameParts = employeeName.split(' ');
     const firstName = nameParts[0];
     const filename = `Payslip-${employeeName.replace(/\s+/g, '-')}-${month.replace(/\s+/g, '-')}.pdf`;
+
+    // Convert base64 to Uint8Array for attachment
+    const binaryString = atob(pdfBase64);
+    const pdfBuffer = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      pdfBuffer[i] = binaryString.charCodeAt(i);
+    }
 
     const emailHtml = `
       <!DOCTYPE html>
@@ -135,114 +145,23 @@ const handler = async (req: Request): Promise<Response> => {
       </html>
     `;
 
-    // Build multipart email with attachment
-    const boundary = `----=_Part_${Date.now()}`;
-    const CRLF = "\r\n";
-    
-    let emailBody = "";
-    emailBody += `--${boundary}${CRLF}`;
-    emailBody += `Content-Type: text/html; charset=utf-8${CRLF}`;
-    emailBody += `Content-Transfer-Encoding: quoted-printable${CRLF}${CRLF}`;
-    emailBody += emailHtml + CRLF;
-    emailBody += `--${boundary}${CRLF}`;
-    emailBody += `Content-Type: application/pdf; name="${filename}"${CRLF}`;
-    emailBody += `Content-Disposition: attachment; filename="${filename}"${CRLF}`;
-    emailBody += `Content-Transfer-Encoding: base64${CRLF}${CRLF}`;
-    emailBody += pdfBase64 + CRLF;
-    emailBody += `--${boundary}--${CRLF}`;
+    // Get the from email - use SMTP_FROM_EMAIL if set, otherwise use Resend's test domain
+    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "onboarding@resend.dev";
 
-    const SMTP_HOST = Deno.env.get("SMTP_HOST") || "";
-    const SMTP_PORT = parseInt(Deno.env.get("SMTP_PORT") || "587");
-    const SMTP_USER = Deno.env.get("SMTP_USER") || "";
-    const SMTP_PASS = Deno.env.get("SMTP_PASS") || "";
-    const SMTP_FROM_EMAIL = Deno.env.get("SMTP_FROM_EMAIL") || SMTP_USER;
-
-    // Use Deno's built-in TCP connection for SMTP
-    const conn = await Deno.connect({
-      hostname: SMTP_HOST,
-      port: SMTP_PORT,
+    const emailResponse = await resend.emails.send({
+      from: `${companyName} <${fromEmail}>`,
+      to: [employeeEmail],
+      subject: `Payslip for ${month} - ${employeeName}`,
+      html: emailHtml,
+      attachments: [
+        {
+          filename: filename,
+          content: pdfBuffer,
+        },
+      ],
     });
 
-    const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-
-    const send = async (data: string) => {
-      await conn.write(encoder.encode(data + CRLF));
-    };
-
-    const read = async (): Promise<string> => {
-      const buffer = new Uint8Array(1024);
-      const n = await conn.read(buffer);
-      return n ? decoder.decode(buffer.subarray(0, n)) : "";
-    };
-
-    // SMTP conversation
-    await read(); // Server greeting
-    await send(`EHLO ${SMTP_HOST}`);
-    await read();
-    
-    // Start TLS
-    await send("STARTTLS");
-    const starttlsResponse = await read();
-    
-    if (starttlsResponse.includes("220")) {
-      // Upgrade to TLS
-      const tlsConn = await Deno.startTls(conn, { hostname: SMTP_HOST });
-      
-      const tlsSend = async (data: string) => {
-        await tlsConn.write(encoder.encode(data + CRLF));
-      };
-
-      const tlsRead = async (): Promise<string> => {
-        const buffer = new Uint8Array(4096);
-        const n = await tlsConn.read(buffer);
-        return n ? decoder.decode(buffer.subarray(0, n)) : "";
-      };
-
-      await tlsSend(`EHLO ${SMTP_HOST}`);
-      await tlsRead();
-
-      // Auth
-      await tlsSend("AUTH LOGIN");
-      await tlsRead();
-      await tlsSend(btoa(SMTP_USER));
-      await tlsRead();
-      await tlsSend(btoa(SMTP_PASS));
-      const authResponse = await tlsRead();
-      
-      if (!authResponse.includes("235")) {
-        throw new Error("SMTP authentication failed: " + authResponse);
-      }
-
-      await tlsSend(`MAIL FROM:<${SMTP_FROM_EMAIL}>`);
-      await tlsRead();
-      await tlsSend(`RCPT TO:<${employeeEmail}>`);
-      await tlsRead();
-      await tlsSend("DATA");
-      await tlsRead();
-
-      // Send headers and body
-      const headers = [
-        `From: ${companyName} <${SMTP_FROM_EMAIL}>`,
-        `To: ${employeeEmail}`,
-        `Subject: Payslip for ${month} - ${employeeName}`,
-        `MIME-Version: 1.0`,
-        `Content-Type: multipart/mixed; boundary="${boundary}"`,
-        "",
-        emailBody,
-        ".",
-      ].join(CRLF);
-
-      await tlsSend(headers);
-      await tlsRead();
-      await tlsSend("QUIT");
-      tlsConn.close();
-    } else {
-      conn.close();
-      throw new Error("STARTTLS not supported");
-    }
-
-    console.log(`Payslip email sent successfully to ${employeeEmail}`);
+    console.log("Email sent successfully:", emailResponse);
 
     return new Response(
       JSON.stringify({ success: true, message: `Payslip sent to ${employeeEmail}` }),
