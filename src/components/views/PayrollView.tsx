@@ -40,6 +40,9 @@ export function PayrollView() {
   const [editingPayroll, setEditingPayroll] = useState<any>(null);
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [isBulkEmailOpen, setIsBulkEmailOpen] = useState(false);
+  const [bulkEmailSending, setBulkEmailSending] = useState(false);
+  const [bulkEmailProgress, setBulkEmailProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
 
   const [newPayroll, setNewPayroll] = useState({
     employeeId: '',
@@ -294,6 +297,97 @@ export function PayrollView() {
     }
   };
 
+  // Bulk Email All Payslips
+  const recordsWithEmail = useMemo(() => 
+    filteredPayroll.filter(r => r.employees?.work_email), 
+    [filteredPayroll]
+  );
+  
+  const recordsWithoutEmail = useMemo(() => 
+    filteredPayroll.filter(r => !r.employees?.work_email), 
+    [filteredPayroll]
+  );
+
+  const handleBulkEmailPayslips = async () => {
+    if (recordsWithEmail.length === 0) {
+      toast.error('No employees with work email in this month');
+      return;
+    }
+
+    setIsBulkEmailOpen(false);
+    setBulkEmailSending(true);
+    setBulkEmailProgress({ current: 0, total: recordsWithEmail.length, success: 0, failed: 0 });
+
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (const record of recordsWithEmail) {
+      try {
+        // Generate PDF for each employee
+        const pdfDoc = await generatePayslipPDF(record, settings, true, true);
+        if (!pdfDoc) {
+          throw new Error('Failed to generate PDF');
+        }
+
+        const pdfArrayBuffer = pdfDoc.output('arraybuffer');
+        const pdfBytes = new Uint8Array(pdfArrayBuffer);
+        
+        let binary = '';
+        const chunkSize = 8192;
+        for (let i = 0; i < pdfBytes.length; i += chunkSize) {
+          const chunk = pdfBytes.subarray(i, i + chunkSize);
+          binary += String.fromCharCode.apply(null, Array.from(chunk));
+        }
+        const pdfBase64 = btoa(binary);
+
+        const [year, monthNum] = record.month.split('-');
+        const monthDate = new Date(parseInt(year), parseInt(monthNum) - 1);
+        const formattedMonth = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+        const { error } = await supabase.functions.invoke('send-payslip-email', {
+          body: {
+            employeeName: record.employees?.full_name || 'Employee',
+            employeeEmail: record.employees?.work_email,
+            employeeId: record.employee_id,
+            employeeHrmsNo: record.employees?.hrms_no || '',
+            month: formattedMonth,
+            pdfBase64,
+            companyName: settings?.company_name || 'M.A Brain Development Center',
+            hrManagerName: 'Myranel D. Plaza',
+            hrManagerTitle: 'Human Resource Manager',
+          }
+        });
+
+        if (error) throw error;
+
+        successCount++;
+        setBulkEmailProgress(prev => ({ 
+          ...prev, 
+          current: prev.current + 1,
+          success: prev.success + 1 
+        }));
+      } catch (error) {
+        console.error(`Failed to send payslip to ${record.employees?.full_name}:`, error);
+        failedCount++;
+        setBulkEmailProgress(prev => ({ 
+          ...prev, 
+          current: prev.current + 1,
+          failed: prev.failed + 1 
+        }));
+      }
+    }
+
+    setBulkEmailSending(false);
+    
+    if (successCount > 0 && failedCount === 0) {
+      toast.success(`✅ All ${successCount} payslips sent successfully!`);
+    } else if (successCount > 0 && failedCount > 0) {
+      toast.warning(`Sent ${successCount} payslips, ${failedCount} failed`);
+    } else {
+      toast.error(`Failed to send all ${failedCount} payslips`);
+    }
+  };
+
   const totalNet = newPayroll.basicSalary + newPayroll.housingAllowance + newPayroll.transportAllowance + newPayroll.otherAllowances - newPayroll.deductions;
 
   return (
@@ -350,6 +444,27 @@ export function PayrollView() {
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportAll} disabled={filteredPayroll.length === 0} className="border-border">
               <Download className="w-4 h-4 mr-1" /> Export PDF
+            </Button>
+
+            {/* Bulk Email Button */}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setIsBulkEmailOpen(true)}
+              disabled={bulkEmailSending || filteredPayroll.length === 0}
+              className="border-primary text-primary hover:bg-primary/10"
+            >
+              {bulkEmailSending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  Sending {bulkEmailProgress.current}/{bulkEmailProgress.total}...
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4 mr-1" />
+                  Email All
+                </>
+              )}
             </Button>
             
             {/* Bulk Generate Button */}
@@ -752,6 +867,53 @@ export function PayrollView() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Email Confirmation Dialog */}
+      <AlertDialog open={isBulkEmailOpen} onOpenChange={setIsBulkEmailOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Mail className="w-5 h-5 text-primary" />
+              Send All Payslips via Email
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  This will send password-protected payslip PDFs to all employees with email addresses for <strong>{months.find(m => m.value === selectedMonth)?.label}</strong>.
+                </p>
+                <div className="bg-secondary/50 rounded-lg p-3 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Employees with email:</span>
+                    <span className="font-bold text-primary">{recordsWithEmail.length}</span>
+                  </div>
+                  {recordsWithoutEmail.length > 0 && (
+                    <div className="flex justify-between text-sm text-amber-600">
+                      <span>⚠️ Missing work email:</span>
+                      <span className="font-medium">{recordsWithoutEmail.length}</span>
+                    </div>
+                  )}
+                </div>
+                {recordsWithoutEmail.length > 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 text-xs text-amber-700">
+                    The following employees will be skipped: {recordsWithoutEmail.map(r => r.employees?.full_name).join(', ')}
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleBulkEmailPayslips}
+              disabled={recordsWithEmail.length === 0}
+              className="bg-primary hover:bg-primary/90"
+            >
+              <Mail className="w-4 h-4 mr-1" />
+              Send {recordsWithEmail.length} Emails
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
