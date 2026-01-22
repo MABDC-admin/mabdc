@@ -139,9 +139,22 @@ export default function EmployeePortal() {
     };
   }, [employee?.joining_date]);
 
+  // Employee visible leave types only (5 core types with gender filtering)
+  const EMPLOYEE_VISIBLE_CODES = ['ANNUAL', 'LOP', 'SICK', 'MATERNITY', 'PATERNITY'];
+  const filteredLeaveTypes = useMemo(() => {
+    return leaveTypes.filter(type => {
+      if (!EMPLOYEE_VISIBLE_CODES.includes(type.code)) return false;
+      if (type.code === 'MATERNITY' && employee?.gender !== 'Female') return false;
+      if (type.code === 'PATERNITY' && employee?.gender !== 'Male') return false;
+      return true;
+    });
+  }, [leaveTypes, employee?.gender]);
+
+  const defaultLeaveType = filteredLeaveTypes.length > 0 ? filteredLeaveTypes[0].name : 'Annual Leave';
+
   // Leave request form
   const [leaveForm, setLeaveForm] = useState({
-    leave_type: 'Annual',
+    leave_type: 'Annual Leave',
     start_date: '',
     end_date: '',
     reason: '',
@@ -388,16 +401,10 @@ export default function EmployeePortal() {
                       <Select value={leaveForm.leave_type} onValueChange={(v) => setLeaveForm({ ...leaveForm, leave_type: v })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {leaveTypes.length > 0 ? leaveTypes.map((type) => (
+                          {filteredLeaveTypes.length > 0 ? filteredLeaveTypes.map((type) => (
                             <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
                           )) : (
-                            <>
-                              <SelectItem value="Annual">Annual Leave</SelectItem>
-                              <SelectItem value="Sick">Sick Leave</SelectItem>
-                              <SelectItem value="Maternity">Maternity Leave</SelectItem>
-                              <SelectItem value="Emergency">Emergency Leave</SelectItem>
-                              <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
-                            </>
+                            <SelectItem value="Annual Leave">Annual Leave</SelectItem>
                           )}
                         </SelectContent>
                       </Select>

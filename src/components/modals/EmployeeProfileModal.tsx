@@ -2120,6 +2120,7 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
         onClose={() => setIsLeaveOpen(false)}
         employeeId={currentEmployee.id}
         employeeName={currentEmployee.full_name}
+        employeeGender={currentEmployee.gender}
       />
 
       <ImagePreviewModal
