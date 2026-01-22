@@ -110,9 +110,15 @@ export function AdminLeaveSection() {
     }
   };
 
-  const leaveTypeOptions = leaveTypes.length > 0 
-    ? leaveTypes.map(lt => lt.name) 
-    : ['Annual', 'Sick', 'Emergency', 'Unpaid', 'Maternity', 'Paternity', 'Compassionate', 'Hajj'];
+  // HR visible leave types only (5 core types)
+  const HR_VISIBLE_CODES = ['ANNUAL', 'SICK', 'LOP', 'MATERNITY', 'PATERNITY'];
+  const filteredLeaveTypes = useMemo(() => {
+    return leaveTypes.filter(lt => HR_VISIBLE_CODES.includes(lt.code));
+  }, [leaveTypes]);
+  
+  const leaveTypeOptions = filteredLeaveTypes.length > 0 
+    ? filteredLeaveTypes.map(lt => lt.name) 
+    : ['Annual Leave', 'Sick Leave', 'Loss of Pay', 'Maternity Leave', 'Paternity Leave'];
   const statuses = ['Pending', 'Approved', 'Rejected'];
 
   // Get leave balance for selected employee

@@ -21,24 +21,54 @@ import { differenceInDays, parseISO } from 'date-fns';
 import { AlertCircle, CalendarX2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Leave types visible to employees (gender-filtered)
+const EMPLOYEE_VISIBLE_CODES = ['ANNUAL', 'LOP', 'SICK', 'MATERNITY', 'PATERNITY'];
+
 interface LeaveRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
   employeeId: string;
   employeeName: string;
+  employeeGender?: string | null;
 }
 
-export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName }: LeaveRequestModalProps) {
+export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName, employeeGender }: LeaveRequestModalProps) {
   const addLeave = useAddLeave();
   const { data: leaveTypes = [] } = useLeaveTypes();
   const { data: leaveBalances = [] } = useLeaveBalances(employeeId);
   const { data: allLeave = [] } = useLeave();
+
+  // Filter leave types for employees - only show allowed types with gender filtering
+  const filteredLeaveTypes = useMemo(() => {
+    return leaveTypes.filter(type => {
+      // Only show allowed types
+      if (!EMPLOYEE_VISIBLE_CODES.includes(type.code)) return false;
+      // Gender-specific filtering
+      if (type.code === 'MATERNITY' && employeeGender !== 'Female') return false;
+      if (type.code === 'PATERNITY' && employeeGender !== 'Male') return false;
+      return true;
+    });
+  }, [leaveTypes, employeeGender]);
+
+  // Set default leave type based on filtered types
+  const defaultLeaveType = filteredLeaveTypes.length > 0 ? filteredLeaveTypes[0].name : 'Annual Leave';
+
   const [formData, setFormData] = useState({
-    leave_type: 'Annual',
+    leave_type: defaultLeaveType,
     start_date: '',
     end_date: '',
     reason: '',
   });
+
+  // Reset form when modal opens with correct default type
+  useEffect(() => {
+    if (isOpen && filteredLeaveTypes.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        leave_type: filteredLeaveTypes[0].name,
+      }));
+    }
+  }, [isOpen, filteredLeaveTypes]);
 
   // Check for overlapping leaves
   const overlappingLeave = useMemo(() => {
@@ -151,17 +181,12 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName }:
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {leaveTypes.length > 0 ? (
-                  leaveTypes.map((type) => (
+                {filteredLeaveTypes.length > 0 ? (
+                  filteredLeaveTypes.map((type) => (
                     <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
                   ))
                 ) : (
-                  <>
-                    <SelectItem value="Annual">Annual Leave</SelectItem>
-                    <SelectItem value="Sick">Sick Leave</SelectItem>
-                    <SelectItem value="Emergency">Emergency Leave</SelectItem>
-                    <SelectItem value="Unpaid">Unpaid Leave</SelectItem>
-                  </>
+                  <SelectItem value="Annual Leave">Annual Leave</SelectItem>
                 )}
               </SelectContent>
             </Select>

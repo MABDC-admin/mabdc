@@ -1367,6 +1367,7 @@ export default function EmployeeSelfServicePortal() {
         onClose={() => setShowLeaveModal(false)}
         employeeId={employee.id}
         employeeName={employee.full_name}
+        employeeGender={(employee as any)?.gender}
       />
 
       {/* HR Assistant Chat - Floating */}

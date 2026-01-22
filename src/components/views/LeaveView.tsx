@@ -32,6 +32,12 @@ export function LeaveView() {
   const processAccrual = useProcessLeaveAccrual();
   const { data: accrualLog = [] } = useLeaveAccrualLog(new Date().getFullYear());
 
+  // HR visible leave types only (5 core types)
+  const HR_VISIBLE_CODES = ['ANNUAL', 'SICK', 'LOP', 'MATERNITY', 'PATERNITY'];
+  const filteredLeaveTypes = useMemo(() => {
+    return leaveTypes.filter(lt => HR_VISIBLE_CODES.includes(lt.code));
+  }, [leaveTypes]);
+
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
   const [isAllocateModalOpen, setIsAllocateModalOpen] = useState(false);
@@ -828,7 +834,7 @@ export function LeaveView() {
                   <SelectValue placeholder="Select leave type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {leaveTypes.map((type) => (
+                  {filteredLeaveTypes.map((type) => (
                     <SelectItem key={type.id} value={type.name}>
                       {type.name} ({type.max_days_per_year} days - {type.paid_type})
                     </SelectItem>
@@ -953,7 +959,7 @@ export function LeaveView() {
                   <SelectValue placeholder="Select leave type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {leaveTypes.map((type) => (
+                  {filteredLeaveTypes.map((type) => (
                     <SelectItem key={type.id} value={type.id}>{type.name} ({type.max_days_per_year} days)</SelectItem>
                   ))}
                 </SelectContent>
@@ -1012,7 +1018,7 @@ export function LeaveView() {
                   <SelectValue placeholder="Select leave type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {leaveTypes.map((type) => (
+                  {filteredLeaveTypes.map((type) => (
                     <SelectItem key={type.id} value={type.id}>{type.name} ({type.max_days_per_year} days)</SelectItem>
                   ))}
                 </SelectContent>
