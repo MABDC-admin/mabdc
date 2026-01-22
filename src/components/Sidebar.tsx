@@ -56,7 +56,7 @@ const navItems: NavItem[] = [
     icon: <LayoutDashboard className="w-5 h-5" />,
     subItems: [
       { id: 'dashboard', label: 'Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
-      { id: 'gamification', label: 'Gamification', icon: <Gamepad2 className="w-4 h-4" /> }
+      { id: 'visa-process', label: 'Visa Process', icon: <Plane className="w-4 h-4" /> }
     ]
   },
   { 
