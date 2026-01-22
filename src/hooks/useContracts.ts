@@ -52,6 +52,10 @@ export function useAddContract() {
   
   return useMutation({
     mutationFn: async (contract: Omit<Contract, 'id' | 'created_at' | 'employees'>) => {
+      // Archive previous active contracts before inserting new one
+      const { archivePreviousContracts } = await import('@/utils/contractArchiver');
+      await archivePreviousContracts(contract.employee_id);
+      
       const { data, error } = await supabase
         .from('contracts')
         .insert([contract])
@@ -132,18 +136,14 @@ export function useRenewContract() {
       oldContractId: string; 
       newContract: Omit<Contract, 'id' | 'created_at' | 'employees'> 
     }) => {
-      // Mark old contract as terminated
-      const { error: terminateError } = await supabase
-        .from('contracts')
-        .update({ status: 'Terminated' })
-        .eq('id', oldContractId);
-      
-      if (terminateError) throw terminateError;
+      // Archive ALL previous active contracts for this employee (not just the old one)
+      const { archivePreviousContracts } = await import('@/utils/contractArchiver');
+      await archivePreviousContracts(newContract.employee_id);
 
-      // Create new contract
+      // Create new contract as Active
       const { data, error } = await supabase
         .from('contracts')
-        .insert([{ ...newContract, status: 'Draft' }])
+        .insert([{ ...newContract, status: 'Active' }])
         .select()
         .single();
       
