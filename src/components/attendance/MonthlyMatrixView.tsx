@@ -10,12 +10,14 @@ import { cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay, isWithinInterval, addMonths, subMonths } from 'date-fns';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
+import { useCompanySettings } from '@/hooks/useSettings';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { EmployeeAttendanceCalendar } from './EmployeeAttendanceCalendar';
+import { getWeekendDays } from '@/utils/workWeekUtils';
 
 // Map matrix status codes to database status values
 const STATUS_TO_DB: Record<string, string> = {
@@ -98,6 +100,15 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
   const queryClient = useQueryClient();
   const { data: allAttendance = [] } = useAttendance();
   const { data: employees = [] } = useEmployees();
+  const { data: companySettings } = useCompanySettings();
+
+  // Calculate weekend days from company settings
+  const weekendDays = useMemo(() => {
+    return getWeekendDays(
+      companySettings?.work_week_start || 'Monday',
+      companySettings?.work_week_end || 'Friday'
+    );
+  }, [companySettings?.work_week_start, companySettings?.work_week_end]);
 
   // Fetch public holidays
   const { data: publicHolidays = [] } = useQuery({
@@ -188,8 +199,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     }
 
     const dayOfWeek = getDay(date);
-    const isSat = dayOfWeek === 6;
-    const isSun = dayOfWeek === 0;
+    const isWeekend = weekendDays.includes(dayOfWeek);
     
     // CHECK LEAVE FIRST - before weekends! So leave shows on Sat/Sun too
     const leave = getLeaveForEmployeeDay(employeeId, date);
@@ -204,8 +214,8 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       return 'VL'; // Default to vacation leave for other approved leaves
     }
     
-    // Weekend (Saturday and Sunday only) - only if NOT on leave
-    if (isSat || isSun) {
+    // Weekend - only if NOT on leave
+    if (isWeekend) {
       return 'W';
     }
     
@@ -446,7 +456,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       
       return { ...emp, index: index + 1, ...counts, presentWithAppealed };
     });
-  }, [filteredEmployees, daysInMonth, allAttendance, leaveRecords, publicHolidays, manualOverrides]);
+  }, [filteredEmployees, daysInMonth, allAttendance, leaveRecords, publicHolidays, manualOverrides, weekendDays]);
 
   // PDF Generation
   const generateMatrixPDF = () => {

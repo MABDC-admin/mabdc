@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { format, eachDayOfInterval, isWeekend, getDay, startOfMonth, endOfMonth, addMonths } from 'date-fns';
+import { format, eachDayOfInterval, getDay, startOfMonth, endOfMonth, addMonths } from 'date-fns';
 import { Calendar as CalendarIcon, Users, Clock, AlertCircle, CheckCircle2, Loader2, Filter, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,9 +12,11 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useTimeShifts, SHIFT_DEFINITIONS, ShiftType } from '@/hooks/useTimeShifts';
+import { useCompanySettings } from '@/hooks/useSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { getWeekendDays, getWeekendLabel } from '@/utils/workWeekUtils';
 
 interface BulkEditConfig {
   startDate: Date | undefined;
@@ -28,11 +30,25 @@ interface BulkEditConfig {
   adminRemarks: string;
 }
 
-const UAE_WEEKEND_DAYS = [5, 6]; // Friday & Saturday
-
 export function AdminBulkAttendanceEditor() {
   const { data: employees = [] } = useEmployees();
   const { data: shifts = [] } = useTimeShifts();
+  const { data: companySettings } = useCompanySettings();
+  
+  // Calculate weekend days dynamically from company settings
+  const weekendDays = useMemo(() => {
+    return getWeekendDays(
+      companySettings?.work_week_start || 'Monday',
+      companySettings?.work_week_end || 'Friday'
+    );
+  }, [companySettings?.work_week_start, companySettings?.work_week_end]);
+  
+  const weekendLabel = useMemo(() => {
+    return getWeekendLabel(
+      companySettings?.work_week_start || 'Monday',
+      companySettings?.work_week_end || 'Friday'
+    );
+  }, [companySettings?.work_week_start, companySettings?.work_week_end]);
   
   const [config, setConfig] = useState<BulkEditConfig>({
     startDate: undefined,
@@ -87,11 +103,11 @@ export function AdminBulkAttendanceEditor() {
     const allDays = eachDayOfInterval({ start: config.startDate, end: config.endDate });
     
     if (config.excludeWeekends) {
-      return allDays.filter(day => !UAE_WEEKEND_DAYS.includes(getDay(day)));
+      return allDays.filter(day => !weekendDays.includes(getDay(day)));
     }
     
     return allDays;
-  }, [config.startDate, config.endDate, config.excludeWeekends]);
+  }, [config.startDate, config.endDate, config.excludeWeekends, weekendDays]);
 
   // Calculate total records to be affected
   const totalRecords = workingDays.length * config.selectedEmployees.length;
@@ -336,7 +352,7 @@ export function AdminBulkAttendanceEditor() {
               }
             />
             <Label htmlFor="excludeWeekends" className="text-sm">
-              Exclude UAE weekends (Fri-Sat)
+              Exclude weekends ({weekendLabel})
             </Label>
           </div>
           {workingDays.length > 0 && (
