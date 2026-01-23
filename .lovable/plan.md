@@ -1,200 +1,126 @@
 
 
-## Plan: Fix Friday Attendance - Use Company Settings for Weekend Logic
+## Plan: Add Date Filter to Attendance Appeals
 
-### Problem Summary
+### Current State
 
-The Employee Calendar shows Fridays as empty because:
+Both appeal views (`AttendanceAppealsView.tsx` and `AdminAppealsSection.tsx`) currently have:
+- **Status filter** - Filter by Pending/Approved/Rejected
+- **Employee filter** (AttendanceAppealsView only)
+- **Search filter** (AdminAppealsSection only)
 
-1. The **Bulk Attendance Editor** uses hardcoded UAE weekend days (Friday & Saturday)
-2. But your **company settings** define the work week as **Monday to Friday**
-3. This caused attendance records to be created for Sundays but NOT Fridays
-
-**Evidence from your database:**
-- Friday Jan 2, 2026: Only 1 record
-- Friday Jan 9, 2026: Only 1 record
-- Sunday Jan 11, 2026: 31 records (should be weekend!)
-- Friday Jan 23, 2026: 27 records (more recent, correct)
+Neither view has a **date filter** for filtering appeals by date range.
 
 ---
 
-### Solution Overview
+### Solution
 
-Fix the system to use your company's configured work week instead of hardcoded weekend days.
+Add a date range filter to both appeal views, allowing HR/Admin to filter appeals by:
+- Appeal date (the date the employee is requesting correction for)
+- Preset options: Today, This Week, This Month, Custom Range
 
 ---
 
 ### Changes Required
 
-#### 1. Create Weekend Calculation Utility
+#### 1. Update `AttendanceAppealsView.tsx`
 
-Create a new shared utility that calculates weekend days based on company settings:
-
-**New File: `src/utils/workWeekUtils.ts`**
-
-This utility will:
-- Convert work week settings (e.g., "Monday" to "Friday") into day-of-week numbers
-- Calculate which days are weekends based on the configured work week
-- Be used consistently across all attendance components
-
-```text
-Input: work_week_start = "Monday", work_week_end = "Friday"
-Output: Weekend days = [0, 6] (Sunday, Saturday)
-
-Input: work_week_start = "Sunday", work_week_end = "Thursday"  
-Output: Weekend days = [5, 6] (Friday, Saturday)
-```
-
----
-
-#### 2. Update AdminBulkAttendanceEditor
-
-**File: `src/components/admin/AdminBulkAttendanceEditor.tsx`**
-
-**Current (Hardcoded):**
+**Add State:**
 ```typescript
-const UAE_WEEKEND_DAYS = [5, 6]; // Friday & Saturday
+const [dateFilter, setDateFilter] = useState<string>('all');
+const [customDateRange, setCustomDateRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
 ```
 
-**New (Dynamic):**
-- Import `useCompanySettings` hook
-- Calculate weekend days from company settings
-- Use the calculated weekend days instead of hardcoded values
+**Add Filter UI:**
+- Add a Select dropdown with preset date options (All Time, Today, This Week, This Month, Custom)
+- When "Custom" is selected, show a date range picker using Popover + Calendar
 
----
-
-#### 3. Update EmployeeAttendanceCalendar
-
-**File: `src/components/attendance/EmployeeAttendanceCalendar.tsx`**
-
-**Current (Hardcoded):**
+**Update Filter Logic:**
 ```typescript
-const isSat = dayOfWeek === 6;
-const isSun = dayOfWeek === 0;
-if (isSat || isSun) {
-  return { type: 'weekend', ... };
-}
+const filteredAppeals = appeals.filter(appeal => {
+  const matchesStatus = statusFilter === 'all' || appeal.status === statusFilter;
+  const matchesEmployee = employeeFilter === 'all' || appeal.employee_id === employeeFilter;
+  
+  // NEW: Date filter
+  const appealDate = parseISO(appeal.appeal_date);
+  let matchesDate = true;
+  if (dateFilter === 'today') {
+    matchesDate = isToday(appealDate);
+  } else if (dateFilter === 'week') {
+    matchesDate = isThisWeek(appealDate);
+  } else if (dateFilter === 'month') {
+    matchesDate = isThisMonth(appealDate);
+  } else if (dateFilter === 'custom' && customDateRange.from) {
+    matchesDate = appealDate >= customDateRange.from && 
+                  (!customDateRange.to || appealDate <= customDateRange.to);
+  }
+  
+  return matchesStatus && matchesEmployee && matchesDate;
+});
 ```
 
-**New (Dynamic):**
-- Import company settings
-- Use the weekend utility to check if a day is a weekend
+---
+
+#### 2. Update `AdminAppealsSection.tsx`
+
+Same changes as above:
+- Add date filter state
+- Add date filter UI alongside existing status filter
+- Update filter logic to include date matching
 
 ---
 
-#### 4. Update MonthlyMatrixView
+### UI Layout
 
-**File: `src/components/attendance/MonthlyMatrixView.tsx`**
-
-Same changes as above - replace hardcoded weekend logic with dynamic calculation.
-
----
-
-#### 5. Update AttendanceMatrixView
-
-**File: `src/components/attendance/AttendanceMatrixView.tsx`**
-
-Same changes as above - replace hardcoded weekend logic with dynamic calculation.
-
----
-
-#### 6. Update AttendanceScanner
-
-**File: `src/pages/AttendanceScanner.tsx`**
-
-**Current:**
-```typescript
-const isWorkDay = currentTime.getDay() >= 1 && currentTime.getDay() <= 5;
+**AttendanceAppealsView Filters (Updated):**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ [🔍] [Status ▼] [Employee ▼] [Date Range ▼] [📅 From] [📅 To]  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**New:**
-- Use company settings to determine work days
+**AdminAppealsSection Filters (Updated):**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ [🔍 Search...                ] [Status ▼] [Date Range ▼]       │
+└─────────────────────────────────────────────────────────────────┘
+(When Custom selected, show date pickers inline)
+```
 
 ---
 
-#### 7. Fix Existing Data (One-Time)
+### Date Filter Options
 
-After fixing the code, you will need to either:
-- **Option A**: Use the updated Bulk Attendance Editor to create records for the missing Fridays
-- **Option B**: Run a database query to populate Friday records
+| Option | Description |
+|--------|-------------|
+| All Time | No date filter (default) |
+| Today | Appeals for today's date only |
+| This Week | Appeals from current week (Monday-Sunday) |
+| This Month | Appeals from current month |
+| Custom Range | User selects From and To dates |
 
 ---
 
 ### Files to Modify
 
-| File | Change |
-|------|--------|
-| `src/utils/workWeekUtils.ts` | **NEW** - Weekend calculation utility |
-| `src/components/admin/AdminBulkAttendanceEditor.tsx` | Use company settings for weekends |
-| `src/components/attendance/EmployeeAttendanceCalendar.tsx` | Use company settings for weekends |
-| `src/components/attendance/MonthlyMatrixView.tsx` | Use company settings for weekends |
-| `src/components/attendance/AttendanceMatrixView.tsx` | Use company settings for weekends |
-| `src/pages/AttendanceScanner.tsx` | Use company settings for work days |
+| File | Changes |
+|------|---------|
+| `src/components/views/AttendanceAppealsView.tsx` | Add date filter state, UI (Select + Calendar popover), and filter logic |
+| `src/components/admin/AdminAppealsSection.tsx` | Add date filter state, UI, and filter logic |
 
 ---
 
-### Technical Details
+### Technical Implementation
 
-#### Weekend Utility Function
-
+**New Imports Needed:**
 ```typescript
-// src/utils/workWeekUtils.ts
-
-const DAY_NAME_TO_NUMBER: Record<string, number> = {
-  'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
-  'Thursday': 4, 'Friday': 5, 'Saturday': 6
-};
-
-export function getWeekendDays(
-  workWeekStart: string = 'Monday',
-  workWeekEnd: string = 'Friday'
-): number[] {
-  const startDay = DAY_NAME_TO_NUMBER[workWeekStart];
-  const endDay = DAY_NAME_TO_NUMBER[workWeekEnd];
-  
-  // Calculate working days
-  const workingDays: number[] = [];
-  let current = startDay;
-  while (true) {
-    workingDays.push(current);
-    if (current === endDay) break;
-    current = (current + 1) % 7;
-  }
-  
-  // Weekend = all days NOT in working days
-  return [0, 1, 2, 3, 4, 5, 6].filter(d => !workingDays.includes(d));
-}
-
-export function isWeekendDay(
-  date: Date,
-  workWeekStart: string = 'Monday',
-  workWeekEnd: string = 'Friday'
-): boolean {
-  const weekendDays = getWeekendDays(workWeekStart, workWeekEnd);
-  return weekendDays.includes(date.getDay());
-}
+import { isToday, isThisWeek, isThisMonth, startOfDay, endOfDay } from 'date-fns';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 ```
 
-#### Example Usage in Components
-
-```typescript
-// In any attendance component
-const { data: companySettings } = useCompanySettings();
-
-const isWeekend = isWeekendDay(
-  date,
-  companySettings?.work_week_start || 'Monday',
-  companySettings?.work_week_end || 'Friday'
-);
-```
-
----
-
-### After Implementation
-
-With your current settings (Monday-Friday work week):
-- **Work Days**: Monday, Tuesday, Wednesday, Thursday, Friday
-- **Weekend Days**: Saturday, Sunday
-- **Fridays will show attendance data** (not empty)
-- **Sundays will show as "Weekend"** (grey, not clickable)
+**Custom Date Range UI:**
+- Use Shadcn Popover with Calendar component
+- Show "From" and "To" date pickers when "Custom" is selected
+- Include `pointer-events-auto` class on Calendar for proper interaction
 
