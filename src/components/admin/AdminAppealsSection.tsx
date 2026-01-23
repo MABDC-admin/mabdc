@@ -6,11 +6,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { 
   Clock, Trash2, Edit, User, Calendar, AlertTriangle, 
-  Search, Filter
+  Search, Filter, CalendarIcon
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isToday, isThisWeek, isThisMonth, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAttendanceAppeals, useUpdateAttendanceAppeal, useDeleteAttendanceAppeal } from '@/hooks/useAttendanceAppeals';
 import { useEmployees } from '@/hooks/useEmployees';
@@ -34,6 +36,8 @@ export function AdminAppealsSection() {
   const deleteAppeal = useDeleteAttendanceAppeal();
   
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [customDateRange, setCustomDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
   const [searchQuery, setSearchQuery] = useState('');
   const [editAppeal, setEditAppeal] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -62,7 +66,23 @@ export function AdminAppealsSection() {
     const employeeName = getEmployeeName(appeal.employee_id).toLowerCase();
     const matchesSearch = employeeName.includes(searchQuery.toLowerCase()) ||
       appeal.appeal_message.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
+    
+    // Date filter logic
+    const appealDate = parseISO(appeal.appeal_date);
+    let matchesDate = true;
+    if (dateFilter === 'today') {
+      matchesDate = isToday(appealDate);
+    } else if (dateFilter === 'week') {
+      matchesDate = isThisWeek(appealDate, { weekStartsOn: 1 });
+    } else if (dateFilter === 'month') {
+      matchesDate = isThisMonth(appealDate);
+    } else if (dateFilter === 'custom' && customDateRange.from) {
+      const fromDate = startOfDay(customDateRange.from);
+      const toDate = customDateRange.to ? endOfDay(customDateRange.to) : endOfDay(customDateRange.from);
+      matchesDate = appealDate >= fromDate && appealDate <= toDate;
+    }
+    
+    return matchesStatus && matchesSearch && matchesDate;
   });
 
   const handleEdit = (appeal: any) => {
@@ -131,10 +151,10 @@ export function AdminAppealsSection() {
                 className="pl-10"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Filter className="w-4 h-4 text-muted-foreground" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-[130px]">
                   <SelectValue placeholder="Filter status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -144,6 +164,59 @@ export function AdminAppealsSection() {
                   <SelectItem value="Rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={dateFilter} onValueChange={(v) => {
+                setDateFilter(v);
+                if (v !== 'custom') {
+                  setCustomDateRange({ from: undefined, to: undefined });
+                }
+              }}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="Date range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">This Week</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+              {dateFilter === 'custom' && (
+                <>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-1 h-9">
+                        <CalendarIcon className="w-3 h-3" />
+                        {customDateRange.from ? format(customDateRange.from, 'dd MMM') : 'From'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={customDateRange.from}
+                        onSelect={(date) => setCustomDateRange(prev => ({ ...prev, from: date }))}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-1 h-9">
+                        <CalendarIcon className="w-3 h-3" />
+                        {customDateRange.to ? format(customDateRange.to, 'dd MMM') : 'To'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={customDateRange.to}
+                        onSelect={(date) => setCustomDateRange(prev => ({ ...prev, to: date }))}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </>
+              )}
             </div>
           </div>
 

@@ -5,11 +5,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { 
   Clock, CheckCircle, XCircle, AlertTriangle, 
-  User, Calendar, MessageSquare, Filter
+  User, Calendar, MessageSquare, Filter, CalendarIcon
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isToday, isThisWeek, isThisMonth, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAttendanceAppeals, useUpdateAttendanceAppeal } from '@/hooks/useAttendanceAppeals';
 import { useEmployees } from '@/hooks/useEmployees';
@@ -25,13 +27,31 @@ export function AttendanceAppealsView() {
   
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [employeeFilter, setEmployeeFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [customDateRange, setCustomDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
   const [selectedAppeal, setSelectedAppeal] = useState<any>(null);
   const [reviewForm, setReviewForm] = useState({ action: '', reason: '' });
 
   const filteredAppeals = appeals.filter(appeal => {
     const matchesStatus = statusFilter === 'all' || appeal.status === statusFilter;
     const matchesEmployee = employeeFilter === 'all' || appeal.employee_id === employeeFilter;
-    return matchesStatus && matchesEmployee;
+    
+    // Date filter logic
+    const appealDate = parseISO(appeal.appeal_date);
+    let matchesDate = true;
+    if (dateFilter === 'today') {
+      matchesDate = isToday(appealDate);
+    } else if (dateFilter === 'week') {
+      matchesDate = isThisWeek(appealDate, { weekStartsOn: 1 });
+    } else if (dateFilter === 'month') {
+      matchesDate = isThisMonth(appealDate);
+    } else if (dateFilter === 'custom' && customDateRange.from) {
+      const fromDate = startOfDay(customDateRange.from);
+      const toDate = customDateRange.to ? endOfDay(customDateRange.to) : endOfDay(customDateRange.from);
+      matchesDate = appealDate >= fromDate && appealDate <= toDate;
+    }
+    
+    return matchesStatus && matchesEmployee && matchesDate;
   });
 
   const getEmployeeName = (employeeId: string) => {
@@ -210,6 +230,59 @@ export function AttendanceAppealsView() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={dateFilter} onValueChange={(v) => {
+          setDateFilter(v);
+          if (v !== 'custom') {
+            setCustomDateRange({ from: undefined, to: undefined });
+          }
+        }}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Date range" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Time</SelectItem>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="week">This Week</SelectItem>
+            <SelectItem value="month">This Month</SelectItem>
+            <SelectItem value="custom">Custom Range</SelectItem>
+          </SelectContent>
+        </Select>
+        {dateFilter === 'custom' && (
+          <>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <CalendarIcon className="w-4 h-4" />
+                  {customDateRange.from ? format(customDateRange.from, 'dd MMM') : 'From'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={customDateRange.from}
+                  onSelect={(date) => setCustomDateRange(prev => ({ ...prev, from: date }))}
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <CalendarIcon className="w-4 h-4" />
+                  {customDateRange.to ? format(customDateRange.to, 'dd MMM') : 'To'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={customDateRange.to}
+                  onSelect={(date) => setCustomDateRange(prev => ({ ...prev, to: date }))}
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          </>
+        )}
       </div>
 
       {/* Appeals List */}
