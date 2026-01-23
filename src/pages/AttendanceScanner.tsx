@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { useCheckInByHRMS, useCheckOutByHRMS, useTodayAttendance, useCheckInById, useCheckOutById } from '@/hooks/useAttendance';
+import { useCompanySettings } from '@/hooks/useSettings';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -16,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { FaceRecognitionScanner } from '@/components/FaceRecognitionScanner';
 import { FaceEnrollmentModal } from '@/components/FaceEnrollmentModal';
 import { toast } from 'sonner';
+import { isWorkingDay } from '@/utils/workWeekUtils';
 
 type ScanMode = 'check-in' | 'check-out';
 type ScannerState = 'standby' | 'scanning' | 'result';
@@ -54,6 +56,7 @@ export default function AttendanceScanner() {
   const checkInById = useCheckInById();
   const checkOutById = useCheckOutById();
   const { data: todayAttendance = [], refetch } = useTodayAttendance();
+  const { data: companySettings } = useCompanySettings();
 
   // Auto-select mode based on time of day
   useEffect(() => {
@@ -286,8 +289,12 @@ export default function AttendanceScanner() {
   const presentCount = todayAttendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
   const lateCount = todayAttendance.filter(a => a.status === 'Late').length;
 
-  // Check if current day is a work day (Monday to Friday)
-  const isWorkDay = currentTime.getDay() >= 1 && currentTime.getDay() <= 5;
+  // Check if current day is a work day based on company settings
+  const isWorkDay = isWorkingDay(
+    currentTime,
+    companySettings?.work_week_start || 'Monday',
+    companySettings?.work_week_end || 'Friday'
+  );
   const workHours = "8:00 AM - 7:00 PM";
 
   return (

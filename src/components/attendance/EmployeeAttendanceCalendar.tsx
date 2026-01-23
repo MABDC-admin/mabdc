@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay, isWithinInterval } from 'date-fns';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
+import { useCompanySettings } from '@/hooks/useSettings';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AttendanceDetailModal } from './AttendanceDetailModal';
@@ -16,6 +17,7 @@ import { AttendanceMatrixView } from './AttendanceMatrixView';
 import { MonthlyMatrixView } from './MonthlyMatrixView';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
+import { isWeekendDay, getWeekendDays } from '@/utils/workWeekUtils';
 
 interface EmployeeAttendanceCalendarProps {
   employeeId?: string;
@@ -48,7 +50,15 @@ export function EmployeeAttendanceCalendar({
   
   const { data: allAttendance = [] } = useAttendance();
   const { data: employees = [] } = useEmployees();
+  const { data: companySettings } = useCompanySettings();
 
+  // Calculate weekend days from company settings
+  const weekendDays = useMemo(() => {
+    return getWeekendDays(
+      companySettings?.work_week_start || 'Monday',
+      companySettings?.work_week_end || 'Friday'
+    );
+  }, [companySettings?.work_week_start, companySettings?.work_week_end]);
   // Fetch public holidays
   const { data: publicHolidays = [] } = useQuery({
     queryKey: ['public_holidays'],
@@ -124,8 +134,7 @@ export function EmployeeAttendanceCalendar({
       const leaveStart = parseISO(leave.start_date);
       const leaveEnd = parseISO(leave.end_date);
       daysInMonth.forEach(day => {
-        const dayOfWeek = getDay(day);
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const isWeekend = weekendDays.includes(getDay(day));
         if (!isWeekend && isWithinInterval(day, { start: leaveStart, end: leaveEnd })) {
           onLeave++;
         }
@@ -162,7 +171,7 @@ export function EmployeeAttendanceCalendar({
     present += appealed;
     
     return { present, late, absent, holidays, missedPunch, appealed, undertime, onLeave };
-  }, [monthAttendance, publicHolidays, leaveRecords, selectedMonth, selectedYear]);
+  }, [monthAttendance, publicHolidays, leaveRecords, selectedMonth, selectedYear, weekendDays]);
 
   // Generate calendar days
   const calendarDays = useMemo(() => {
@@ -199,8 +208,7 @@ export function EmployeeAttendanceCalendar({
     const holiday = getHolidayForDay(date);
     const leave = getLeaveForDay(date);
     const dayOfWeek = getDay(date);
-    const isSat = dayOfWeek === 6;
-    const isSun = dayOfWeek === 0;
+    const isWeekend = weekendDays.includes(dayOfWeek);
     
     // CHECK LEAVE FIRST - even on weekends (for continuous leave display)
     if (leave) {
@@ -216,7 +224,7 @@ export function EmployeeAttendanceCalendar({
     }
     
     // Weekend - Dark Grey (only if NOT on leave)
-    if (isSat || isSun) {
+    if (isWeekend) {
       return { type: 'weekend', label: 'Weekend', color: 'bg-zinc-600 dark:bg-zinc-700', textColor: 'text-white', pulse: false };
     }
     
@@ -289,8 +297,8 @@ export function EmployeeAttendanceCalendar({
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const handleDayClick = (day: Date) => {
-    const dayOfWeek = getDay(day);
-    if (dayOfWeek === 0 || dayOfWeek === 6) return; // Skip weekends
+    const isWeekend = weekendDays.includes(getDay(day));
+    if (isWeekend) return; // Skip weekends
     
     setSelectedDate(day);
     
@@ -390,8 +398,7 @@ export function EmployeeAttendanceCalendar({
 
       const status = getDayStatus(day);
       const attendance = getAttendanceForDay(day);
-      const dayOfWeek = getDay(day);
-      const isWeekendDay = dayOfWeek === 0 || dayOfWeek === 6;
+      const isWeekendDay = weekendDays.includes(getDay(day));
 
       // Cell background color
       if (status.type === 'maternity') {

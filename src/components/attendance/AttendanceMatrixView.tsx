@@ -8,11 +8,13 @@ import { cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay, isWithinInterval } from 'date-fns';
 import { useAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
+import { useCompanySettings } from '@/hooks/useSettings';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
+import { getWeekendDays } from '@/utils/workWeekUtils';
 interface AttendanceMatrixViewProps {
   onBack: () => void;
 }
@@ -24,6 +26,15 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
   
   const { data: allAttendance = [] } = useAttendance();
   const { data: employees = [] } = useEmployees();
+  const { data: companySettings } = useCompanySettings();
+
+  // Calculate weekend days from company settings
+  const weekendDays = useMemo(() => {
+    return getWeekendDays(
+      companySettings?.work_week_start || 'Monday',
+      companySettings?.work_week_end || 'Friday'
+    );
+  }, [companySettings?.work_week_start, companySettings?.work_week_end]);
 
   // Fetch public holidays
   const { data: publicHolidays = [] } = useQuery({
@@ -87,8 +98,7 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
     const holiday = getHolidayForDay(date);
     const leave = getLeaveForEmployeeDay(employeeId, date);
     const dayOfWeek = getDay(date);
-    const isSat = dayOfWeek === 6;
-    const isSun = dayOfWeek === 0;
+    const isWeekend = weekendDays.includes(dayOfWeek);
     
     // CHECK LEAVE FIRST - before weekends! So leave shows on Sat/Sun too
     if (leave) {
@@ -104,7 +114,7 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
     }
     
     // Weekends (only if NOT on leave)
-    if (isSat || isSun) {
+    if (isWeekend) {
       return { type: 'weekend', color: 'bg-zinc-600', textColor: 'text-white', label: 'W' };
     }
     
@@ -190,7 +200,7 @@ export function AttendanceMatrixView({ onBack }: AttendanceMatrixViewProps) {
       
       return { ...emp, present, late, absent, missedPunch, appealed, undertime, onLeave };
     });
-  }, [employees, daysInMonth, allAttendance, leaveRecords]);
+  }, [employees, daysInMonth, allAttendance, leaveRecords, weekendDays]);
 
   // PDF Generation
   const generateMatrixPDF = () => {
