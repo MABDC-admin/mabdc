@@ -242,3 +242,45 @@ export function useUpdateContractImages() {
     },
   });
 }
+
+export interface DataIntegrityResult {
+  success: boolean;
+  checked_at: string;
+  total_discrepancies: number;
+  critical: number;
+  warnings: number;
+  info: number;
+  discrepancies: Array<{
+    type: string;
+    severity: 'critical' | 'warning' | 'info';
+    employee_id: string;
+    employee_name: string;
+    details: string;
+    found_at: string;
+  }>;
+}
+
+export function useCheckDataIntegrity() {
+  return useMutation({
+    mutationFn: async (): Promise<DataIntegrityResult> => {
+      const { data, error } = await supabase.functions.invoke('check-data-integrity');
+      
+      if (error) throw error;
+      return data as DataIntegrityResult;
+    },
+    onSuccess: (data) => {
+      if (data.total_discrepancies === 0) {
+        toast.success('Data integrity check passed - no issues found');
+      } else if (data.critical > 0) {
+        toast.error(`Found ${data.critical} critical issue(s) and ${data.warnings} warning(s)`);
+      } else if (data.warnings > 0) {
+        toast.warning(`Found ${data.warnings} warning(s) and ${data.info} info item(s)`);
+      } else {
+        toast.info(`Found ${data.info} informational item(s)`);
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to run integrity check: ${error.message}`);
+    },
+  });
+}

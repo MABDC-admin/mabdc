@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useHRStore } from '@/store/hrStore';
 import { useDeleteEmployee, useEmployees, useUpdateEmployee } from '@/hooks/useEmployees';
 import { useEmployeeDocuments, useUploadDocument, useDeleteDocument, useUploadEmployeePhoto } from '@/hooks/useDocuments';
@@ -45,6 +46,7 @@ interface EmployeeProfileModalProps {
 type TabType = 'summary' | 'private' | 'education' | 'contract' | 'visa' | 'leave' | 'documents' | 'eos';
 
 export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalProps) {
+  const queryClient = useQueryClient();
   const { currentEmployee, setCurrentEmployee } = useHRStore();
   const { refetch: refetchEmployees } = useEmployees();
   const deleteEmployee = useDeleteEmployee();
@@ -282,7 +284,9 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
           page2Url: uploadedUrls.page2 || employeeContract.page2_url,
         });
         
-        refetchContracts();
+        // Force invalidation and refetch to ensure fresh contract data
+        await queryClient.invalidateQueries({ queryKey: ['contracts'] });
+        await refetchContracts();
         toast.success('Contract pages uploaded successfully');
       }
     } catch (error) {
@@ -716,10 +720,20 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                       {/* Expiry Alerts Section */}
                       {(getExpiryWarning(currentEmployee.visa_expiration) || 
                         getExpiryWarning(currentEmployee.emirates_id_expiry) || 
-                        getExpiryWarning(currentEmployee.passport_expiry)) && (
+                        getExpiryWarning(currentEmployee.passport_expiry) ||
+                        getExpiryWarning(employeeContract?.end_date)) && (
                         <div className="pt-2 border-t border-border">
                           <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">EXPIRY ALERTS</p>
                           <div className="space-y-1.5">
+                            {getExpiryWarning(employeeContract?.end_date) && (
+                              <div className="flex items-center gap-2">
+                                <AlertTriangle className={cn("w-4 h-4", 
+                                  getExpiryWarning(employeeContract?.end_date)?.type === 'expired' ? 'text-destructive' :
+                                  getExpiryWarning(employeeContract?.end_date)?.type === 'urgent' ? 'text-amber-400' : 'text-yellow-400'
+                                )} />
+                                <span className="text-sm text-foreground">Contract: {getExpiryWarning(employeeContract?.end_date)?.text}</span>
+                              </div>
+                            )}
                             {getExpiryWarning(currentEmployee.visa_expiration) && (
                               <div className="flex items-center gap-2">
                                 <AlertTriangle className={cn("w-4 h-4", 
@@ -755,7 +769,8 @@ export function EmployeeProfileModal({ isOpen, onClose }: EmployeeProfileModalPr
                       {docCompleteness?.isComplete && 
                        !getExpiryWarning(currentEmployee.visa_expiration) && 
                        !getExpiryWarning(currentEmployee.emirates_id_expiry) && 
-                       !getExpiryWarning(currentEmployee.passport_expiry) && (
+                       !getExpiryWarning(currentEmployee.passport_expiry) &&
+                       !getExpiryWarning(employeeContract?.end_date) && (
                         <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
                           <CheckCircle className="w-4 h-4" />
                           <span className="text-sm">All documents up to date</span>

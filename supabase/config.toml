@@ -3,6 +3,9 @@ project_id = "fwdtjszxnnfqxjevlasm"
 [functions.check-contract-expiry]
 verify_jwt = false
 
+[functions.check-data-integrity]
+verify_jwt = false
+
 [functions.send-late-notification]
 verify_jwt = false
 
