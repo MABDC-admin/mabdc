@@ -1,103 +1,126 @@
 
 
-## Plan: Add Date Filter to Attendance Appeals
+## Plan: Allow Employees to Submit Appeals for All Attendance Records (Including Complete Records)
 
-### Current State
+### Problem Identified
 
-Both appeal views (`AttendanceAppealsView.tsx` and `AdminAppealsSection.tsx`) currently have:
-- **Status filter** - Filter by Pending/Approved/Rejected
-- **Employee filter** (AttendanceAppealsView only)
-- **Search filter** (AdminAppealsSection only)
+**Root Cause**: The Employee Calendar currently restricts appeals to only two scenarios:
+1. **Missing attendance record** (no record exists)
+2. **Missed punch** (only check-in OR check-out exists, but not both)
 
-Neither view has a **date filter** for filtering appeals by date range.
+**Issue**: Employees like Jade Amurao with complete attendance records (both check-in and check-out present) - such as "Undertime", "Late", or even "Present" - cannot submit appeals because clicking on those days opens the **Detail Modal** (view-only) instead of the **Appeal Modal**.
+
+**Friday Example (2026-01-23)**:
+- Jade's Record: check_in=07:23, check_out=13:16, status="Undertime"
+- Both punches exist → Appeal blocked → Only detail view shown
 
 ---
 
 ### Solution
 
-Add a date range filter to both appeal views, allowing HR/Admin to filter appeals by:
-- Appeal date (the date the employee is requesting correction for)
-- Preset options: Today, This Week, This Month, Custom Range
+Modify the Employee Calendar behavior to:
+1. **Always show a "Request Correction" button** in the Detail Modal for employee portal users
+2. OR **Change the day-click logic** to always allow appeals for any non-weekend day
+
+**Recommended Approach**: Add an "Appeal" button to the Detail Modal when viewed from Employee Portal, so employees can:
+- First see their attendance details
+- Then choose to submit an appeal if needed
+
+This is better UX because employees can review their record before deciding to appeal.
 
 ---
 
 ### Changes Required
 
-#### 1. Update `AttendanceAppealsView.tsx`
+#### 1. Update `AttendanceDetailModal.tsx`
 
-**Add State:**
+Add a new prop `onRequestAppeal` and an "Appeal" button for employee portal users:
+
+**Current Props:**
 ```typescript
-const [dateFilter, setDateFilter] = useState<string>('all');
-const [customDateRange, setCustomDateRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
+interface AttendanceDetailModalProps {
+  open: boolean;
+  onClose: () => void;
+  date: Date;
+  attendance: AttendanceRecord | null;
+  employeeId: string;
+  employeeName: string;
+  isHRView?: boolean;  // Currently determines if "Add Event" tab shows
+}
 ```
 
-**Add Filter UI:**
-- Add a Select dropdown with preset date options (All Time, Today, This Week, This Month, Custom)
-- When "Custom" is selected, show a date range picker using Popover + Calendar
-
-**Update Filter Logic:**
+**New Prop:**
 ```typescript
-const filteredAppeals = appeals.filter(appeal => {
-  const matchesStatus = statusFilter === 'all' || appeal.status === statusFilter;
-  const matchesEmployee = employeeFilter === 'all' || appeal.employee_id === employeeFilter;
-  
-  // NEW: Date filter
-  const appealDate = parseISO(appeal.appeal_date);
-  let matchesDate = true;
-  if (dateFilter === 'today') {
-    matchesDate = isToday(appealDate);
-  } else if (dateFilter === 'week') {
-    matchesDate = isThisWeek(appealDate);
-  } else if (dateFilter === 'month') {
-    matchesDate = isThisMonth(appealDate);
-  } else if (dateFilter === 'custom' && customDateRange.from) {
-    matchesDate = appealDate >= customDateRange.from && 
-                  (!customDateRange.to || appealDate <= customDateRange.to);
+interface AttendanceDetailModalProps {
+  // ... existing props
+  onRequestAppeal?: () => void;  // NEW: Callback to open appeal modal
+}
+```
+
+**Add Appeal Button**: At the bottom of the attendance details section (when `onRequestAppeal` is provided):
+
+```
+┌──────────────────────────────────────┐
+│ 📅 Friday, January 23, 2026          │
+├──────────────────────────────────────┤
+│ Employee: Jade Amurao                │
+│ ┌──────────────────────────────────┐ │
+│ │ Status: Undertime                │ │
+│ │ Check In: 07:23 AM               │ │
+│ │ Check Out: 01:16 PM              │ │
+│ └──────────────────────────────────┘ │
+│                                      │
+│ [🔄 Request Time Correction]  ← NEW  │
+│                                      │
+└──────────────────────────────────────┘
+```
+
+---
+
+#### 2. Update `EmployeeAttendanceCalendar.tsx`
+
+Modify the `handleDayClick` logic to:
+1. Store the selected date
+2. Always open Detail Modal first
+3. Pass a callback to transition to Appeal Modal
+
+**Current Logic (lines 305-317):**
+```typescript
+if (isEmployeePortal) {
+  const attendance = getAttendanceForDay(day);
+  const isMissedPunch = attendance && ((attendance.check_in && !attendance.check_out) || (!attendance.check_in && attendance.check_out));
+  if (isMissedPunch || !attendance) {
+    setShowAppealModal(true);
+  } else {
+    setShowDetailModal(true);  // ← No appeal option here!
   }
-  
-  return matchesStatus && matchesEmployee && matchesDate;
-});
+}
 ```
 
----
-
-#### 2. Update `AdminAppealsSection.tsx`
-
-Same changes as above:
-- Add date filter state
-- Add date filter UI alongside existing status filter
-- Update filter logic to include date matching
-
----
-
-### UI Layout
-
-**AttendanceAppealsView Filters (Updated):**
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ [🔍] [Status ▼] [Employee ▼] [Date Range ▼] [📅 From] [📅 To]  │
-└─────────────────────────────────────────────────────────────────┘
+**New Logic:**
+```typescript
+if (isEmployeePortal) {
+  setShowDetailModal(true);  // Always show detail first
+  // Appeal button in detail modal will trigger setShowAppealModal(true)
+}
 ```
 
-**AdminAppealsSection Filters (Updated):**
+**Modal Connection:**
+```typescript
+<AttendanceDetailModal
+  open={showDetailModal && isEmployeePortal}
+  onClose={() => setShowDetailModal(false)}
+  date={selectedDate!}
+  attendance={selectedAttendance}
+  employeeId={employeeId}
+  employeeName={employeeName}
+  isHRView={false}
+  onRequestAppeal={() => {
+    setShowDetailModal(false);
+    setShowAppealModal(true);
+  }}
+/>
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ [🔍 Search...                ] [Status ▼] [Date Range ▼]       │
-└─────────────────────────────────────────────────────────────────┘
-(When Custom selected, show date pickers inline)
-```
-
----
-
-### Date Filter Options
-
-| Option | Description |
-|--------|-------------|
-| All Time | No date filter (default) |
-| Today | Appeals for today's date only |
-| This Week | Appeals from current week (Monday-Sunday) |
-| This Month | Appeals from current month |
-| Custom Range | User selects From and To dates |
 
 ---
 
@@ -105,22 +128,76 @@ Same changes as above:
 
 | File | Changes |
 |------|---------|
-| `src/components/views/AttendanceAppealsView.tsx` | Add date filter state, UI (Select + Calendar popover), and filter logic |
-| `src/components/admin/AdminAppealsSection.tsx` | Add date filter state, UI, and filter logic |
+| `src/components/attendance/AttendanceDetailModal.tsx` | Add `onRequestAppeal` prop, render "Request Time Correction" button when provided |
+| `src/components/attendance/EmployeeAttendanceCalendar.tsx` | Simplify day-click logic for employees, pass `onRequestAppeal` callback to detail modal |
 
 ---
 
-### Technical Implementation
+### Technical Details
 
-**New Imports Needed:**
+**AttendanceDetailModal.tsx changes:**
+
 ```typescript
-import { isToday, isThisWeek, isThisMonth, startOfDay, endOfDay } from 'date-fns';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+// Add to props interface
+onRequestAppeal?: () => void;
+
+// Add button in the details TabsContent (after attendance display):
+{onRequestAppeal && (
+  <Button 
+    variant="outline" 
+    className="w-full mt-4"
+    onClick={onRequestAppeal}
+  >
+    <AlertTriangle className="w-4 h-4 mr-2 text-orange-500" />
+    Request Time Correction
+  </Button>
+)}
 ```
 
-**Custom Date Range UI:**
-- Use Shadcn Popover with Calendar component
-- Show "From" and "To" date pickers when "Custom" is selected
-- Include `pointer-events-auto` class on Calendar for proper interaction
+**EmployeeAttendanceCalendar.tsx changes:**
+
+```typescript
+const handleDayClick = (day: Date) => {
+  const isWeekend = weekendDays.includes(getDay(day));
+  if (isWeekend) return;
+  
+  setSelectedDate(day);
+  
+  if (isEmployeePortal) {
+    // Always show detail modal first - employees can appeal from there
+    setShowDetailModal(true);
+  } else {
+    // HR view: show detail modal as before
+    setShowDetailModal(true);
+  }
+};
+```
+
+---
+
+### Result After Fix
+
+When Jade Amurao (or any employee) clicks on Friday:
+
+1. **Detail Modal opens** showing:
+   - Status: Undertime
+   - Check In: 07:23 AM
+   - Check Out: 01:16 PM
+   - **[Request Time Correction]** button at bottom
+
+2. **Clicking "Request Time Correction"** opens the Appeal Modal where she can:
+   - Enter corrected check-in/check-out times
+   - Provide explanation message
+   - Submit appeal for HR review
+
+---
+
+### Alternative Approach (Not Recommended)
+
+Change day-click to always open Appeal Modal directly. However, this is worse UX because:
+- Employee doesn't see current record before appealing
+- More clicks needed if they just want to view details
+- Inconsistent with HR view behavior
+
+The recommended approach (detail modal with appeal button) provides better user experience.
 
