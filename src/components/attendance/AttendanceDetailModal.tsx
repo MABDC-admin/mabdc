@@ -30,6 +30,7 @@ interface AttendanceDetailModalProps {
   employeeId: string;
   employeeName: string;
   isHRView?: boolean;
+  onRequestAppeal?: () => void;
 }
 
 export function AttendanceDetailModal({
@@ -40,6 +41,7 @@ export function AttendanceDetailModal({
   employeeId,
   employeeName,
   isHRView = true,
+  onRequestAppeal,
 }: AttendanceDetailModalProps) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('details');
@@ -183,11 +185,35 @@ export function AttendanceDetailModal({
                     <p className="text-sm">{attendance.admin_remarks}</p>
                   </div>
                 )}
+
+                {/* Request Time Correction button for employees */}
+                {onRequestAppeal && (
+                  <Button 
+                    variant="outline" 
+                    className="w-full mt-4 border-orange-500/50 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                    onClick={onRequestAppeal}
+                  >
+                    <AlertTriangle className="w-4 h-4 mr-2" />
+                    Request Time Correction
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <Clock className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p>No attendance record for this date</p>
+                
+                {/* Request Time Correction button for employees with no record */}
+                {onRequestAppeal && (
+                  <Button 
+                    variant="outline" 
+                    className="mt-4 border-orange-500/50 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                    onClick={onRequestAppeal}
+                  >
+                    <AlertTriangle className="w-4 h-4 mr-2" />
+                    Request Time Correction
+                  </Button>
+                )}
               </div>
             )}
           </TabsContent>
