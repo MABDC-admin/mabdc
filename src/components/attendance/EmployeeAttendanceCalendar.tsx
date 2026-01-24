@@ -302,18 +302,8 @@ export function EmployeeAttendanceCalendar({
     
     setSelectedDate(day);
     
-    if (isEmployeePortal) {
-      const attendance = getAttendanceForDay(day);
-      // Only allow appeal for missed punch or no record
-      const isMissedPunch = attendance && ((attendance.check_in && !attendance.check_out) || (!attendance.check_in && attendance.check_out));
-      if (isMissedPunch || !attendance) {
-        setShowAppealModal(true);
-      } else {
-        setShowDetailModal(true);
-      }
-    } else {
-      setShowDetailModal(true);
-    }
+    // Always show detail modal first - employees can appeal from there via button
+    setShowDetailModal(true);
   };
 
   const selectedAttendance = selectedDate ? getAttendanceForDay(selectedDate) : null;
@@ -754,7 +744,7 @@ export function EmployeeAttendanceCalendar({
         />
       )}
 
-      {/* Detail Modal for Employee (view only) */}
+      {/* Detail Modal for Employee with Appeal option */}
       {selectedDate && isEmployeePortal && !showAppealModal && (
         <AttendanceDetailModal
           open={showDetailModal}
@@ -775,6 +765,10 @@ export function EmployeeAttendanceCalendar({
           employeeId={employeeId}
           employeeName={employeeName}
           isHRView={false}
+          onRequestAppeal={() => {
+            setShowDetailModal(false);
+            setShowAppealModal(true);
+          }}
         />
       )}
 
