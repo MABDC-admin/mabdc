@@ -60,7 +60,7 @@ const STATUS_LABELS: Record<TimeClockStatus, string> = {
   late_exit: 'Late Exit',
   miss_punch_in: 'Miss Punch In',
   miss_punch_out: 'Miss Punch Out',
-  on_time: 'On Time',
+  on_time: 'Present',
   appealed: 'Appealed'
 };
 
@@ -276,6 +276,10 @@ export default function TimeClockView() {
   };
 
   const timeClockRecords = useMemo<TimeClockRecord[]>(() => {
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const now = new Date();
+    const isPastDate = selectedDate < new Date(format(now, 'yyyy-MM-dd'));
+    
     return employees.map(emp => {
       // Prioritize shift override, then permanent shift, then default
       const override = overridesMap.get(emp.id);
@@ -288,9 +292,22 @@ export default function TimeClockView() {
       
       // Use saved database status if available and mapped, otherwise calculate
       const dbStatuses = att?.dbStatus ? dbStatusToTimeClock(att.dbStatus) : [];
-      const statuses = dbStatuses.length > 0
-        ? dbStatuses
+      let statuses = dbStatuses.length > 0
+        ? [...dbStatuses]  // Clone to avoid mutating
         : calculateStatus(att?.checkIn, att?.checkOut, shiftTimes.start, shiftTimes.end, selectedDate, !!override);
+
+      // CRITICAL FIX: Check for missing checkout regardless of database status
+      // If employee has check-in but no check-out, and shift has ended, add miss_punch_out
+      if (att?.checkIn && !att?.checkOut) {
+        const isPastShiftEnd = now > new Date(`${dateStr}T${shiftTimes.end}:00`);
+        
+        if (isPastDate || isPastShiftEnd) {
+          // Add miss_punch_out if not already present
+          if (!statuses.includes('miss_punch_out')) {
+            statuses = [...statuses, 'miss_punch_out'];
+          }
+        }
+      }
 
       return {
         employeeId: emp.id,
@@ -612,7 +629,7 @@ export default function TimeClockView() {
           <CardContent className="p-3 text-center">
             <CheckCircle className="h-5 w-5 text-green-600 mx-auto mb-1" />
             <p className="text-lg font-bold">{statusStats.on_time}</p>
-            <p className="text-xs text-muted-foreground">On Time</p>
+            <p className="text-xs text-muted-foreground">Present</p>
           </CardContent>
         </Card>
         
@@ -692,7 +709,7 @@ export default function TimeClockView() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="on_time">On Time</SelectItem>
+                  <SelectItem value="on_time">Present</SelectItem>
                   <SelectItem value="early_in">Early In</SelectItem>
                   <SelectItem value="late_entry">Late Entry</SelectItem>
                   <SelectItem value="early_out">Early Out</SelectItem>
@@ -860,7 +877,7 @@ export default function TimeClockView() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="on_time">On Time</SelectItem>
+                    <SelectItem value="on_time">Present</SelectItem>
                     <SelectItem value="early_in">Early In</SelectItem>
                     <SelectItem value="late_entry">Late Entry</SelectItem>
                     <SelectItem value="early_out">Early Out</SelectItem>
@@ -894,7 +911,7 @@ export default function TimeClockView() {
           <h3 className="font-semibold mb-3">Status Legend</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className={STATUS_COLORS.on_time}>On Time</Badge>
+              <Badge variant="outline" className={STATUS_COLORS.on_time}>Present</Badge>
               <span className="text-xs text-muted-foreground">Within scheduled time</span>
             </div>
             <div className="flex items-center gap-2">
