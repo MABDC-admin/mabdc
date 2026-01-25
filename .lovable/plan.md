@@ -1,308 +1,189 @@
 
 
-## Plan: Fix Contract Expiry Display and Create Data Integrity Edge Function
+## Plan: Fix Time Clock Status Display and Logic Issues
 
-### Problem Analysis
+### Issues Identified
 
-I've identified the root cause of the contract expiry notification not updating for Johnny Boy:
+After inspecting the Time Clock view and database:
 
-**Database Evidence (Johnny Boy's Contracts):**
-1. **New Contract (Active)**: `MB308637683AE` | `end_date: 2026-02-20` | Created: `2026-01-19`
-2. **Old Contract (Archived)**: `MB260224075AE` | `end_date: 2026-02-06` | Created: `2026-01-13`
+1. **"On Time" should be "Present"**
+   - Current: UI shows "On Time" for employees who checked in within scheduled time
+   - Database stores: `Present`
+   - User wants: Display "Present" to match database terminology
 
-The contract archiving is working correctly (old contract is "Archived", new contract is "Active").
+2. **Missing Punch Out Flag for Appealed/Present Records**
+   - Found records where employees checked in but have no checkout:
+     - Aimee June A. Alolor: check_in=07:19, check_out=NULL, status=Appealed
+     - Jecille F. Buizon: check_in=07:23, check_out=NULL, status=Present
+     - Mark John J. Ramirez: check_in=07:35, check_out=NULL, status=Present
+     - Zeny M. Puguan: check_in=07:15, check_out=NULL, status=Appealed
+   - Current logic: When status is "Appealed" or "Present", it shows ONLY that status
+   - Issue: Missing "Miss Punch Out" flag for records without checkout
 
-**Root Cause**: The Employee Profile Modal correctly pulls `employeeContract` from the `contracts` table using `useMemo` and displays the correct expiry date. However, there are **two separate UI sections** that display contract/document information:
-
-1. **Contract Card (Lines 533-579)** - Uses `employeeContract.end_date` - THIS IS CORRECT
-2. **Document Status "Expiry Alerts" Section (Lines 716-752)** - Uses `currentEmployee.visa_expiration`, `emirates_id_expiry`, `passport_expiry` from the `employees` table - Contract expiry is NOT shown here
-
-**The actual issue**: If the user is seeing outdated expiry dates, it's likely because:
-- Old contract data was cached in React Query
-- The `refetchContracts()` call isn't being invoked after the new contract upload
-- The `useMemo` for `employeeContract` might be stale due to missing dependencies
-
----
-
-### Solution Overview
-
-Implement a three-part solution:
-
-1. **Fix UI Refresh Issue** - Ensure contract data refreshes properly after upload
-2. **Create Data Integrity Edge Function** - Periodic background job to detect and alert discrepancies
-3. **Add Contract Expiry to Alert Section** - Show contract expiry alongside Visa/Emirates ID/Passport alerts
+3. **Status Type Naming Inconsistency**
+   - Internal type: `on_time` 
+   - Display label: "On Time"
+   - Database: "Present"
+   - This creates confusion between UI and database
 
 ---
 
-### Part 1: Fix Contract Refresh After Upload
+### Solution
 
-**File: `src/components/modals/EmployeeProfileModal.tsx`**
+#### Part 1: Rename "On Time" to "Present" Throughout
 
-The `handleContractPageUpload` function uploads contract page images but the contract expiry may come from Smart Upload with different dates. Add explicit query invalidation to ensure fresh data:
-
+**Changes to STATUS_LABELS (line 56-65):**
 ```typescript
-// After updateContractImages.mutateAsync(), add:
-import { useQueryClient } from '@tanstack/react-query';
-
-// In the component:
-const queryClient = useQueryClient();
-
-// After successful upload:
-await queryClient.invalidateQueries({ queryKey: ['contracts'] });
-refetchContracts();
+const STATUS_LABELS: Record<TimeClockStatus, string> = {
+  early_in: 'Early In',
+  late_entry: 'Late Entry',
+  early_out: 'Early Out',
+  late_exit: 'Late Exit',
+  miss_punch_in: 'Miss Punch In',
+  miss_punch_out: 'Miss Punch Out',
+  on_time: 'Present',  // Changed from 'On Time'
+  appealed: 'Appealed'
+};
 ```
 
----
+**Also update all UI references:**
+- Status summary card (line 615): "On Time" → "Present"
+- Filter dropdown (line 695): "On Time" → "Present"
+- Edit dialog dropdown (line 863): "On Time" → "Present"
+- Legend (line 897-898): "On Time" → "Present"
 
-### Part 2: Create Data Integrity Edge Function
+#### Part 2: Fix Status Logic for Missing Checkout
 
-**New File: `supabase/functions/check-data-integrity/index.ts`**
+**Update timeClockRecords logic (lines 278-309):**
 
-This edge function will:
-1. Run periodically (daily) via cron job
-2. Detect discrepancies across the system
-3. Send alerts to HR when issues are found
-
-**Discrepancies to Check:**
-
-| Check Type | Description |
-|------------|-------------|
-| **Multiple Active Contracts** | Employee has more than one "Active" contract |
-| **Orphaned Contract Images** | Contract has page URLs but status is not Active |
-| **Employee-Contract Mismatch** | Employee's `contract_type` doesn't match active contract's type |
-| **Stale Document Renewals** | Documents marked `is_renewed=true` but no `renewed_document_id` |
-| **Missing Contract for Active Employee** | Active employee has no active contract |
-| **Expired Documents Not Marked** | Documents past expiry date but not marked properly |
-
-**Function Structure:**
+Add logic to append `miss_punch_out` when:
+- Record has check-in BUT no check-out
+- AND it's a past date OR past shift end time for today
+- REGARDLESS of the database status (Appealed, Present, etc.)
 
 ```typescript
-// supabase/functions/check-data-integrity/index.ts
-
-interface DataDiscrepancy {
-  type: string;
-  severity: 'critical' | 'warning' | 'info';
-  employee_id: string;
-  employee_name: string;
-  details: string;
-  found_at: string;
-}
-
-// Checks to perform:
-1. checkMultipleActiveContracts()
-2. checkOrphanedContractImages()
-3. checkStaledocumentRenewals()
-4. checkMissingActiveContracts()
-5. checkExpiredDocumentsNotMarked()
-6. checkContractTypeConsistency()
-
-// Output: Send email summary to HR if discrepancies found
+const timeClockRecords = useMemo<TimeClockRecord[]>(() => {
+  return employees.map(emp => {
+    // ... existing shift logic ...
+    const att = attendanceMap.get(emp.id);
+    
+    // Get base status from database
+    let statuses = att?.dbStatus ? dbStatusToTimeClock(att.dbStatus) : [];
+    
+    // If no database status, calculate from punch times
+    if (statuses.length === 0) {
+      statuses = calculateStatus(att?.checkIn, att?.checkOut, shiftTimes.start, shiftTimes.end, selectedDate, !!override);
+    }
+    
+    // CRITICAL FIX: Check for missing checkout regardless of database status
+    if (att?.checkIn && !att?.checkOut) {
+      const isPastDate = selectedDate < new Date(format(new Date(), 'yyyy-MM-dd'));
+      const now = new Date();
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const isPastShiftEnd = now > new Date(`${dateStr}T${shiftTimes.end}:00`);
+      
+      if (isPastDate || isPastShiftEnd) {
+        // Add miss_punch_out if not already present
+        if (!statuses.includes('miss_punch_out')) {
+          statuses = [...statuses, 'miss_punch_out'];
+        }
+      }
+    }
+    
+    return { ...record, status: statuses };
+  });
+}, [employees, shiftMap, overridesMap, attendanceMap, selectedDate]);
 ```
 
----
+#### Part 3: Update dbStatusToTimeClock for Compound Logic
 
-### Part 3: Add Contract Expiry to Alerts Section
+**Improve the status mapping (lines 179-209):**
 
-**File: `src/components/modals/EmployeeProfileModal.tsx`**
-
-Currently, the "Expiry Alerts" section only shows Visa, Emirates ID, and Passport. Add contract expiry check:
+The function should handle Appealed records that still need checkout flagging:
 
 ```typescript
-// In the Expiry Alerts section (lines 716-752), add contract check:
-
-{getExpiryWarning(employeeContract?.end_date) && (
-  <div className="flex items-center gap-2">
-    <AlertTriangle className={cn("w-4 h-4", 
-      getExpiryWarning(employeeContract?.end_date)?.type === 'expired' ? 'text-destructive' :
-      getExpiryWarning(employeeContract?.end_date)?.type === 'urgent' ? 'text-amber-400' : 'text-yellow-400'
-    )} />
-    <span className="text-sm text-foreground">
-      Contract: {getExpiryWarning(employeeContract?.end_date)?.text}
-    </span>
-  </div>
-)}
-```
-
----
-
-### Files to Create/Modify
-
-| File | Change |
-|------|--------|
-| `supabase/functions/check-data-integrity/index.ts` | **NEW** - Data integrity checking edge function |
-| `supabase/config.toml` | Add config for new edge function |
-| `src/components/modals/EmployeeProfileModal.tsx` | Add contract expiry to alerts, add query invalidation |
-| `src/hooks/useContracts.ts` | Add `useDataIntegrityCheck()` hook to manually trigger checks |
-
----
-
-### Edge Function Implementation Details
-
-**`check-data-integrity/index.ts`:**
-
-```typescript
-serve(async (req) => {
-  // 1. Initialize Supabase client
-  // 2. Run all integrity checks
-  // 3. Collect discrepancies
-  // 4. If discrepancies found:
-  //    - Log to console with details
-  //    - Send email alert to HR_NOTIFICATION_EMAIL
-  //    - Return summary JSON
+const dbStatusToTimeClock = (dbStatus: string | undefined, hasCheckIn: boolean, hasCheckOut: boolean): TimeClockStatus[] => {
+  if (!dbStatus) return [];
   
-  const checks = [
-    await checkMultipleActiveContracts(supabase),
-    await checkOrphanedData(supabase),
-    await checkStaleRenewals(supabase),
-    await checkExpiredNotMarked(supabase),
-    await checkMissingContracts(supabase),
-  ];
+  // Handle compound statuses
+  const compoundStatusMap: Record<string, TimeClockStatus[]> = {
+    'Late | Undertime': ['late_entry', 'early_out'],
+    'Miss Punch In | Undertime': ['miss_punch_in', 'early_out'],
+  };
   
-  const discrepancies = checks.flat();
-  
-  if (discrepancies.length > 0 && HR_NOTIFICATION_EMAIL) {
-    await sendDiscrepancyAlert(discrepancies, HR_NOTIFICATION_EMAIL);
+  if (compoundStatusMap[dbStatus]) {
+    return compoundStatusMap[dbStatus];
   }
   
-  return Response(JSON.stringify({
-    success: true,
-    checked_at: new Date().toISOString(),
-    discrepancies_found: discrepancies.length,
-    discrepancies,
-  }));
-});
-```
-
-**Check Functions:**
-
-```typescript
-// Check 1: Multiple Active Contracts
-async function checkMultipleActiveContracts(supabase) {
-  const { data } = await supabase
-    .from('contracts')
-    .select('employee_id, id, employees(full_name)')
-    .eq('status', 'Active');
+  const statuses: TimeClockStatus[] = [];
   
-  // Group by employee_id, flag if count > 1
-  const grouped = data.reduce((acc, c) => {
-    acc[c.employee_id] = acc[c.employee_id] || [];
-    acc[c.employee_id].push(c);
-    return acc;
-  }, {});
+  // Single status mapping
+  const statusMap: Record<string, TimeClockStatus> = {
+    'Present': 'on_time',
+    'Late': 'late_entry',
+    'Undertime': 'early_out',
+    'Missed Punch': 'miss_punch_in',
+    'Miss Punch In': 'miss_punch_in',
+    'Appealed': 'appealed',
+    'Absent': 'miss_punch_in',
+    'Half Day': 'early_out',
+    'On Leave': 'on_time',
+    'Holiday': 'on_time'
+  };
   
-  return Object.entries(grouped)
-    .filter(([_, contracts]) => contracts.length > 1)
-    .map(([empId, contracts]) => ({
-      type: 'MULTIPLE_ACTIVE_CONTRACTS',
-      severity: 'critical',
-      employee_id: empId,
-      employee_name: contracts[0].employees?.full_name,
-      details: `Employee has ${contracts.length} active contracts`,
-    }));
-}
-
-// Check 2: Orphaned Contract Images
-async function checkOrphanedData(supabase) {
-  // Contracts with images but non-Active status
-  const { data } = await supabase
-    .from('contracts')
-    .select('id, employee_id, page1_url, page2_url, status, employees(full_name)')
-    .or('page1_url.not.is.null,page2_url.not.is.null')
-    .not('status', 'eq', 'Active');
+  const mapped = statusMap[dbStatus];
+  if (mapped) {
+    statuses.push(mapped);
+  }
   
-  // Return items where images exist but status is Expired/Archived (info level)
-}
-
-// Check 3: Expired Documents Not Marked
-async function checkExpiredNotMarked(supabase) {
-  const today = new Date().toISOString().split('T')[0];
-  
-  // Documents past expiry that aren't marked as renewed
-  const { data } = await supabase
-    .from('employee_documents')
-    .select('id, name, expiry_date, is_renewed, employee_id, employees(full_name)')
-    .lt('expiry_date', today)
-    .eq('is_renewed', false);
-  
-  return data.map(doc => ({
-    type: 'EXPIRED_DOCUMENT_NOT_MARKED',
-    severity: 'warning',
-    employee_id: doc.employee_id,
-    employee_name: doc.employees?.full_name,
-    details: `Document "${doc.name}" expired on ${doc.expiry_date} but not marked as renewed`,
-  }));
-}
+  return statuses;
+};
 ```
 
 ---
 
-### Cron Job Setup (Manual Step)
+### Files to Modify
 
-After the edge function is deployed, a cron job should be set up to run it daily. This requires running SQL in the database:
-
-```sql
--- Enable required extensions
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
-
--- Schedule daily integrity check at 6 AM UAE time (2 AM UTC)
-SELECT cron.schedule(
-  'daily-data-integrity-check',
-  '0 2 * * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://fwdtjszxnnfqxjevlasm.supabase.co/functions/v1/check-data-integrity',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer <anon_key>"}'::jsonb,
-    body := '{}'::jsonb
-  );
-  $$
-);
-```
+| File | Changes |
+|------|---------|
+| `src/components/views/TimeClockView.tsx` | Rename "On Time" → "Present" in labels, fix missing checkout detection logic |
 
 ---
 
-### Email Alert Format
+### Summary of Changes
 
-When discrepancies are found, HR receives an email like:
-
-```
-Subject: ⚠️ Data Integrity Alert: 3 Issues Found
-
-┌────────────────────────────────────────────┐
-│ 🔍 HRMS Data Integrity Report              │
-│ Checked: 2026-01-24 06:00:00 UTC           │
-├────────────────────────────────────────────┤
-│ 🚨 CRITICAL (1)                            │
-│ • Johnny Boy: 2 active contracts found     │
-├────────────────────────────────────────────┤
-│ ⚠️ WARNING (2)                             │
-│ • Jane Doe: Emirates ID expired 5 days ago │
-│ • John Smith: Contract renewal pending     │
-└────────────────────────────────────────────┘
-```
+| Location | Current | After Fix |
+|----------|---------|-----------|
+| STATUS_LABELS.on_time | "On Time" | "Present" |
+| Summary Card | "On Time" | "Present" |
+| Filter Dropdown | "On Time" | "Present" |
+| Edit Dialog | "On Time" | "Present" |
+| Legend | "On Time" | "Present" |
+| Missing Checkout Logic | Only calculated statuses | Append `miss_punch_out` to ANY record without checkout (past shift end) |
 
 ---
 
-### Manual Trigger Option
+### Visual Result After Fix
 
-Add a button to the Admin Dashboard or Settings page to manually trigger the integrity check:
+**Before (Current):**
+| Employee | Status |
+|----------|--------|
+| Aimee June | Appealed |
+| Jecille | On Time |
 
-```typescript
-// In settings or admin view
-const checkIntegrity = useCheckDataIntegrity();
-
-<Button onClick={() => checkIntegrity.mutate()}>
-  Run Data Integrity Check
-</Button>
-```
+**After (Fixed):**
+| Employee | Status |
+|----------|--------|
+| Aimee June | Appealed, Miss Punch Out |
+| Jecille | Present, Miss Punch Out |
 
 ---
 
-### Summary of Benefits
+### Validation
 
-1. **Immediate Fix**: Contract expiry displays correctly using `employeeContract` from contracts table
-2. **Proactive Monitoring**: Daily automated checks catch discrepancies before they become problems
-3. **HR Visibility**: Email alerts ensure HR knows about issues regardless of origin (admin, HR, or employee portal)
-4. **Audit Trail**: All discrepancies are logged with timestamps for review
-5. **Self-Healing**: Some checks can automatically fix issues (e.g., marking expired contracts)
+The fix ensures:
+1. UI terminology matches database (Present, not On Time)
+2. Missing checkout is always flagged regardless of appeal status
+3. Missed Punch Alerts section correctly shows all employees without checkout
+4. Export to Excel uses correct "Present" label
 
