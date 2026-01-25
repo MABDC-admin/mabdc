@@ -19,7 +19,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Search, UserCog, Shield, UserCheck, User, Plus, Trash2, Loader2, RefreshCw, KeyRound } from 'lucide-react';
+import { Search, UserCog, Shield, UserCheck, User, Plus, Trash2, Loader2, RefreshCw, KeyRound, AlertTriangle, Mail } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { useEmployees } from '@/hooks/useEmployees';
 
@@ -33,6 +34,8 @@ interface UserWithRoles {
   roles: AppRole[];
   linked_employee_id: string | null;
   linked_employee_name: string | null;
+  linked_employee_email: string | null;
+  email_mismatch: boolean;
 }
 
 export function AdminUserAccountsSection() {
@@ -72,7 +75,7 @@ export function AdminUserAccountsSection() {
       // Fetch employees to find linked accounts
       const { data: employeesData, error: empError } = await supabase
         .from('employees')
-        .select('id, full_name, user_id');
+        .select('id, full_name, user_id, work_email');
 
       if (empError) throw empError;
 
@@ -83,6 +86,12 @@ export function AdminUserAccountsSection() {
           .map((r) => r.role as AppRole);
 
         const linkedEmployee = (employeesData || []).find((e) => e.user_id === profile.id);
+        
+        // Check for email mismatch
+        const linkedEmployeeEmail = linkedEmployee?.work_email || null;
+        const emailMismatch = linkedEmployee && linkedEmployeeEmail
+          ? linkedEmployeeEmail.toLowerCase() !== (profile.email || '').toLowerCase()
+          : false;
 
         return {
           id: profile.id,
@@ -92,6 +101,8 @@ export function AdminUserAccountsSection() {
           roles: userRoles,
           linked_employee_id: linkedEmployee?.id || null,
           linked_employee_name: linkedEmployee?.full_name || null,
+          linked_employee_email: linkedEmployeeEmail,
+          email_mismatch: emailMismatch,
         };
       });
 
@@ -368,10 +379,35 @@ export function AdminUserAccountsSection() {
                   </TableCell>
                   <TableCell>
                     {user.linked_employee_name ? (
-                      <div className="flex items-center gap-2">
-                        <UserCheck className="w-4 h-4 text-emerald-500" />
-                        <span className="text-sm text-foreground">{user.linked_employee_name}</span>
-                      </div>
+                      <TooltipProvider>
+                        <div className="flex items-center gap-2">
+                          <UserCheck className="w-4 h-4 text-emerald-500" />
+                          <span className="text-sm text-foreground">{user.linked_employee_name}</span>
+                          {user.email_mismatch && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1 text-amber-500">
+                                  <AlertTriangle className="w-4 h-4" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <div className="space-y-1">
+                                  <p className="font-semibold text-amber-500">Email Mismatch!</p>
+                                  <p className="text-xs">
+                                    <span className="text-muted-foreground">Login:</span> {user.email}
+                                  </p>
+                                  <p className="text-xs">
+                                    <span className="text-muted-foreground">Employee:</span> {user.linked_employee_email}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    Edit the employee to sync or reset the account.
+                                  </p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </TooltipProvider>
                     ) : (
                       <span className="text-xs text-muted-foreground italic">Not linked</span>
                     )}
