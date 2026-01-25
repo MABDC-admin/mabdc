@@ -1,189 +1,234 @@
 
+## Plan: Fix Employee Email Change → Auth Account Sync Issue
 
-## Plan: Fix Time Clock Status Display and Logic Issues
+### Problem Identified
 
-### Issues Identified
+**Current State (Renz Vincent S. Aclan):**
+| Field | Value |
+|-------|-------|
+| Employee `work_email` | `aclanrenz1@gmail.com` (NEW) |
+| Profile `email` (Auth) | `aclanrenzvincent91@gmail.com` (OLD) |
+| `user_id` | `60a3ed28-e7b2-4c06-ae47-f2ab3bba8e09` |
 
-After inspecting the Time Clock view and database:
+**Root Cause**: When an employee's `work_email` is changed in the Edit Employee modal, it only updates the `employees` table. The linked Auth user account (`auth.users`) and the `profiles` table remain unchanged.
 
-1. **"On Time" should be "Present"**
-   - Current: UI shows "On Time" for employees who checked in within scheduled time
-   - Database stores: `Present`
-   - User wants: Display "Present" to match database terminology
-
-2. **Missing Punch Out Flag for Appealed/Present Records**
-   - Found records where employees checked in but have no checkout:
-     - Aimee June A. Alolor: check_in=07:19, check_out=NULL, status=Appealed
-     - Jecille F. Buizon: check_in=07:23, check_out=NULL, status=Present
-     - Mark John J. Ramirez: check_in=07:35, check_out=NULL, status=Present
-     - Zeny M. Puguan: check_in=07:15, check_out=NULL, status=Appealed
-   - Current logic: When status is "Appealed" or "Present", it shows ONLY that status
-   - Issue: Missing "Miss Punch Out" flag for records without checkout
-
-3. **Status Type Naming Inconsistency**
-   - Internal type: `on_time` 
-   - Display label: "On Time"
-   - Database: "Present"
-   - This creates confusion between UI and database
+**Impact**:
+1. Employee still logs in with OLD email
+2. Admin User Accounts section shows OLD email (from `profiles` table)
+3. Mismatch creates confusion for HR and employees
 
 ---
 
-### Solution
+### Solution Overview
 
-#### Part 1: Rename "On Time" to "Present" Throughout
+Implement a two-part solution:
 
-**Changes to STATUS_LABELS (line 56-65):**
+1. **Create Edge Function**: `update-employee-email` - Updates both Auth user email and profiles table when work_email changes
+2. **Modify Edit Flow**: Detect email changes and prompt admin to choose:
+   - **Option A**: Update the Auth account email (sync emails)
+   - **Option B**: Unlink and recreate account (reset account with new email)
+3. **Add Email Mismatch Detection**: Show warning in Admin User Accounts when employee email differs from auth email
+
+---
+
+### Part 1: New Edge Function `update-employee-email`
+
+**File: `supabase/functions/update-employee-email/index.ts`**
+
+This function will:
+1. Accept employee ID and new email
+2. Verify caller is HR or Admin
+3. Check if employee has a linked user account (`user_id`)
+4. Update the Auth user's email using `supabase.auth.admin.updateUserById()`
+5. Update the `profiles` table email
+6. Return success/error
+
 ```typescript
-const STATUS_LABELS: Record<TimeClockStatus, string> = {
-  early_in: 'Early In',
-  late_entry: 'Late Entry',
-  early_out: 'Early Out',
-  late_exit: 'Late Exit',
-  miss_punch_in: 'Miss Punch In',
-  miss_punch_out: 'Miss Punch Out',
-  on_time: 'Present',  // Changed from 'On Time'
-  appealed: 'Appealed'
+// Key operations:
+await adminClient.auth.admin.updateUserById(user_id, {
+  email: newEmail,
+  email_confirm: true  // Auto-confirm to avoid verification email
+});
+
+await adminClient.from('profiles')
+  .update({ email: newEmail })
+  .eq('id', user_id);
+```
+
+---
+
+### Part 2: Create "Reset Employee Account" Function
+
+**New Edge Function: `reset-employee-account`**
+
+For cases where email change requires account reset:
+1. Delete existing Auth user (if exists)
+2. Remove `user_id` from employee record
+3. Remove `employee` role from `user_roles`
+4. This allows the "Generate Account" button to reappear
+
+```typescript
+// Steps:
+1. Get employee's user_id
+2. Delete from auth.users using adminClient.auth.admin.deleteUser(userId)
+3. Update employee: set user_id = null
+4. Delete from user_roles where user_id = userId and role = 'employee'
+```
+
+---
+
+### Part 3: Update Edit Employee Modal
+
+**File: `src/components/modals/EditEmployeeModal.tsx`**
+
+Add detection for email changes when employee has an existing account:
+
+1. Compare `formData.work_email` with original `employee.work_email`
+2. If changed AND `employee.user_id` exists, show confirmation dialog
+3. Offer two options:
+   - **"Sync Email"**: Call `update-employee-email` edge function
+   - **"Reset Account"**: Call `reset-employee-account` edge function (unlinks account, allows regeneration)
+
+```text
+┌──────────────────────────────────────────────────────┐
+│ ⚠️ Email Change Detected                            │
+├──────────────────────────────────────────────────────┤
+│ This employee has a login account linked to:        │
+│ OLD: aclanrenzvincent91@gmail.com                   │
+│ NEW: aclanrenz1@gmail.com                           │
+│                                                      │
+│ How would you like to proceed?                       │
+│                                                      │
+│ [Sync Email] - Update the login email to match      │
+│ [Reset Account] - Unlink and regenerate account     │
+│ [Skip] - Only update employee record, keep old login│
+└──────────────────────────────────────────────────────┘
+```
+
+---
+
+### Part 4: Add Email Mismatch Warning in Admin User Accounts
+
+**File: `src/components/admin/AdminUserAccountsSection.tsx`**
+
+When displaying users, compare auth email with linked employee's work_email and show warning badge:
+
+```typescript
+// In the query function, add employee work_email to the join
+const linkedEmployee = (employeesData || []).find((e) => e.user_id === profile.id);
+
+return {
+  ...
+  linked_employee_email: linkedEmployee?.work_email || null,
+  email_mismatch: linkedEmployee && 
+    linkedEmployee.work_email?.toLowerCase() !== profile.email?.toLowerCase()
 };
 ```
 
-**Also update all UI references:**
-- Status summary card (line 615): "On Time" → "Present"
-- Filter dropdown (line 695): "On Time" → "Present"
-- Edit dialog dropdown (line 863): "On Time" → "Present"
-- Legend (line 897-898): "On Time" → "Present"
-
-#### Part 2: Fix Status Logic for Missing Checkout
-
-**Update timeClockRecords logic (lines 278-309):**
-
-Add logic to append `miss_punch_out` when:
-- Record has check-in BUT no check-out
-- AND it's a past date OR past shift end time for today
-- REGARDLESS of the database status (Appealed, Present, etc.)
-
-```typescript
-const timeClockRecords = useMemo<TimeClockRecord[]>(() => {
-  return employees.map(emp => {
-    // ... existing shift logic ...
-    const att = attendanceMap.get(emp.id);
-    
-    // Get base status from database
-    let statuses = att?.dbStatus ? dbStatusToTimeClock(att.dbStatus) : [];
-    
-    // If no database status, calculate from punch times
-    if (statuses.length === 0) {
-      statuses = calculateStatus(att?.checkIn, att?.checkOut, shiftTimes.start, shiftTimes.end, selectedDate, !!override);
-    }
-    
-    // CRITICAL FIX: Check for missing checkout regardless of database status
-    if (att?.checkIn && !att?.checkOut) {
-      const isPastDate = selectedDate < new Date(format(new Date(), 'yyyy-MM-dd'));
-      const now = new Date();
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const isPastShiftEnd = now > new Date(`${dateStr}T${shiftTimes.end}:00`);
-      
-      if (isPastDate || isPastShiftEnd) {
-        // Add miss_punch_out if not already present
-        if (!statuses.includes('miss_punch_out')) {
-          statuses = [...statuses, 'miss_punch_out'];
-        }
-      }
-    }
-    
-    return { ...record, status: statuses };
-  });
-}, [employees, shiftMap, overridesMap, attendanceMap, selectedDate]);
-```
-
-#### Part 3: Update dbStatusToTimeClock for Compound Logic
-
-**Improve the status mapping (lines 179-209):**
-
-The function should handle Appealed records that still need checkout flagging:
-
-```typescript
-const dbStatusToTimeClock = (dbStatus: string | undefined, hasCheckIn: boolean, hasCheckOut: boolean): TimeClockStatus[] => {
-  if (!dbStatus) return [];
-  
-  // Handle compound statuses
-  const compoundStatusMap: Record<string, TimeClockStatus[]> = {
-    'Late | Undertime': ['late_entry', 'early_out'],
-    'Miss Punch In | Undertime': ['miss_punch_in', 'early_out'],
-  };
-  
-  if (compoundStatusMap[dbStatus]) {
-    return compoundStatusMap[dbStatus];
-  }
-  
-  const statuses: TimeClockStatus[] = [];
-  
-  // Single status mapping
-  const statusMap: Record<string, TimeClockStatus> = {
-    'Present': 'on_time',
-    'Late': 'late_entry',
-    'Undertime': 'early_out',
-    'Missed Punch': 'miss_punch_in',
-    'Miss Punch In': 'miss_punch_in',
-    'Appealed': 'appealed',
-    'Absent': 'miss_punch_in',
-    'Half Day': 'early_out',
-    'On Leave': 'on_time',
-    'Holiday': 'on_time'
-  };
-  
-  const mapped = statusMap[dbStatus];
-  if (mapped) {
-    statuses.push(mapped);
-  }
-  
-  return statuses;
-};
+Display warning in table:
+```text
+│ User                  │ Roles    │ Linked Employee        │
+│ old@email.com         │ employee │ Renz Vincent (⚠️ Email │
+│                       │          │ mismatch!)             │
 ```
 
 ---
 
-### Files to Modify
+### Part 5: Immediate Fix for Renz
 
-| File | Changes |
-|------|---------|
-| `src/components/views/TimeClockView.tsx` | Rename "On Time" → "Present" in labels, fix missing checkout detection logic |
+After implementing the above, call the edge function to sync Renz's account:
 
----
+```sql
+-- Current state:
+-- Employee work_email: aclanrenz1@gmail.com
+-- Auth/Profile email: aclanrenzvincent91@gmail.com
 
-### Summary of Changes
-
-| Location | Current | After Fix |
-|----------|---------|-----------|
-| STATUS_LABELS.on_time | "On Time" | "Present" |
-| Summary Card | "On Time" | "Present" |
-| Filter Dropdown | "On Time" | "Present" |
-| Edit Dialog | "On Time" | "Present" |
-| Legend | "On Time" | "Present" |
-| Missing Checkout Logic | Only calculated statuses | Append `miss_punch_out` to ANY record without checkout (past shift end) |
+-- Options:
+-- 1. Sync: Update auth.users and profiles.email to aclanrenz1@gmail.com
+-- 2. Reset: Delete auth user, set employee.user_id = null, regenerate account
+```
 
 ---
 
-### Visual Result After Fix
+### Files to Create/Modify
 
-**Before (Current):**
-| Employee | Status |
-|----------|--------|
-| Aimee June | Appealed |
-| Jecille | On Time |
-
-**After (Fixed):**
-| Employee | Status |
-|----------|--------|
-| Aimee June | Appealed, Miss Punch Out |
-| Jecille | Present, Miss Punch Out |
+| File | Action | Description |
+|------|--------|-------------|
+| `supabase/functions/update-employee-email/index.ts` | **CREATE** | Edge function to sync auth email with employee email |
+| `supabase/functions/reset-employee-account/index.ts` | **CREATE** | Edge function to unlink/delete employee auth account |
+| `supabase/config.toml` | **MODIFY** | Register new edge functions |
+| `src/components/modals/EditEmployeeModal.tsx` | **MODIFY** | Add email change detection and confirmation dialog |
+| `src/components/admin/AdminUserAccountsSection.tsx` | **MODIFY** | Add email mismatch detection and warning display |
+| `src/hooks/useEmployees.ts` | **MODIFY** | Add hooks for email sync and account reset |
 
 ---
 
-### Validation
+### Edge Function: `update-employee-email`
 
-The fix ensures:
-1. UI terminology matches database (Present, not On Time)
-2. Missing checkout is always flagged regardless of appeal status
-3. Missed Punch Alerts section correctly shows all employees without checkout
-4. Export to Excel uses correct "Present" label
+```typescript
+// Endpoint: POST /functions/v1/update-employee-email
+// Body: { employeeId: string, newEmail: string }
 
+// Flow:
+1. Verify caller is HR/Admin
+2. Fetch employee to get user_id
+3. If no user_id, return "No account to update"
+4. Update auth.users email via adminClient.auth.admin.updateUserById()
+5. Update profiles.email
+6. Return success
+
+// Security: Uses service role key internally
+// Authorization: Requires HR or Admin role
+```
+
+---
+
+### Edge Function: `reset-employee-account`
+
+```typescript
+// Endpoint: POST /functions/v1/reset-employee-account
+// Body: { employeeId: string }
+
+// Flow:
+1. Verify caller is HR/Admin
+2. Fetch employee to get user_id
+3. If no user_id, return "No account to reset"
+4. Delete user from auth.users
+5. Update employee: set user_id = null
+6. Delete from user_roles
+7. Return success
+
+// After reset: Admin can use "Generate Account" button with new email
+```
+
+---
+
+### UI Flow After Implementation
+
+**Scenario: HR changes Renz's email from old@email.com to new@email.com**
+
+1. HR opens Edit Employee modal
+2. Changes work_email field
+3. Clicks Save
+4. System detects:
+   - Email changed ✓
+   - Employee has linked account ✓
+5. Confirmation dialog appears with options
+6. HR selects "Sync Email"
+7. Edge function updates:
+   - `auth.users.email` → new@email.com
+   - `profiles.email` → new@email.com
+8. Success toast: "Email synced successfully"
+9. Admin User Accounts now shows correct email
+
+---
+
+### Summary
+
+| Issue | Solution |
+|-------|----------|
+| Email mismatch not detected | Add comparison in EditEmployeeModal |
+| Auth email not updated | New `update-employee-email` edge function |
+| Can't regenerate account | New `reset-employee-account` edge function |
+| No visibility of mismatches | Warning badge in Admin User Accounts |
+| Renz's specific issue | Can be fixed immediately after implementation |
