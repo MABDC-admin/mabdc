@@ -60,16 +60,18 @@ export function usePayslipEmailHistory(month: string) {
       
       const { data, error } = await supabase
         .from("email_history")
-        .select("employee_id, status, created_at, error_message")
+        .select("employee_id, status, created_at, error_message, metadata")
         .eq("email_type", "payslip")
         .order("created_at", { ascending: false });
       
       if (error) throw error;
       
-      // Filter by month in metadata (done client-side due to jsonb filter limitations)
+      // Filter to only emails for this month based on metadata
       return (data || []).filter(email => {
-        // Check if metadata.month matches the formatted month label
-        return email.employee_id;
+        if (!email.employee_id) return false;
+        // Check if metadata.month matches
+        const emailMonth = (email.metadata as Record<string, any>)?.month;
+        return emailMonth === monthLabel;
       });
     },
   });
