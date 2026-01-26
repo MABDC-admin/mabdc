@@ -220,10 +220,13 @@ export function useEmployeeTicketAllowance(employeeId: string) {
 }
 
 // Fetch approved but not processed ticket allowances (for payroll)
+// Only returns records where eligibility date has passed
 export function useApprovedTicketAllowances() {
   return useQuery({
     queryKey: ['approved-ticket-allowances'],
     queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      
       const { data, error } = await supabase
         .from('ticket_allowance_records')
         .select(`
@@ -232,6 +235,7 @@ export function useApprovedTicketAllowances() {
         `)
         .eq('status', 'approved')
         .is('processed_in_payroll_id', null)
+        .lte('eligibility_start_date', today) // Only past/current eligibility
         .order('eligibility_start_date', { ascending: true });
       
       if (error) throw error;
