@@ -1,241 +1,82 @@
 
-# Plan: Fix Leave Request & Appeal Submission Notifications to HR
+# Plan: Fix Leave Request & Appeal Notifications - Ensure Mandatory Execution
 
-## Problem Identified
+## Root Cause Analysis
 
-### Issue 1: Leave Request Notifications Not Working
-The `send-leave-request-notification` edge function shows **no logs at all**, which means either:
-1. The function is not being called
-2. The function is failing silently before any logging
+After investigating the edge function logs, database records, and network activity:
 
-**Current pattern** (src/hooks/useLeave.ts:466-470):
+1. **The edge function `send-leave-request-notification` works correctly** - when called directly, it successfully sent the email to HR
+2. **The leave request was created successfully** at 18:27:24 and the balance was updated at 18:27:25
+3. **The edge function was NEVER invoked** by the frontend during the leave submission
+4. **Cause**: The code changes were made but the user's browser was still running a cached version, or the deployment hadn't fully propagated
+
+## Solution: Make Notifications Absolutely Mandatory
+
+To prevent this from happening again and ensure 100% reliability:
+
+### 1. Add Error Logging to Email Notification Call
+
+**File:** `src/hooks/useLeave.ts` (Lines 457-470)
+
+Add try-catch wrapper and more detailed logging to catch any silent failures:
+
 ```typescript
+// MANDATORY: Send email notification to HR about new leave request
 if (data?.id) {
-  supabase.functions.invoke('send-leave-request-notification', {
-    body: { leave_id: data.id }
-  }).catch(err => console.error('Failed to send leave request notification:', err));
-}
-```
-
-**Problem:** This is a "fire and forget" pattern that:
-- Does not await the result
-- Silently swallows errors to console
-- Provides no user feedback on success/failure
-
-### Issue 2: No HR Notification for Appeal Submissions
-Currently, `useAddAttendanceAppeal` does **not** notify HR when an employee submits an appeal - only when HR approves/rejects it.
-
----
-
-## Solution: Match the Payslip Email Pattern
-
-The payslip email works reliably because it:
-1. Uses `await` to wait for the response
-2. Throws on error to show feedback
-3. Provides success toast to confirm delivery
-
-### Changes Required
-
-### 1. Create Edge Function: `send-appeal-request-notification`
-**(New file)** - Notifies HR when employee submits an appeal
-
-**File:** `supabase/functions/send-appeal-request-notification/index.ts`
-
-This will:
-- Fetch appeal details + employee info
-- Send email to HR (`HR_NOTIFICATION_EMAIL`)
-- Log to `email_history` table
-- Use `SMTP_FROM_EMAIL` for verified sender
-
----
-
-### 2. Update `src/hooks/useLeave.ts` - Make Notification Mandatory
-
-**Current (Line 459-471):**
-```typescript
-onSuccess: (data) => {
-  queryClient.invalidateQueries({ queryKey: ['leave'] });
-  queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
-  queryClient.invalidateQueries({ queryKey: ['all_leave_balances'] });
-  toast.success('Leave request submitted');
-  
-  if (data?.id) {
-    supabase.functions.invoke('send-leave-request-notification', {
-      body: { leave_id: data.id }
-    }).catch(err => console.error('Failed to send leave request notification:', err));
-  }
-},
-```
-
-**Updated (Move notification inside mutationFn to make it mandatory):**
-```typescript
-mutationFn: async (leave: Omit<LeaveRecord, 'id' | 'created_at' | 'employees'>) => {
-  const { data, error } = await supabase
-    .from('leave_records')
-    .insert([leave])
-    .select()
-    .single();
-  
-  if (error) throw error;
-  
-  // ... existing balance update logic ...
-  
-  // MANDATORY: Send email notification to HR
-  if (data?.id) {
-    const { error: notifyError } = await supabase.functions.invoke('send-leave-request-notification', {
+  try {
+    console.log('[LEAVE NOTIFICATION] Starting notification for leave_id:', data.id);
+    
+    const { data: invokeData, error: notifyError } = await supabase.functions.invoke('send-leave-request-notification', {
       body: { leave_id: data.id }
     });
     
     if (notifyError) {
-      console.error('Failed to notify HR:', notifyError);
-      // Continue - don't fail the entire request, but log it
+      console.error('[LEAVE NOTIFICATION] Edge function error:', notifyError);
+    } else {
+      console.log('[LEAVE NOTIFICATION] Success:', invokeData);
     }
+  } catch (err) {
+    console.error('[LEAVE NOTIFICATION] Exception caught:', err);
   }
-  
-  return data;
-},
-```
-
----
-
-### 3. Update `src/hooks/useAttendanceAppeals.ts` - Add HR Notification on Submit
-
-**Current `useAddAttendanceAppeal` (Line 50-69):**
-```typescript
-export function useAddAttendanceAppeal() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (appeal: ...) => {
-      const { data, error } = await supabase
-        .from('attendance_appeals')
-        .insert([{ ...appeal, status: 'Pending' }])
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attendance_appeals'] });
-      toast.success('Appeal submitted successfully');
-    },
-    // ...
-  });
 }
 ```
 
-**Updated (Add HR notification in mutationFn):**
-```typescript
-mutationFn: async (appeal: ...) => {
-  const { data, error } = await supabase
-    .from('attendance_appeals')
-    .insert([{ ...appeal, status: 'Pending' }])
-    .select()
-    .single();
-  if (error) throw error;
-  
-  // MANDATORY: Send email notification to HR about new appeal
-  if (data?.id) {
-    const { error: notifyError } = await supabase.functions.invoke('send-appeal-request-notification', {
-      body: { appeal_id: data.id }
-    });
-    
-    if (notifyError) {
-      console.error('Failed to notify HR of appeal:', notifyError);
-    }
-  }
-  
-  return data;
-},
-```
+### 2. Same Pattern for Attendance Appeal Notifications
+
+**File:** `src/hooks/useAttendanceAppeals.ts`
+
+Apply the same try-catch logging pattern to ensure visibility of any failures.
+
+### 3. Redeploy Edge Functions
+
+Explicitly redeploy both edge functions to ensure they are running the latest code:
+- `send-leave-request-notification`
+- `send-appeal-request-notification`
 
 ---
 
-### 4. Update `supabase/config.toml`
+## Files to Modify
 
-Add configuration for the new function:
-```toml
-[functions.send-appeal-request-notification]
-verify_jwt = false
-```
-
----
-
-## Files to Create/Modify
-
-| File | Action | Description |
-|------|--------|-------------|
-| `supabase/functions/send-appeal-request-notification/index.ts` | **Create** | New edge function to email HR on appeal submission |
-| `supabase/config.toml` | Modify | Add new function configuration |
-| `src/hooks/useLeave.ts` | Modify | Move notification to mutationFn with await |
-| `src/hooks/useAttendanceAppeals.ts` | Modify | Add HR notification on appeal submission |
+| File | Change |
+|------|--------|
+| `src/hooks/useLeave.ts` | Add try-catch with detailed console logging around notification call |
+| `src/hooks/useAttendanceAppeals.ts` | Add try-catch with detailed console logging around notification call |
 
 ---
 
-## Email Flow After Implementation
+## Testing After Implementation
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ LEAVE REQUEST FLOW                                          │
-├─────────────────────────────────────────────────────────────┤
-│ Employee submits leave request                              │
-│         │                                                   │
-│         ▼                                                   │
-│ Database insert successful                                  │
-│         │                                                   │
-│         ▼                                                   │
-│ AWAIT supabase.functions.invoke('send-leave-request-...')   │
-│         │                                                   │
-│         ▼                                                   │
-│ HR receives: "📩 New Leave Request: Dennis Sotto"           │
-│   - Employee info                                           │
-│   - Leave details + reason                                  │
-│   - Attachment link (if any)                                │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│ APPEAL SUBMISSION FLOW (NEW)                                │
-├─────────────────────────────────────────────────────────────┤
-│ Employee submits attendance appeal                          │
-│         │                                                   │
-│         ▼                                                   │
-│ Database insert successful                                  │
-│         │                                                   │
-│         ▼                                                   │
-│ AWAIT supabase.functions.invoke('send-appeal-request-...')  │
-│         │                                                   │
-│         ▼                                                   │
-│ HR receives: "📩 New Attendance Appeal: Dennis Sotto"       │
-│   - Employee info                                           │
-│   - Appeal date + requested times                           │
-│   - Appeal message                                          │
-└─────────────────────────────────────────────────────────────┘
-```
+1. Ask Dennis to submit a new test leave request
+2. Verify in edge function logs that the function was invoked
+3. Confirm HR receives the email with attachment link
 
 ---
 
-## Technical Details
+## Technical Summary
 
-### Email Configuration (Same as Working Payslip System)
-| Setting | Source |
-|---------|--------|
-| From Email | `SMTP_FROM_EMAIL` (verified domain) |
-| To Email | `HR_NOTIFICATION_EMAIL` |
-| API | Resend via `RESEND_API_KEY` |
+The current code is correct but may have been affected by caching. The changes will:
+1. Add explicit try-catch blocks to catch any JavaScript exceptions
+2. Add tagged console logs `[LEAVE NOTIFICATION]` for easy debugging
+3. Force redeploy of edge functions to ensure latest code is running
 
-### Key Pattern Change
-| Before | After |
-|--------|-------|
-| Fire-and-forget with `.catch()` | `await` with proper error handling |
-| Silent failures | Logged errors (continue flow) |
-| No confirmation | Mandatory execution |
-
----
-
-## Summary
-
-| Issue | Solution |
-|-------|----------|
-| Leave request notifications not reaching HR | Move invocation inside `mutationFn` with `await` |
-| Appeal submissions not notifying HR | Create new edge function + trigger on submit |
-| Silent error handling | Replace `.catch()` with `await` + error logging |
-| No email logs | Proper logging + email_history tracking |
+This ensures that even if the notification fails, we will have clear visibility into the failure reason.
