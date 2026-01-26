@@ -1,64 +1,57 @@
 
-# Plan: Email HR When Employee Submits Leave Request (with Attachment)
+# Plan: Fix Leave Request & Appeal Submission Notifications to HR
 
-## Current Situation
+## Problem Identified
 
-When an employee submits a leave request:
-1. The request is saved to the database
-2. Any attachment is uploaded to the `leave-attachments` bucket
-3. **Currently**: No notification is sent to HR
+### Issue 1: Leave Request Notifications Not Working
+The `send-leave-request-notification` edge function shows **no logs at all**, which means either:
+1. The function is not being called
+2. The function is failing silently before any logging
 
-HR only receives notifications after **approving/rejecting** (as CC), not when the request is **submitted**.
-
----
-
-## Implementation Details
-
-### 1. Create New Edge Function: `send-leave-request-notification`
-
-**File:** `supabase/functions/send-leave-request-notification/index.ts`
-
-This function will:
-1. Receive the `leave_id` after successful submission
-2. Fetch the complete leave record with employee details
-3. Fetch the attachment URL if present
-4. Send an HTML email to HR (`HR_NOTIFICATION_EMAIL`)
-5. Include a link/preview of the attachment in the email
-
-**Payload:**
+**Current pattern** (src/hooks/useLeave.ts:466-470):
 ```typescript
-{
-  leave_id: string;
+if (data?.id) {
+  supabase.functions.invoke('send-leave-request-notification', {
+    body: { leave_id: data.id }
+  }).catch(err => console.error('Failed to send leave request notification:', err));
 }
 ```
 
-**Email Content:**
-- Employee name, HRMS No, Department
-- Leave type, dates, duration
-- Employee's reason
-- Request submitted timestamp
-- **Attachment link** (if provided) - clickable button to view/download
-- Action buttons: Link to Admin Dashboard to review
+**Problem:** This is a "fire and forget" pattern that:
+- Does not await the result
+- Silently swallows errors to console
+- Provides no user feedback on success/failure
+
+### Issue 2: No HR Notification for Appeal Submissions
+Currently, `useAddAttendanceAppeal` does **not** notify HR when an employee submits an appeal - only when HR approves/rejects it.
 
 ---
 
-### 2. Update `supabase/config.toml`
+## Solution: Match the Payslip Email Pattern
 
-Add configuration for the new function:
+The payslip email works reliably because it:
+1. Uses `await` to wait for the response
+2. Throws on error to show feedback
+3. Provides success toast to confirm delivery
 
-```toml
-[functions.send-leave-request-notification]
-verify_jwt = false
-```
+### Changes Required
+
+### 1. Create Edge Function: `send-appeal-request-notification`
+**(New file)** - Notifies HR when employee submits an appeal
+
+**File:** `supabase/functions/send-appeal-request-notification/index.ts`
+
+This will:
+- Fetch appeal details + employee info
+- Send email to HR (`HR_NOTIFICATION_EMAIL`)
+- Log to `email_history` table
+- Use `SMTP_FROM_EMAIL` for verified sender
 
 ---
 
-### 3. Modify `src/hooks/useLeave.ts`
+### 2. Update `src/hooks/useLeave.ts` - Make Notification Mandatory
 
-**Location:** `useAddLeave` mutation's `onSuccess` callback (Line 459-464)
-
-After the leave request is created, call the edge function:
-
+**Current (Line 459-471):**
 ```typescript
 onSuccess: (data) => {
   queryClient.invalidateQueries({ queryKey: ['leave'] });
@@ -66,7 +59,6 @@ onSuccess: (data) => {
   queryClient.invalidateQueries({ queryKey: ['all_leave_balances'] });
   toast.success('Leave request submitted');
   
-  // Send email notification to HR about new leave request
   if (data?.id) {
     supabase.functions.invoke('send-leave-request-notification', {
       body: { leave_id: data.id }
@@ -75,42 +67,95 @@ onSuccess: (data) => {
 },
 ```
 
----
-
-## Email Template Design
-
-**Subject:** `📩 New Leave Request: [Employee Name] - [Leave Type]`
-
-**Email Body:**
+**Updated (Move notification inside mutationFn to make it mandatory):**
+```typescript
+mutationFn: async (leave: Omit<LeaveRecord, 'id' | 'created_at' | 'employees'>) => {
+  const { data, error } = await supabase
+    .from('leave_records')
+    .insert([leave])
+    .select()
+    .single();
+  
+  if (error) throw error;
+  
+  // ... existing balance update logic ...
+  
+  // MANDATORY: Send email notification to HR
+  if (data?.id) {
+    const { error: notifyError } = await supabase.functions.invoke('send-leave-request-notification', {
+      body: { leave_id: data.id }
+    });
+    
+    if (notifyError) {
+      console.error('Failed to notify HR:', notifyError);
+      // Continue - don't fail the entire request, but log it
+    }
+  }
+  
+  return data;
+},
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ 📩 NEW LEAVE REQUEST                                        │
-│                                                             │
-│ From: Mark John J. Ramirez                                  │
-│ HRMS No: HRMS NO. 0015                                      │
-│ Department: Finance                                         │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│ 📋 Leave Details                                            │
-├─────────────────────────────────────────────────────────────┤
-│ Type:        Sick Leave                                     │
-│ Duration:    Jan 27, 2026 (1 day)                          │
-│ Reason:      Fever                                          │
-│                                                             │
-│ ⏱️ Submitted: Jan 26, 2026 at 6:44 PM                       │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│ 📎 ATTACHMENT                                               │
-│                                                             │
-│ [View/Download Attachment]  ← Clickable button              │
-└─────────────────────────────────────────────────────────────┘
-
-Please review and approve/reject this request in the HRMS portal.
 
 ---
-MABDC HR System
+
+### 3. Update `src/hooks/useAttendanceAppeals.ts` - Add HR Notification on Submit
+
+**Current `useAddAttendanceAppeal` (Line 50-69):**
+```typescript
+export function useAddAttendanceAppeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (appeal: ...) => {
+      const { data, error } = await supabase
+        .from('attendance_appeals')
+        .insert([{ ...appeal, status: 'Pending' }])
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance_appeals'] });
+      toast.success('Appeal submitted successfully');
+    },
+    // ...
+  });
+}
+```
+
+**Updated (Add HR notification in mutationFn):**
+```typescript
+mutationFn: async (appeal: ...) => {
+  const { data, error } = await supabase
+    .from('attendance_appeals')
+    .insert([{ ...appeal, status: 'Pending' }])
+    .select()
+    .single();
+  if (error) throw error;
+  
+  // MANDATORY: Send email notification to HR about new appeal
+  if (data?.id) {
+    const { error: notifyError } = await supabase.functions.invoke('send-appeal-request-notification', {
+      body: { appeal_id: data.id }
+    });
+    
+    if (notifyError) {
+      console.error('Failed to notify HR of appeal:', notifyError);
+    }
+  }
+  
+  return data;
+},
+```
+
+---
+
+### 4. Update `supabase/config.toml`
+
+Add configuration for the new function:
+```toml
+[functions.send-appeal-request-notification]
+verify_jwt = false
 ```
 
 ---
@@ -119,57 +164,78 @@ MABDC HR System
 
 | File | Action | Description |
 |------|--------|-------------|
-| `supabase/functions/send-leave-request-notification/index.ts` | **Create** | Edge function to email HR on new leave requests with attachments |
-| `supabase/config.toml` | Modify | Add function configuration |
-| `src/hooks/useLeave.ts` | Modify | Add edge function call in `useAddLeave.onSuccess` |
+| `supabase/functions/send-appeal-request-notification/index.ts` | **Create** | New edge function to email HR on appeal submission |
+| `supabase/config.toml` | Modify | Add new function configuration |
+| `src/hooks/useLeave.ts` | Modify | Move notification to mutationFn with await |
+| `src/hooks/useAttendanceAppeals.ts` | Modify | Add HR notification on appeal submission |
 
 ---
 
-## Technical Flow
+## Email Flow After Implementation
 
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ LEAVE REQUEST FLOW                                          │
+├─────────────────────────────────────────────────────────────┤
+│ Employee submits leave request                              │
+│         │                                                   │
+│         ▼                                                   │
+│ Database insert successful                                  │
+│         │                                                   │
+│         ▼                                                   │
+│ AWAIT supabase.functions.invoke('send-leave-request-...')   │
+│         │                                                   │
+│         ▼                                                   │
+│ HR receives: "📩 New Leave Request: Dennis Sotto"           │
+│   - Employee info                                           │
+│   - Leave details + reason                                  │
+│   - Attachment link (if any)                                │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ APPEAL SUBMISSION FLOW (NEW)                                │
+├─────────────────────────────────────────────────────────────┤
+│ Employee submits attendance appeal                          │
+│         │                                                   │
+│         ▼                                                   │
+│ Database insert successful                                  │
+│         │                                                   │
+│         ▼                                                   │
+│ AWAIT supabase.functions.invoke('send-appeal-request-...')  │
+│         │                                                   │
+│         ▼                                                   │
+│ HR receives: "📩 New Attendance Appeal: Dennis Sotto"       │
+│   - Employee info                                           │
+│   - Appeal date + requested times                           │
+│   - Appeal message                                          │
+└─────────────────────────────────────────────────────────────┘
 ```
-Employee Submits Leave Request
-         │
-         ▼
-LeaveRequestModal.handleSubmit()
-         │
-         ├── Upload attachment to 'leave-attachments' bucket
-         │
-         └── addLeave.mutate({ ..., attachment_url })
-                  │
-                  ▼
-         Database Insert ✓
-                  │
-                  ▼
-         onSuccess callback
-                  │
-                  ▼
-         supabase.functions.invoke('send-leave-request-notification')
-                  │
-                  ▼
-         Edge Function:
-           1. Fetch leave record (incl. attachment_url)
-           2. Fetch employee details
-           3. Get HR email from HR_NOTIFICATION_EMAIL
-           4. Send email with attachment link
-                  │
-                  ▼
-         HR receives email:
-           - Employee info
-           - Leave details
-           - Attachment link (if any)
-           - Request timestamp
-```
+
+---
+
+## Technical Details
+
+### Email Configuration (Same as Working Payslip System)
+| Setting | Source |
+|---------|--------|
+| From Email | `SMTP_FROM_EMAIL` (verified domain) |
+| To Email | `HR_NOTIFICATION_EMAIL` |
+| API | Resend via `RESEND_API_KEY` |
+
+### Key Pattern Change
+| Before | After |
+|--------|-------|
+| Fire-and-forget with `.catch()` | `await` with proper error handling |
+| Silent failures | Logged errors (continue flow) |
+| No confirmation | Mandatory execution |
 
 ---
 
 ## Summary
 
-| Feature | Description |
-|---------|-------------|
-| Trigger | When employee submits leave request |
-| Recipient | HR email from `HR_NOTIFICATION_EMAIL` |
-| Content | Employee info, leave details, reason, timestamps |
-| Attachment | Included as clickable link/button in email |
-| Email Service | Resend API (same as other notifications) |
-| Error Handling | Non-blocking - leave request still succeeds if email fails |
+| Issue | Solution |
+|-------|----------|
+| Leave request notifications not reaching HR | Move invocation inside `mutationFn` with `await` |
+| Appeal submissions not notifying HR | Create new edge function + trigger on submit |
+| Silent error handling | Replace `.catch()` with `await` + error logging |
+| No email logs | Proper logging + email_history tracking |
