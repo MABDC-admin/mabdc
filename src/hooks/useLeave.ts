@@ -306,6 +306,17 @@ export function useUpdateLeaveStatus() {
       queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
       queryClient.invalidateQueries({ queryKey: ['all_leave_balances'] });
       toast.success(`Leave request ${variables.status.toLowerCase()}`);
+      
+      // Send email notification to employee
+      if (variables.status === 'Approved' || variables.status === 'Rejected') {
+        supabase.functions.invoke('send-leave-decision-notification', {
+          body: {
+            leave_id: variables.id,
+            status: variables.status,
+            rejection_reason: variables.rejection_reason
+          }
+        }).catch(err => console.error('Failed to send leave notification:', err));
+      }
     },
     onError: (error: Error) => {
       toast.error(`Failed to update leave: ${error.message}`);
