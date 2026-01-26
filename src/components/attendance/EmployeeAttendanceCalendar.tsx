@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Download, Grid3X3 } from 'lucide-react';
+import { ArrowLeft, Download, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, isSameDay, isWithinInterval } from 'date-fns';
 import { useAttendance } from '@/hooks/useAttendance';
@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AttendanceDetailModal } from './AttendanceDetailModal';
 import { AttendanceAppealModal } from './AttendanceAppealModal';
-import { AttendanceMatrixView } from './AttendanceMatrixView';
+
 import { MonthlyMatrixView } from './MonthlyMatrixView';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
@@ -45,7 +45,7 @@ export function EmployeeAttendanceCalendar({
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAppealModal, setShowAppealModal] = useState(false);
-  const [showMatrixView, setShowMatrixView] = useState(false);
+  
   const [showMonthlyMatrixView, setShowMonthlyMatrixView] = useState(false);
   
   const { data: allAttendance = [] } = useAttendance();
@@ -461,10 +461,6 @@ export function EmployeeAttendanceCalendar({
     toast.success('PDF generated successfully');
   };
 
-  // Show Matrix View if toggled
-  if (showMatrixView && !isEmployeePortal) {
-    return <AttendanceMatrixView onBack={() => setShowMatrixView(false)} />;
-  }
 
   // Show Monthly Matrix View if toggled
   if (showMonthlyMatrixView && !isEmployeePortal) {
@@ -535,23 +531,15 @@ export function EmployeeAttendanceCalendar({
         </Card>
       </div>
 
-      {/* Matrix View Buttons - Only for HR */}
+      {/* Matrix View Button - Only for HR */}
       {showEmployeeSelector && !isEmployeePortal && (
         <div className="flex flex-wrap gap-2">
-          <Button 
-            variant="default" 
-            onClick={() => setShowMatrixView(true)}
-            className="w-full md:w-auto"
-          >
-            <Grid3X3 className="w-4 h-4 mr-2" />
-            Matrix View - All Employees
-          </Button>
           <Button 
             variant="outline" 
             onClick={() => setShowMonthlyMatrixView(true)}
             className="w-full md:w-auto"
           >
-            <Grid3X3 className="w-4 h-4 mr-2" />
+            <Calendar className="w-4 h-4 mr-2" />
             Monthly Matrix View
           </Button>
         </div>

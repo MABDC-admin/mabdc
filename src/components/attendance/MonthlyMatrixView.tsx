@@ -33,6 +33,7 @@ const STATUS_TO_DB: Record<string, string> = {
   'HDSL': 'Half Day Sick Leave',
   'DO': 'Day Off',
   'L': 'Late',
+  'LOP': 'Loss of Pay',
   '-': 'No Record',
 };
 
@@ -53,10 +54,10 @@ const STATUS_CONFIG = {
   SL: { label: 'SL', name: 'Sick Leave', bg: 'bg-lime-400', text: 'text-lime-900', pdfBg: [163, 230, 53] },
   SB: { label: 'SB', name: 'Spring Break', bg: 'bg-violet-400', text: 'text-violet-900', pdfBg: [167, 139, 250] },
   WB: { label: 'WB', name: 'Winter Break', bg: 'bg-violet-400', text: 'text-violet-900', pdfBg: [167, 139, 250] },
+  LOP: { label: 'LOP', name: 'Loss of Pay', bg: 'bg-rose-400', text: 'text-rose-900', pdfBg: [251, 113, 133] },
   HDA: { label: 'HDA', name: 'Half Day Absent', bg: 'bg-pink-400', text: 'text-pink-900', pdfBg: [244, 114, 182] },
   HDSL: { label: 'HDSL', name: 'Half Day Sick Leave', bg: 'bg-lime-400', text: 'text-lime-900', pdfBg: [163, 230, 53] },
   PH: { label: 'PH', name: 'Public Holiday', bg: 'bg-cyan-300', text: 'text-cyan-800', pdfBg: [103, 232, 249] },
-  AP: { label: 'AP', name: 'Appealed', bg: 'bg-cyan-400', text: 'text-cyan-900', pdfBg: [34, 211, 238] },
   MP: { label: 'MP', name: 'Missed Punch', bg: 'bg-orange-500', text: 'text-white', pdfBg: [249, 115, 22] },
   UT: { label: 'UT', name: 'Undertime', bg: 'bg-purple-400', text: 'text-purple-900', pdfBg: [192, 132, 252] },
   '-': { label: '-', name: 'No Record', bg: 'bg-gray-200', text: 'text-gray-600', pdfBg: [229, 231, 235] },
@@ -65,7 +66,7 @@ const STATUS_CONFIG = {
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // Editable statuses for the dropdown
-const EDITABLE_STATUSES = ['-', 'A', 'PH', 'P', 'L', 'SL', 'HDSL', 'VL', 'M', 'SB', 'WB', 'HDA', 'DO'] as const;
+const EDITABLE_STATUSES = ['-', 'A', 'PH', 'P', 'L', 'SL', 'HDSL', 'VL', 'M', 'SB', 'WB', 'LOP', 'HDA', 'DO'] as const;
 
 // Legend items for the header bar
 const LEGEND_ITEMS = [
@@ -74,10 +75,13 @@ const LEGEND_ITEMS = [
   { code: 'A', color: 'bg-red-500' },
   { code: 'VL', color: 'bg-blue-500', label: 'On Leave' },
   { code: 'M', color: 'bg-pink-500', label: 'Maternity' },
+  { code: 'SL', color: 'bg-lime-400', label: 'Sick' },
+  { code: 'LOP', color: 'bg-rose-400', label: 'Loss of Pay' },
+  { code: 'SB', color: 'bg-violet-400', label: 'Spring Break' },
+  { code: 'WB', color: 'bg-violet-400', label: 'Winter Break' },
   { code: 'W', color: 'bg-slate-200' },
   { code: 'DO', color: 'bg-purple-400', label: 'Day Off' },
   { code: 'H', color: 'bg-orange-400', label: 'Half Day' },
-  { code: 'AP', color: 'bg-cyan-400', label: 'Appealed' },
   { code: 'MP', color: 'bg-orange-500', label: 'Missed Punch' },
   { code: 'UT', color: 'bg-purple-400', label: 'Undertime' },
 ];
@@ -210,6 +214,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       if (leaveType.includes('maternity')) return 'M';
       if (leaveType.includes('spring')) return 'SB';
       if (leaveType.includes('winter')) return 'WB';
+      if (leaveType.includes('loss') || leaveType.includes('lop')) return 'LOP';
       if (leaveType.includes('day off')) return 'DO';
       return 'VL'; // Default to vacation leave for other approved leaves
     }
@@ -241,8 +246,8 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     // Map attendance status - check DB status FIRST before raw punch data
     const status = attendance.status?.toLowerCase() || '';
     
-    // Appealed - Cyan
-    if (status === 'appealed') return 'AP';
+    // Appealed - Show as Present (approved appeal = Present)
+    if (status === 'appealed') return 'P';
     
     // Missed Punch statuses - Orange
     if (status.includes('miss punch') || status === 'missed punch') return 'MP';
