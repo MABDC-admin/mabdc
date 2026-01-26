@@ -324,10 +324,13 @@ serve(async (req: Request) => {
     // Send email via Resend
     const hrEmail = Deno.env.get("HR_NOTIFICATION_EMAIL") || "myranelsotto@gmail.com";
     
+    // Get the from email - use SMTP_FROM_EMAIL if set, otherwise use Resend's test domain
+    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "onboarding@resend.dev";
+    
     console.log(`Sending email to: ${hrEmail}`);
 
     const emailResponse = await resend.emails.send({
-      from: "MABDC HRMS <noreply@resend.dev>",
+      from: `MABDC HRMS <${fromEmail}>`,
       to: [hrEmail.toLowerCase().trim()],
       subject: emailSubject,
       html: emailHtml,
