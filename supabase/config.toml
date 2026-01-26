@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.reset-employee-account]
 verify_jwt = false
+
+[functions.send-absent-notification]
+verify_jwt = false
