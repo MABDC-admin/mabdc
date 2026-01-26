@@ -1,63 +1,19 @@
 
-# Plan: Fix Email Sending for Leave/Appeal Decision Notifications
+# Plan: Add HR Email as CC on Leave/Appeal Decision Notifications
 
-## Problem Identified
+## Summary
 
-The Edge Function logs clearly show the error:
-
-```
-You can only send testing emails to your own email address (stfxsa2024@gmail.com). 
-To send emails to other recipients, please verify a domain at resend.com/domains, 
-and change the `from` address to an email using this domain.
-```
-
-**Root Cause:** Both `send-leave-decision-notification` and `send-appeal-decision-notification` are using the hardcoded test sender:
-```typescript
-from: "MABDC HRMS <onboarding@resend.dev>"
-```
-
-This only allows sending to `stfxsa2024@gmail.com` (the Resend account owner).
+When sending approval/rejection emails to employees, HR will also receive a copy (CC) as confirmation that the notification was sent successfully.
 
 ---
 
-## Why Payslip Emails Work
+## Implementation Details
 
-The `send-payslip-email` function correctly uses the verified domain:
+### 1. Update `send-leave-decision-notification/index.ts`
+
+**Current Code (Lines 234-240):**
 ```typescript
-const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "onboarding@resend.dev";
-
-await resend.emails.send({
-  from: `${companyName} <${fromEmail}>`,
-  to: [employeeEmail],
-  // ...
-});
-```
-
-The `SMTP_FROM_EMAIL` secret contains a verified domain email that can send to any recipient.
-
----
-
-## Solution
-
-Update both edge functions to use `SMTP_FROM_EMAIL` instead of the hardcoded test address.
-
-### 1. Fix `send-leave-decision-notification/index.ts`
-
-**Current (Line 232-237):**
-```typescript
-const emailResponse = await resend.emails.send({
-  from: "MABDC HRMS <onboarding@resend.dev>",
-  to: [recipientEmail],
-  subject: subject,
-  html: emailHtml,
-});
-```
-
-**Fixed:**
-```typescript
-// Get the from email - use SMTP_FROM_EMAIL if set, otherwise fallback
-const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "onboarding@resend.dev";
-
+// Send email via Resend
 const emailResponse = await resend.emails.send({
   from: `MABDC HRMS <${fromEmail}>`,
   to: [recipientEmail],
@@ -66,25 +22,28 @@ const emailResponse = await resend.emails.send({
 });
 ```
 
----
-
-### 2. Fix `send-appeal-decision-notification/index.ts`
-
-**Current (Line 233-238):**
+**Updated Code:**
 ```typescript
+// Get HR email for CC
+const hrEmail = Deno.env.get("HR_NOTIFICATION_EMAIL");
+
+// Send email via Resend
 const emailResponse = await resend.emails.send({
-  from: "MABDC HRMS <onboarding@resend.dev>",
+  from: `MABDC HRMS <${fromEmail}>`,
   to: [recipientEmail],
+  cc: hrEmail ? [hrEmail] : undefined,  // CC HR for confirmation
   subject: subject,
   html: emailHtml,
 });
 ```
 
-**Fixed:**
-```typescript
-// Get the from email - use SMTP_FROM_EMAIL if set, otherwise fallback
-const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "onboarding@resend.dev";
+---
 
+### 2. Update `send-appeal-decision-notification/index.ts`
+
+**Current Code (Lines 235-241):**
+```typescript
+// Send email via Resend
 const emailResponse = await resend.emails.send({
   from: `MABDC HRMS <${fromEmail}>`,
   to: [recipientEmail],
@@ -92,6 +51,31 @@ const emailResponse = await resend.emails.send({
   html: emailHtml,
 });
 ```
+
+**Updated Code:**
+```typescript
+// Get HR email for CC
+const hrEmail = Deno.env.get("HR_NOTIFICATION_EMAIL");
+
+// Send email via Resend
+const emailResponse = await resend.emails.send({
+  from: `MABDC HRMS <${fromEmail}>`,
+  to: [recipientEmail],
+  cc: hrEmail ? [hrEmail] : undefined,  // CC HR for confirmation
+  subject: subject,
+  html: emailHtml,
+});
+```
+
+---
+
+## How It Works
+
+| Field | Value |
+|-------|-------|
+| **To** | Employee's work email (e.g., `ramirezmarkjohn@gmail.com`) |
+| **CC** | HR email from `HR_NOTIFICATION_EMAIL` secret (`myranelsotto@gmail.com`) |
+| **From** | `MABDC HRMS <{SMTP_FROM_EMAIL}>` |
 
 ---
 
@@ -99,23 +83,32 @@ const emailResponse = await resend.emails.send({
 
 | File | Change |
 |------|--------|
-| `supabase/functions/send-leave-decision-notification/index.ts` | Use `SMTP_FROM_EMAIL` for sender |
-| `supabase/functions/send-appeal-decision-notification/index.ts` | Use `SMTP_FROM_EMAIL` for sender |
+| `supabase/functions/send-leave-decision-notification/index.ts` | Add `cc` field with HR email |
+| `supabase/functions/send-appeal-decision-notification/index.ts` | Add `cc` field with HR email |
 
 ---
 
-## Testing After Fix
+## Email Flow After Implementation
 
-1. Deploy the updated edge functions
-2. Approve one of the pending leave requests from the Admin Dashboard
-3. Verify the email is received by the employee (e.g., `ramirezmarkjohn@gmail.com`)
+```
+HR Approves Leave Request
+         │
+         ▼
+Email Sent via Resend
+  To: ramirezmarkjohn@gmail.com (Employee)
+  CC: myranelsotto@gmail.com (HR - confirmation copy)
+         │
+         ├──► Employee receives: "✅ Leave Approved: Sick Leave"
+         │
+         └──► HR receives same email as CC (confirmation)
+```
 
 ---
 
 ## Summary
 
-| Issue | The sender email was hardcoded to `onboarding@resend.dev` |
-|-------|----------------------------------------------------------|
-| Effect | Resend blocks sending to external recipients with test domain |
-| Solution | Use `SMTP_FROM_EMAIL` environment variable (verified domain) |
-| Pattern | Same approach as the working `send-payslip-email` function |
+| Feature | Description |
+|---------|-------------|
+| CC Recipient | HR email from `HR_NOTIFICATION_EMAIL` secret |
+| Purpose | HR receives confirmation that approval/rejection email was sent |
+| Fallback | If `HR_NOTIFICATION_EMAIL` not set, CC is omitted (email still sent to employee) |
