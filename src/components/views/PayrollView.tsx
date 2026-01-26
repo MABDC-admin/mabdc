@@ -196,9 +196,15 @@ export function PayrollView() {
     setBulkGenerating(true);
     let successCount = 0;
     let errorCount = 0;
+    let ticketIncludedCount = 0;
 
     for (const emp of employeesWithoutPayroll) {
       const contract = contracts.find(c => c.employee_id === emp.id && c.status === 'Active');
+      
+      // Check for approved ticket allowance for this employee
+      const ticketAllowance = approvedTicketAllowances.find(t => t.employee_id === emp.id);
+      const ticketAmount = ticketAllowance?.amount || 0;
+      
       const basicSalary = contract?.basic_salary || emp.basic_salary || 0;
       const housingAllowance = contract?.housing_allowance || 0;
       const transportAllowance = contract?.transportation_allowance || 0;
@@ -211,11 +217,15 @@ export function PayrollView() {
           basicSalary,
           housingAllowance,
           transportationAllowance: transportAllowance,
+          ticketAllowance: ticketAmount,
           otherAllowances,
           deductions: 0,
           deductionReason: '',
         });
         successCount++;
+        if (ticketAmount > 0) {
+          ticketIncludedCount++;
+        }
       } catch (error) {
         console.error(`Failed to generate payroll for ${emp.full_name}:`, error);
         errorCount++;
@@ -226,7 +236,8 @@ export function PayrollView() {
     setIsBulkGenerateOpen(false);
     
     if (successCount > 0) {
-      toast.success(`Generated payroll for ${successCount} employees. You can now edit each record to add deductions.`);
+      const ticketMsg = ticketIncludedCount > 0 ? ` (${ticketIncludedCount} with ticket allowance)` : '';
+      toast.success(`Generated payroll for ${successCount} employees${ticketMsg}. You can now edit each record to add deductions.`);
     }
     if (errorCount > 0) {
       toast.error(`Failed to generate payroll for ${errorCount} employees`);
@@ -765,9 +776,23 @@ export function PayrollView() {
                         <p className="text-[10px] uppercase text-muted-foreground">Basic Salary</p>
                         <p className="text-sm font-medium text-foreground">AED {record.basic_salary?.toLocaleString()}</p>
                       </div>
-                      <div>
+                      <div className="group relative">
                         <p className="text-[10px] uppercase text-muted-foreground">Allowances</p>
-                        <p className="text-sm font-medium text-primary">+{record.allowances?.toLocaleString()}</p>
+                        <p className="text-sm font-medium text-primary cursor-help">+{record.allowances?.toLocaleString()}</p>
+                        {/* Allowance Breakdown Tooltip */}
+                        <div className="absolute z-20 hidden group-hover:block bg-popover border border-border rounded-lg p-3 shadow-lg text-xs w-52 top-full left-0 mt-1">
+                          <p className="font-semibold text-foreground mb-2 border-b border-border pb-1">Allowance Breakdown</p>
+                          <div className="space-y-1.5">
+                            <p className="flex justify-between"><span className="text-muted-foreground">Housing:</span> <span className="font-medium">AED {(record.housing_allowance || 0).toLocaleString()}</span></p>
+                            <p className="flex justify-between"><span className="text-muted-foreground">Transport:</span> <span className="font-medium">AED {(record.transportation_allowance || 0).toLocaleString()}</span></p>
+                            {(record.ticket_allowance || 0) > 0 && (
+                              <p className="flex justify-between text-blue-600"><span>Ticket:</span> <span className="font-medium">AED {record.ticket_allowance?.toLocaleString()}</span></p>
+                            )}
+                            {(record.other_allowances || 0) > 0 && (
+                              <p className="flex justify-between"><span className="text-muted-foreground">Other:</span> <span className="font-medium">AED {record.other_allowances?.toLocaleString()}</span></p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                       <div>
                         <p className="text-[10px] uppercase text-muted-foreground">Deductions</p>
@@ -785,6 +810,14 @@ export function PayrollView() {
                         </div>
                       </div>
                     </div>
+                    {/* Ticket Allowance Badge */}
+                    {(record.ticket_allowance || 0) > 0 && (
+                      <div className="mt-2">
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/30 inline-flex items-center gap-1">
+                          <Plane className="w-3 h-3" /> Ticket Allowance +AED {record.ticket_allowance?.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap">
                     <Button 

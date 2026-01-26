@@ -617,7 +617,7 @@ function formatCurrency(amount: number, currency: string = 'AED'): string {
 }
 
 function getEarningsBreakdown(record: PayrollRecord): Array<{ label: string; amount: number }> {
-  // If we have itemized earnings from the database, use those
+  // PRIORITY 1: If we have itemized earnings from the database, use those
   if (record.payroll_earnings && record.payroll_earnings.length > 0) {
     return record.payroll_earnings.map(e => ({
       label: formatEarningLabel(e.earning_type),
@@ -625,47 +625,43 @@ function getEarningsBreakdown(record: PayrollRecord): Array<{ label: string; amo
     }));
   }
   
-  // Otherwise, use the stored breakdown or calculate from totals
+  // PRIORITY 2: Use stored breakdown fields (housing_allowance, transportation_allowance, etc.)
   const earnings: Array<{ label: string; amount: number }> = [];
   
   if (record.basic_salary > 0) {
     earnings.push({ label: 'Basic Salary', amount: record.basic_salary });
   }
   
-  if (record.housing_allowance && record.housing_allowance > 0) {
-    earnings.push({ label: 'Housing Rental Allowance', amount: record.housing_allowance });
-  }
+  // Check if we have any itemized allowance fields stored
+  const hasItemizedAllowances = 
+    (record.housing_allowance && record.housing_allowance > 0) ||
+    (record.transportation_allowance && record.transportation_allowance > 0) ||
+    (record.ticket_allowance && record.ticket_allowance > 0) ||
+    (record.other_allowances && record.other_allowances > 0);
   
-  if (record.transportation_allowance && record.transportation_allowance > 0) {
-    earnings.push({ label: 'Transportation Allowance', amount: record.transportation_allowance });
-  }
-  
-  if (record.ticket_allowance && record.ticket_allowance > 0) {
-    earnings.push({ label: 'Ticket Allowance', amount: record.ticket_allowance });
-  }
-  
-  if (record.other_allowances && record.other_allowances > 0) {
-    earnings.push({ label: 'Other Allowances', amount: record.other_allowances });
-  }
-  
-  // If no breakdown available, estimate from totals
-  if (earnings.length === 0 || (earnings.length === 1 && record.allowances > 0)) {
-    const basicSalary = record.basic_salary || 0;
-    const allowances = record.allowances || 0;
-    
-    earnings.length = 0; // Clear
-    earnings.push({ label: 'Basic Salary', amount: basicSalary });
-    
-    if (allowances > 0) {
-      // Estimate typical UAE breakdown: 60% housing, 25% transport, 15% other
-      const housing = Math.round(allowances * 0.60);
-      const transport = Math.round(allowances * 0.25);
-      const other = allowances - housing - transport;
-      
-      if (housing > 0) earnings.push({ label: 'Housing Rental Allowance', amount: housing });
-      if (transport > 0) earnings.push({ label: 'Transportation Allowance', amount: transport });
-      if (other > 0) earnings.push({ label: 'Other Allowances', amount: other });
+  if (hasItemizedAllowances) {
+    if (record.housing_allowance && record.housing_allowance > 0) {
+      earnings.push({ label: 'Housing Rental Allowance', amount: record.housing_allowance });
     }
+    
+    if (record.transportation_allowance && record.transportation_allowance > 0) {
+      earnings.push({ label: 'Transportation Allowance', amount: record.transportation_allowance });
+    }
+    
+    if (record.ticket_allowance && record.ticket_allowance > 0) {
+      earnings.push({ label: 'Ticket Allowance (Annual)', amount: record.ticket_allowance });
+    }
+    
+    if (record.other_allowances && record.other_allowances > 0) {
+      earnings.push({ label: 'Other Allowances', amount: record.other_allowances });
+    }
+    
+    return earnings;
+  }
+  
+  // PRIORITY 3: Fallback - show combined allowances for legacy records without breakdown
+  if (record.allowances > 0) {
+    earnings.push({ label: 'Allowances (Combined)', amount: record.allowances });
   }
   
   return earnings;
