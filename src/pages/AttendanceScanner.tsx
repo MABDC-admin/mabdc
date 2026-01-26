@@ -75,11 +75,7 @@ export default function AttendanceScanner() {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-refresh attendance every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => refetch(), 30000);
-    return () => clearInterval(interval);
-  }, [refetch]);
+  // Note: Removed redundant 30-second polling - realtime subscriptions handle updates
 
   // Cleanup timeouts on unmount
   useEffect(() => {

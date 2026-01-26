@@ -172,8 +172,18 @@ export function useCheckInByHRMS() {
       const now = new Date();
       const checkInTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       
-      // Get employee's assigned shift times
-      const shiftTimes = await getEmployeeShiftTimes(employee.id, today);
+      // Run shift lookup and attendance check in parallel for better performance
+      const [shiftTimes, existingResult] = await Promise.all([
+        getEmployeeShiftTimes(employee.id, today),
+        supabase
+          .from('attendance')
+          .select('id, check_out')
+          .eq('employee_id', employee.id)
+          .eq('date', today)
+          .maybeSingle()
+      ]);
+      
+      const existing = existingResult.data;
       
       // Validate check-in is within allowed window (before shift end time)
       if (!isWithinCheckInWindow(now, shiftTimes.end)) {
@@ -183,14 +193,6 @@ export function useCheckInByHRMS() {
           `Please contact HR if you need to record attendance for today.`
         );
       }
-      
-      // Check if already checked in today
-      const { data: existing } = await supabase
-        .from('attendance')
-        .select('id, check_out')
-        .eq('employee_id', employee.id)
-        .eq('date', today)
-        .maybeSingle();
       
       if (existing) {
         if (!existing.check_out) {
@@ -257,21 +259,24 @@ export function useCheckOutByHRMS() {
       const now = new Date();
       const checkOutTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       
-      // Find today's attendance record
-      const { data: attendance, error: attError } = await supabase
-        .from('attendance')
-        .select('id, check_out, check_in, status')
-        .eq('employee_id', employee.id)
-        .eq('date', today)
-        .maybeSingle();
+      // Run attendance lookup and shift times check in parallel for better performance
+      const [attendanceResult, shiftTimes] = await Promise.all([
+        supabase
+          .from('attendance')
+          .select('id, check_out, check_in, status')
+          .eq('employee_id', employee.id)
+          .eq('date', today)
+          .maybeSingle(),
+        getEmployeeShiftTimes(employee.id, today)
+      ]);
       
+      const { data: attendance, error: attError } = attendanceResult;
       if (attError) throw attError;
       
       // If already checked out, prevent double checkout
       if (attendance?.check_out) throw new Error(`${employee.full_name} already checked out`);
       
-      // Get employee's shift end time for today and check if undertime
-      const shiftTimes = await getEmployeeShiftTimes(employee.id, today);
+      // Check if undertime based on shift end time
       const isUndertime = isUndertimeForShift(now, shiftTimes.end);
       
       // If no attendance record exists (no check-in), create one with miss_punch_in status
