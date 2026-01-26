@@ -1,259 +1,129 @@
 
-# Plan: Fix Payroll Discrepancies and Enhance Payslip Breakdown
 
-## Issues Identified
+# Plan: Reset Payroll System and Fix Bulk Generation
 
-### Issue 1: Payroll Salary Mismatch with Contracts
+## Current Issues Identified
 
-**Evidence from Database:**
-| Employee | Contract Housing | Contract Transport | Payroll Housing | Payroll Transport | Status |
-|----------|-----------------|-------------------|-----------------|-------------------|--------|
-| Aimee June A. Alolor | 1,000 | 700 | 0 | 0 | MISMATCH (Dec-2025) |
-| Arianne Kaye N. Sager | 1,000 | 700 | 0 | 0 | MISMATCH (Dec-2025) |
-| Christine Mari M. Jonson | 800 | 400 | 0 | 0 | MISMATCH (Dec-2025) |
-| Dennis P. Sotto | 1,000 | 700 | 0 | 0 | MISMATCH (Dec-2025) |
+Based on database analysis:
 
-**Root Cause**: The December 2025 payroll was generated **before** the payroll system was updated to pull itemized allowances from contracts. The older records only have a combined `allowances` field with no breakdown stored.
+| Issue | Details |
+|-------|---------|
+| **Discrepancy #1: `other_allowances` duplication** | Bulk generate uses `emp.allowance` (line 211) which adds 1700 AED to some employees on TOP of housing/transport from contracts |
+| **Discrepancy #2: Ticket auto-included** | Lines 205-206: Ticket allowance is automatically included for ALL employees with approved ticket - user wants this OPTIONAL |
+| **Discrepancy #3: Inconsistent totals** | Some have 4700, some 6400, some 1200 - due to mixing of sources |
+| **Email History to Clean** | 9 payslip emails sent that need clearing |
+| **Payroll Records to Delete** | 31 payroll records + 61 earnings entries |
 
-**January 2026 payroll is CORRECT** - the bulk generate now properly pulls housing and transportation from contracts.
-
----
-
-### Issue 2: Missing Payroll Earnings Breakdown
-
-**Evidence:**
-- December 2025 records have **NO** entries in `payroll_earnings` table
-- January 2026 records have **PROPER** itemized earnings (basic_salary, housing_allowance, transport_allowance)
-
-When payslip PDF is generated for December records, the `getEarningsBreakdown()` function falls back to **estimation** (60% housing, 25% transport, 15% other) instead of showing actual breakdown.
-
----
-
-### Issue 3: Ticket Allowance Not Included in Payroll
-
-**Evidence:**
+### Evidence from Database:
 ```
-| Employee | Ticket Status | Ticket Amount | Payroll Ticket |
-|----------|--------------|---------------|----------------|
-| Aimee June A. Alolor | approved | 3,000 | 0 |
-| Antonio | approved | 3,000 | 0 |
-| Arianne Kaye N. Sager | approved | 3,000 | 0 |
-(32+ employees with approved ticket allowance, all showing 0 in payroll)
+Arianne Kaye N. Sager: AED 6400 total (housing 1000 + transport 700 + ticket 3000 + other 1700)
+Aimee June A. Alolor: AED 4700 total (housing 1000 + transport 700 + ticket 3000 + other 0)
 ```
 
-**Root Cause**: 
-1. When using "Bulk Generate", ticket allowance is NOT automatically included
-2. The `handleBulkGenerate` function (lines 190-234) does not check for approved ticket allowances
-3. Only "Single Generate" form shows the ticket allowance option
+The `other_allowances: 1700` comes from `emp.allowance` field which is a legacy/fallback field that should NOT be used when contract values exist.
 
 ---
 
-### Issue 4: Payslip Doesn't Show Ticket Allowance Breakdown
+## Solution: Reset and Fix
 
-Even when ticket allowance IS included, the payslip PDF shows a generic "Ticket Allowance Status" box at the bottom, but doesn't clearly show the amount in the earnings table breakdown if it was part of the payroll.
+### Step 1: Delete All Payroll Data (Clean Slate)
 
----
+Execute SQL to delete all payroll-related data:
 
-## Solution Overview
+```sql
+-- Delete payroll earnings first (foreign key)
+DELETE FROM payroll_earnings;
 
-### Part 1: Fix Bulk Payroll Generation to Include Ticket Allowance
+-- Delete payroll deductions  
+DELETE FROM payroll_deductions;
+
+-- Delete all payroll records
+DELETE FROM payroll;
+
+-- Clear email history for payslips
+DELETE FROM email_history WHERE email_type = 'payslip';
+```
+
+### Step 2: Fix Bulk Generate Logic
 
 **File: `src/components/views/PayrollView.tsx`**
 
-Update `handleBulkGenerate()` to check for approved ticket allowances:
+**Problem in current code (lines 201-224):**
+```typescript
+const ticketAllowance = approvedTicketAllowances.find(...);
+const ticketAmount = ticketAllowance?.amount || 0;  // AUTO INCLUDED!
+const otherAllowances = emp.allowance || 0;  // DUPLICATES CONTRACT VALUES!
 
+await generatePayroll.mutateAsync({
+  ticketAllowance: ticketAmount,  // Always includes ticket
+  otherAllowances,  // Adds legacy field on top
+});
+```
+
+**Fixed logic:**
 ```typescript
 const handleBulkGenerate = async () => {
-  // ...existing code...
+  // ... existing checks ...
   
   for (const emp of employeesWithoutPayroll) {
     const contract = contracts.find(c => c.employee_id === emp.id && c.status === 'Active');
-    
-    // CHECK FOR APPROVED TICKET ALLOWANCE
-    const ticketAllowance = approvedTicketAllowances.find(t => t.employee_id === emp.id);
-    const ticketAmount = ticketAllowance?.amount || 0;
     
     const basicSalary = contract?.basic_salary || emp.basic_salary || 0;
     const housingAllowance = contract?.housing_allowance || 0;
     const transportAllowance = contract?.transportation_allowance || 0;
     
+    // FIX: Only use other_allowances if NO contract exists (fallback only)
+    const otherAllowances = contract ? 0 : (emp.allowance || 0);
+    
+    // FIX: Ticket allowance only if checkbox is checked (optional)
+    const ticketAmount = includeTicketInBulk 
+      ? (approvedTicketAllowances.find(t => t.employee_id === emp.id)?.amount || 0) 
+      : 0;
+
     await generatePayroll.mutateAsync({
       employeeId: emp.id,
       month: selectedMonth,
       basicSalary,
       housingAllowance,
       transportationAllowance: transportAllowance,
-      ticketAllowance: ticketAmount,  // NOW INCLUDED
-      otherAllowances: 0,
+      ticketAllowance: ticketAmount,
+      otherAllowances,
       deductions: 0,
       deductionReason: '',
     });
-    
-    // Mark ticket allowance as processed if included
-    if (ticketAllowance && ticketAmount > 0) {
-      await processTicketAllowance.mutateAsync({
-        id: ticketAllowance.id,
-        payrollId: payrollData.id
-      });
-    }
   }
 };
 ```
 
----
+### Step 3: Add Optional Ticket Allowance Checkbox to Bulk Generate Dialog
 
-### Part 2: Show Allowance Breakdown in Payroll List View
-
-**File: `src/components/views/PayrollView.tsx`**
-
-Update the payroll card to show itemized breakdown on hover or expand:
-
+Add state for the checkbox:
 ```typescript
-<div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-  <div>
-    <p className="text-[10px] uppercase text-muted-foreground">Basic Salary</p>
-    <p className="text-sm font-medium text-foreground">AED {record.basic_salary?.toLocaleString()}</p>
-  </div>
-  <div>
-    <p className="text-[10px] uppercase text-muted-foreground">Allowances</p>
-    <div className="group relative">
-      <p className="text-sm font-medium text-primary">+{record.allowances?.toLocaleString()}</p>
-      {/* Breakdown Tooltip */}
-      <div className="absolute z-10 hidden group-hover:block bg-popover border rounded-lg p-2 shadow-lg text-xs w-48 top-full left-0">
-        <p className="flex justify-between"><span>Housing:</span> <span>AED {record.housing_allowance?.toLocaleString() || 0}</span></p>
-        <p className="flex justify-between"><span>Transport:</span> <span>AED {record.transportation_allowance?.toLocaleString() || 0}</span></p>
-        {record.ticket_allowance > 0 && (
-          <p className="flex justify-between text-blue-500"><span>Ticket:</span> <span>AED {record.ticket_allowance?.toLocaleString()}</span></p>
-        )}
-        {record.other_allowances > 0 && (
-          <p className="flex justify-between"><span>Other:</span> <span>AED {record.other_allowances?.toLocaleString()}</span></p>
-        )}
+const [includeTicketInBulk, setIncludeTicketInBulk] = useState(false);
+```
+
+Add UI in the Bulk Generate Dialog (after the employee list, before the Note):
+```typescript
+{/* Optional: Include Ticket Allowance */}
+{approvedTicketAllowances.length > 0 && (
+  <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+    <Checkbox 
+      id="includeTicket"
+      checked={includeTicketInBulk}
+      onCheckedChange={(checked) => setIncludeTicketInBulk(!!checked)}
+    />
+    <label htmlFor="includeTicket" className="flex-1 text-sm cursor-pointer">
+      <div className="flex items-center gap-2">
+        <Plane className="w-4 h-4 text-blue-500" />
+        <span className="font-medium">Include Ticket Allowance</span>
       </div>
-    </div>
+      <p className="text-xs text-muted-foreground mt-0.5">
+        {approvedTicketAllowances.filter(t => 
+          employeesWithoutPayroll.some(e => e.id === t.employee_id)
+        ).length} employees eligible for ticket allowance this month
+      </p>
+    </label>
   </div>
-  {/* ...rest of grid... */}
-</div>
-```
-
----
-
-### Part 3: Improve Payslip PDF Earnings Breakdown
-
-**File: `src/utils/payrollPdf.ts`**
-
-The `getEarningsBreakdown()` function already handles itemized earnings correctly. However, when no `payroll_earnings` records exist, it estimates. 
-
-Update to always use the stored breakdown fields first:
-
-```typescript
-function getEarningsBreakdown(record: PayrollRecord): Array<{ label: string; amount: number }> {
-  // PRIORITY 1: Use itemized earnings from database if available
-  if (record.payroll_earnings && record.payroll_earnings.length > 0) {
-    return record.payroll_earnings.map(e => ({
-      label: formatEarningLabel(e.earning_type),
-      amount: e.amount
-    }));
-  }
-  
-  // PRIORITY 2: Use stored breakdown fields (housing_allowance, transportation_allowance, etc.)
-  const earnings: Array<{ label: string; amount: number }> = [];
-  
-  if (record.basic_salary > 0) {
-    earnings.push({ label: 'Basic Salary', amount: record.basic_salary });
-  }
-  
-  // Check for itemized allowance fields
-  const hasItemizedAllowances = (record.housing_allowance && record.housing_allowance > 0) ||
-                                 (record.transportation_allowance && record.transportation_allowance > 0) ||
-                                 (record.ticket_allowance && record.ticket_allowance > 0);
-  
-  if (hasItemizedAllowances) {
-    if (record.housing_allowance > 0) {
-      earnings.push({ label: 'Housing Rental Allowance', amount: record.housing_allowance });
-    }
-    if (record.transportation_allowance > 0) {
-      earnings.push({ label: 'Transportation Allowance', amount: record.transportation_allowance });
-    }
-    if (record.ticket_allowance > 0) {
-      earnings.push({ label: 'Ticket Allowance (Annual)', amount: record.ticket_allowance });
-    }
-    if (record.other_allowances > 0) {
-      earnings.push({ label: 'Other Allowances', amount: record.other_allowances });
-    }
-    return earnings;
-  }
-  
-  // PRIORITY 3: Fallback - estimate from total allowances (for legacy records)
-  if (record.allowances > 0) {
-    earnings.push({ label: 'Allowances (Combined)', amount: record.allowances });
-  }
-  
-  return earnings;
-}
-```
-
----
-
-### Part 4: Add Data Repair for Legacy Payroll Records
-
-Create a repair function to backfill `housing_allowance` and `transportation_allowance` for December 2025 records based on contract data:
-
-**SQL Migration or Manual Query:**
-```sql
--- Repair December 2025 payroll records with missing itemized allowances
-UPDATE payroll p
-SET 
-  housing_allowance = c.housing_allowance,
-  transportation_allowance = c.transportation_allowance
-FROM contracts c
-WHERE p.employee_id = c.employee_id
-  AND c.status = 'Active'
-  AND p.month = '2025-12'
-  AND (p.housing_allowance IS NULL OR p.housing_allowance = 0)
-  AND (p.transportation_allowance IS NULL OR p.transportation_allowance = 0);
-
--- Also insert missing payroll_earnings records for December
-INSERT INTO payroll_earnings (payroll_id, earning_type, description, amount)
-SELECT p.id, 'basic_salary', 'Basic Salary', p.basic_salary
-FROM payroll p
-WHERE p.month = '2025-12'
-  AND NOT EXISTS (
-    SELECT 1 FROM payroll_earnings pe 
-    WHERE pe.payroll_id = p.id AND pe.earning_type = 'basic_salary'
-  );
-
-INSERT INTO payroll_earnings (payroll_id, earning_type, description, amount)
-SELECT p.id, 'housing_allowance', 'Housing Rental Allowance', p.housing_allowance
-FROM payroll p
-WHERE p.month = '2025-12'
-  AND p.housing_allowance > 0
-  AND NOT EXISTS (
-    SELECT 1 FROM payroll_earnings pe 
-    WHERE pe.payroll_id = p.id AND pe.earning_type = 'housing_allowance'
-  );
-
-INSERT INTO payroll_earnings (payroll_id, earning_type, description, amount)
-SELECT p.id, 'transport_allowance', 'Transportation Allowance', p.transportation_allowance
-FROM payroll p
-WHERE p.month = '2025-12'
-  AND p.transportation_allowance > 0
-  AND NOT EXISTS (
-    SELECT 1 FROM payroll_earnings pe 
-    WHERE pe.payroll_id = p.id AND pe.earning_type = 'transport_allowance'
-  );
-```
-
----
-
-### Part 5: Add Ticket Allowance Badge to Payroll Cards
-
-Show which payroll records include ticket allowance:
-
-```typescript
-{record.ticket_allowance > 0 && (
-  <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/30 flex items-center gap-1">
-    <Plane className="w-3 h-3" /> Ticket +{record.ticket_allowance?.toLocaleString()}
-  </span>
 )}
 ```
 
@@ -261,39 +131,41 @@ Show which payroll records include ticket allowance:
 
 ## Files to Modify
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/components/views/PayrollView.tsx` | MODIFY | Add ticket allowance to bulk generate, show allowance breakdown tooltip, add ticket badge |
-| `src/utils/payrollPdf.ts` | MODIFY | Improve earnings breakdown priority logic |
-| `src/hooks/usePayroll.ts` | MODIFY | Return ticket allowance processing mutation for bulk operations |
-
----
-
-## Data Fix Required
-
-Run these SQL statements to repair December 2025 payroll records:
-
-1. Update payroll table with correct housing/transport values from contracts
-2. Insert missing payroll_earnings records for itemized breakdown
-3. Verify January 2026 records are correct (already confirmed they are)
+| File | Action |
+|------|--------|
+| `src/components/views/PayrollView.tsx` | Add checkbox state, fix bulk generate logic, add checkbox UI |
 
 ---
 
 ## Summary of Changes
 
-| Issue | Solution |
-|-------|----------|
-| Bulk generate doesn't include ticket allowance | Update `handleBulkGenerate` to check `approvedTicketAllowances` |
-| Payroll list only shows total allowances | Add hover tooltip with itemized breakdown |
-| Payslip PDF estimates allowances | Prioritize stored fields before estimation |
-| Legacy records missing breakdown | SQL repair to backfill from contracts |
-| No visual indicator for ticket in payroll | Add blue "Ticket" badge when amount > 0 |
+| Issue | Fix |
+|-------|-----|
+| `other_allowances` duplication | Only use `emp.allowance` as fallback when NO contract exists |
+| Ticket auto-included | Add checkbox `includeTicketInBulk` - default OFF |
+| Messy data | Delete all payroll + earnings + deductions + email history |
 
 ---
 
-## Technical Notes
+## Post-Implementation Steps
 
-- The January 2026 payroll generation is already working correctly
-- The issue is primarily with legacy December 2025 records
-- The payslip PDF already has logic to show itemized earnings, but it falls back to estimation when no data exists
-- Ticket allowance is approved (32 records) but not being included in bulk payroll generation
+After code changes are deployed:
+
+1. **Delete existing data** via SQL (payroll, payroll_earnings, payroll_deductions, email_history for payslips)
+2. **Re-generate payroll** using the fixed bulk generator
+3. **Verify** allowance breakdown shows correct values (only housing + transport from contract)
+4. **Optionally** include ticket allowance when needed by checking the box
+
+---
+
+## Expected Result After Fix
+
+For an employee with contract:
+- Basic: 1,800
+- Housing: 1,000
+- Transport: 700
+- **Total Allowances: 1,700** (NOT 6,400)
+- **Net: 3,500** (correct)
+
+Ticket allowance only added if HR explicitly checks the option.
+
