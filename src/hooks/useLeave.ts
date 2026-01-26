@@ -456,11 +456,18 @@ export function useAddLeave() {
       
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['leave'] });
       queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
       queryClient.invalidateQueries({ queryKey: ['all_leave_balances'] });
       toast.success('Leave request submitted');
+      
+      // Send email notification to HR about new leave request
+      if (data?.id) {
+        supabase.functions.invoke('send-leave-request-notification', {
+          body: { leave_id: data.id }
+        }).catch(err => console.error('Failed to send leave request notification:', err));
+      }
     },
     onError: (error: Error) => {
       toast.error(`Failed to submit leave: ${error.message}`);

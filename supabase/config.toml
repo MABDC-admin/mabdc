@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.send-appeal-decision-notification]
 verify_jwt = false
+
+[functions.send-leave-request-notification]
+verify_jwt = false
