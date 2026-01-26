@@ -351,7 +351,7 @@ export async function generatePayslipPDF(record: PayrollRecord, settings?: Compa
           `-${formatCurrency(d.amount, currency)}`
         ])
       : [[
-          record.deduction_reason || 'Deductions',
+          'Deductions',
           `-${formatCurrency(record.deductions, currency)}`
         ]];
     
