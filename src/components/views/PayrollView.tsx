@@ -23,20 +23,21 @@ import { TicketAllowanceReminders } from '@/components/admin/TicketAllowanceRemi
 
 export function PayrollView() {
   const queryClient = useQueryClient();
-  const { data: payroll = [], isLoading, refetch } = usePayroll();
-  const { data: employees = [] } = useEmployees();
-  const { data: contracts = [] } = useContracts();
-  const { data: settings } = useCompanySettings();
-  const { data: approvedTicketAllowances = [] } = useApprovedTicketAllowances();
-  const processWPS = useProcessWPS();
-  const generatePayroll = useGeneratePayroll();
-  const deletePayroll = useDeletePayroll();
-  const updatePayroll = useUpdatePayroll();
-
+  
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+
+  const { data: payroll = [], isLoading, refetch } = usePayroll();
+  const { data: employees = [] } = useEmployees();
+  const { data: contracts = [] } = useContracts();
+  const { data: settings } = useCompanySettings();
+  const { data: approvedTicketAllowances = [] } = useApprovedTicketAllowances(selectedMonth);
+  const processWPS = useProcessWPS();
+  const generatePayroll = useGeneratePayroll();
+  const deletePayroll = useDeletePayroll();
+  const updatePayroll = useUpdatePayroll();
 
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const [isBulkGenerateOpen, setIsBulkGenerateOpen] = useState(false);

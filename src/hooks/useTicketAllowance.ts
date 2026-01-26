@@ -220,10 +220,10 @@ export function useEmployeeTicketAllowance(employeeId: string) {
 }
 
 // Fetch approved but not processed ticket allowances (for payroll)
-// Only returns records where eligibility date has passed
-export function useApprovedTicketAllowances() {
+// Only returns records where eligibility MONTH matches the payroll month (biennial anniversary logic)
+export function useApprovedTicketAllowances(payrollMonth?: string) {
   return useQuery({
-    queryKey: ['approved-ticket-allowances'],
+    queryKey: ['approved-ticket-allowances', payrollMonth],
     queryFn: async () => {
       const today = new Date().toISOString().split('T')[0];
       
@@ -239,6 +239,21 @@ export function useApprovedTicketAllowances() {
         .order('eligibility_start_date', { ascending: true });
       
       if (error) throw error;
+      
+      // If payrollMonth is provided (e.g., "2026-01"), filter by matching eligibility month
+      if (payrollMonth) {
+        const [payrollYear, payrollMonthNum] = payrollMonth.split('-').map(Number);
+        
+        return (data || []).filter(ticket => {
+          const eligDate = new Date(ticket.eligibility_start_date);
+          const eligMonth = eligDate.getMonth() + 1; // 1-12
+          const eligYear = eligDate.getFullYear();
+          
+          // Show only if eligibility month matches payroll month AND eligibility year <= payroll year
+          return eligMonth === payrollMonthNum && eligYear <= payrollYear;
+        }) as TicketAllowanceRecord[];
+      }
+      
       return data as TicketAllowanceRecord[];
     },
   });
