@@ -454,20 +454,28 @@ export function useAddLeave() {
         }
       }
       
+      // MANDATORY: Send email notification to HR about new leave request
+      if (data?.id) {
+        console.log('Sending leave request notification for leave_id:', data.id);
+        const { error: notifyError } = await supabase.functions.invoke('send-leave-request-notification', {
+          body: { leave_id: data.id }
+        });
+        
+        if (notifyError) {
+          console.error('Failed to notify HR of leave request:', notifyError);
+          // Continue - don't fail the entire request, but log it
+        } else {
+          console.log('Leave request notification sent successfully');
+        }
+      }
+      
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave'] });
       queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
       queryClient.invalidateQueries({ queryKey: ['all_leave_balances'] });
       toast.success('Leave request submitted');
-      
-      // Send email notification to HR about new leave request
-      if (data?.id) {
-        supabase.functions.invoke('send-leave-request-notification', {
-          body: { leave_id: data.id }
-        }).catch(err => console.error('Failed to send leave request notification:', err));
-      }
     },
     onError: (error: Error) => {
       toast.error(`Failed to submit leave: ${error.message}`);
