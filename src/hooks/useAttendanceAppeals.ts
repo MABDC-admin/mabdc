@@ -82,9 +82,20 @@ export function useUpdateAttendanceAppeal() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['attendance_appeals'] });
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      
+      // Send email notification to employee
+      if (data.status === 'Approved' || data.status === 'Rejected') {
+        supabase.functions.invoke('send-appeal-decision-notification', {
+          body: {
+            appeal_id: data.id,
+            status: data.status,
+            rejection_reason: data.rejection_reason
+          }
+        }).catch(err => console.error('Failed to send appeal notification:', err));
+      }
     },
     onError: (error: Error) => {
       toast.error(`Failed to update appeal: ${error.message}`);
