@@ -1106,20 +1106,18 @@ export function PayrollView() {
                 />
                 <p className="text-xs text-muted-foreground mt-1">Add absences, loan repayments, or other deductions</p>
                 
-                {(editingPayroll.deductions || 0) > 0 && (
-                  <div className="mt-3">
-                    <Label>Deduction Reason (HR Reference Only)</Label>
-                    <Input
-                      value={editingPayroll.deduction_reason || ''}
-                      onChange={(e) => setEditingPayroll({...editingPayroll, deduction_reason: e.target.value})}
-                      placeholder="e.g., 2 days absence, Loan repayment"
-                      className="mt-1"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      For HR records only - not shown on employee payslip
-                    </p>
-                  </div>
-                )}
+                <div className="mt-3">
+                  <Label>Deduction Reason (HR Reference Only)</Label>
+                  <Input
+                    value={editingPayroll.deduction_reason || ''}
+                    onChange={(e) => setEditingPayroll({...editingPayroll, deduction_reason: e.target.value})}
+                    placeholder="e.g., 2 days absence, Loan repayment"
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    For HR records only - not shown on employee payslip
+                  </p>
+                </div>
               </div>
               
               <div className="bg-secondary/50 rounded-lg p-4">
