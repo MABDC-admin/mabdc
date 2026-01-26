@@ -1,171 +1,213 @@
 
+# Plan: Allow Email Resend with Badge Counter
 
-# Plan: Reset Payroll System and Fix Bulk Generation
+## Current Implementation Analysis
 
-## Current Issues Identified
-
-Based on database analysis:
-
-| Issue | Details |
-|-------|---------|
-| **Discrepancy #1: `other_allowances` duplication** | Bulk generate uses `emp.allowance` (line 211) which adds 1700 AED to some employees on TOP of housing/transport from contracts |
-| **Discrepancy #2: Ticket auto-included** | Lines 205-206: Ticket allowance is automatically included for ALL employees with approved ticket - user wants this OPTIONAL |
-| **Discrepancy #3: Inconsistent totals** | Some have 4700, some 6400, some 1200 - due to mixing of sources |
-| **Email History to Clean** | 9 payslip emails sent that need clearing |
-| **Payroll Records to Delete** | 31 payroll records + 61 earnings entries |
-
-### Evidence from Database:
-```
-Arianne Kaye N. Sager: AED 6400 total (housing 1000 + transport 700 + ticket 3000 + other 1700)
-Aimee June A. Alolor: AED 4700 total (housing 1000 + transport 700 + ticket 3000 + other 0)
+### Current Behavior (Lines 858-888 in PayrollView.tsx):
+```typescript
+<Button 
+  disabled={
+    !record.employees?.work_email || 
+    sendingEmailId === record.id ||
+    emailStatusMap.get(record.employee_id)?.status === 'sent'  // ❌ DISABLES after 1 send
+  }
 ```
 
-The `other_allowances: 1700` comes from `emp.allowance` field which is a legacy/fallback field that should NOT be used when contract values exist.
+**Problem**: The email button is disabled permanently after the first successful send. Admin cannot resend if employee didn't receive it or needs a corrected payslip.
+
+### Current Email Status Map (Lines 85-104):
+```typescript
+// Only stores the MOST RECENT email per employee
+if (email.employee_id && !map.has(email.employee_id)) {
+  map.set(email.employee_id, { status, sentAt, error });
+}
+```
+
+**Problem**: Only tracks latest email status, not the total count of emails sent.
 
 ---
 
-## Solution: Reset and Fix
+## Solution Overview
 
-### Step 1: Delete All Payroll Data (Clean Slate)
-
-Execute SQL to delete all payroll-related data:
-
-```sql
--- Delete payroll earnings first (foreign key)
-DELETE FROM payroll_earnings;
-
--- Delete payroll deductions  
-DELETE FROM payroll_deductions;
-
--- Delete all payroll records
-DELETE FROM payroll;
-
--- Clear email history for payslips
-DELETE FROM email_history WHERE email_type = 'payslip';
-```
-
-### Step 2: Fix Bulk Generate Logic
+### 1. Update Email Status Map to Include Send Count
 
 **File: `src/components/views/PayrollView.tsx`**
 
-**Problem in current code (lines 201-224):**
-```typescript
-const ticketAllowance = approvedTicketAllowances.find(...);
-const ticketAmount = ticketAllowance?.amount || 0;  // AUTO INCLUDED!
-const otherAllowances = emp.allowance || 0;  // DUPLICATES CONTRACT VALUES!
+Modify the `emailStatusMap` to track:
+- Latest status (sent/failed/pending)
+- Total send count for badge display
+- Sent timestamp for display
 
-await generatePayroll.mutateAsync({
-  ticketAllowance: ticketAmount,  // Always includes ticket
-  otherAllowances,  // Adds legacy field on top
-});
-```
-
-**Fixed logic:**
 ```typescript
-const handleBulkGenerate = async () => {
-  // ... existing checks ...
+const emailStatusMap = useMemo(() => {
+  const map = new Map<string, { 
+    status: string; 
+    sentAt: string; 
+    error?: string;
+    sendCount: number;  // NEW: Track total emails sent
+  }>();
   
-  for (const emp of employeesWithoutPayroll) {
-    const contract = contracts.find(c => c.employee_id === emp.id && c.status === 'Active');
-    
-    const basicSalary = contract?.basic_salary || emp.basic_salary || 0;
-    const housingAllowance = contract?.housing_allowance || 0;
-    const transportAllowance = contract?.transportation_allowance || 0;
-    
-    // FIX: Only use other_allowances if NO contract exists (fallback only)
-    const otherAllowances = contract ? 0 : (emp.allowance || 0);
-    
-    // FIX: Ticket allowance only if checkbox is checked (optional)
-    const ticketAmount = includeTicketInBulk 
-      ? (approvedTicketAllowances.find(t => t.employee_id === emp.id)?.amount || 0) 
-      : 0;
+  // Count all emails per employee for the selected month
+  const countMap = new Map<string, number>();
+  
+  emailHistory.forEach(email => {
+    if (email.employee_id) {
+      // Count total emails
+      const currentCount = countMap.get(email.employee_id) || 0;
+      countMap.set(email.employee_id, currentCount + 1);
+      
+      // Store latest status (first in list since ordered by created_at desc)
+      if (!map.has(email.employee_id)) {
+        map.set(email.employee_id, { 
+          status: email.status, 
+          sentAt: email.created_at,
+          error: email.error_message || undefined,
+          sendCount: 1  // Will be updated after counting
+        });
+      }
+    }
+  });
+  
+  // Update with actual counts
+  countMap.forEach((count, employeeId) => {
+    const existing = map.get(employeeId);
+    if (existing) {
+      map.set(employeeId, { ...existing, sendCount: count });
+    }
+  });
+  
+  return map;
+}, [emailHistory]);
+```
 
-    await generatePayroll.mutateAsync({
-      employeeId: emp.id,
-      month: selectedMonth,
-      basicSalary,
-      housingAllowance,
-      transportationAllowance: transportAllowance,
-      ticketAllowance: ticketAmount,
-      otherAllowances,
-      deductions: 0,
-      deductionReason: '',
-    });
+### 2. Enable Resend Button (Remove Disable Condition)
+
+**Change the Email Button Logic:**
+
+```typescript
+<Button 
+  variant="outline" 
+  size="sm" 
+  onClick={() => handleEmailPayslip(record)}
+  disabled={
+    !record.employees?.work_email || 
+    sendingEmailId === record.id
+    // REMOVED: || emailStatusMap.get(record.employee_id)?.status === 'sent'
   }
-};
+  className={cn(
+    "border-border relative",
+    emailStatusMap.get(record.employee_id)?.status === 'sent' && 
+      "border-green-300 dark:border-green-800"
+  )}
+  title={
+    record.employees?.work_email 
+      ? `Send to ${record.employees.work_email}` 
+      : 'No work email configured'
+  }
+>
+  {sendingEmailId === record.id ? (
+    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+  ) : emailStatusMap.get(record.employee_id)?.status === 'sent' ? (
+    <MailCheck className="w-4 h-4 mr-1 text-green-600" />
+  ) : emailStatusMap.get(record.employee_id)?.status === 'failed' ? (
+    <MailX className="w-4 h-4 mr-1 text-red-500" />
+  ) : (
+    <Mail className="w-4 h-4 mr-1" />
+  )}
+  
+  {emailStatusMap.get(record.employee_id)?.status === 'sent' ? 'Resend' : 'Email'}
+  
+  {/* Badge Counter */}
+  {(emailStatusMap.get(record.employee_id)?.sendCount || 0) > 0 && (
+    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold rounded-full bg-green-500 text-white">
+      {emailStatusMap.get(record.employee_id)?.sendCount}
+    </span>
+  )}
+</Button>
 ```
 
-### Step 3: Add Optional Ticket Allowance Checkbox to Bulk Generate Dialog
+### 3. Update usePayslipEmailHistory Hook
 
-Add state for the checkbox:
+**File: `src/hooks/useEmailHistory.ts`**
+
+Make the hook return all emails for the month (not just filtered ones) to enable accurate counting:
+
 ```typescript
-const [includeTicketInBulk, setIncludeTicketInBulk] = useState(false);
+export function usePayslipEmailHistory(month: string) {
+  return useQuery({
+    queryKey: ["payslip-email-history", month],
+    queryFn: async () => {
+      // Format month for metadata matching
+      const monthLabel = new Date(month + '-01').toLocaleDateString('en-US', { 
+        month: 'long', year: 'numeric' 
+      });
+      
+      const { data, error } = await supabase
+        .from("email_history")
+        .select("employee_id, status, created_at, error_message, metadata")
+        .eq("email_type", "payslip")
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      
+      // Filter to only emails for this month based on metadata
+      return (data || []).filter(email => {
+        if (!email.employee_id) return false;
+        // Check if metadata.month matches
+        const emailMonth = email.metadata?.month;
+        return emailMonth === monthLabel;
+      });
+    },
+  });
+}
 ```
 
-Add UI in the Bulk Generate Dialog (after the employee list, before the Note):
-```typescript
-{/* Optional: Include Ticket Allowance */}
-{approvedTicketAllowances.length > 0 && (
-  <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-    <Checkbox 
-      id="includeTicket"
-      checked={includeTicketInBulk}
-      onCheckedChange={(checked) => setIncludeTicketInBulk(!!checked)}
-    />
-    <label htmlFor="includeTicket" className="flex-1 text-sm cursor-pointer">
-      <div className="flex items-center gap-2">
-        <Plane className="w-4 h-4 text-blue-500" />
-        <span className="font-medium">Include Ticket Allowance</span>
-      </div>
-      <p className="text-xs text-muted-foreground mt-0.5">
-        {approvedTicketAllowances.filter(t => 
-          employeesWithoutPayroll.some(e => e.id === t.employee_id)
-        ).length} employees eligible for ticket allowance this month
-      </p>
-    </label>
-  </div>
-)}
+---
+
+## Visual Design
+
+### Before (Current):
 ```
+┌─────────────────────────────┐
+│ ✓ Sent                      │  ← Disabled, cannot resend
+└─────────────────────────────┘
+```
+
+### After (New):
+```
+┌─────────────────────────────┐
+│ ✉️ Resend              [2]  │  ← Enabled, shows badge count
+└─────────────────────────────┘
+```
+
+**Badge States:**
+- **No sends**: No badge, button shows "Email"
+- **1+ sends**: Green badge with count, button shows "Resend"
+- **Failed**: Red icon, button enabled for retry
 
 ---
 
 ## Files to Modify
 
-| File | Action |
-|------|--------|
-| `src/components/views/PayrollView.tsx` | Add checkbox state, fix bulk generate logic, add checkbox UI |
+| File | Changes |
+|------|---------|
+| `src/components/views/PayrollView.tsx` | Update emailStatusMap, modify button to allow resend, add badge counter |
+| `src/hooks/useEmailHistory.ts` | Filter by month metadata, return all emails for counting |
 
 ---
 
-## Summary of Changes
+## Expected Behavior After Implementation
 
-| Issue | Fix |
-|-------|-----|
-| `other_allowances` duplication | Only use `emp.allowance` as fallback when NO contract exists |
-| Ticket auto-included | Add checkbox `includeTicketInBulk` - default OFF |
-| Messy data | Delete all payroll + earnings + deductions + email history |
-
----
-
-## Post-Implementation Steps
-
-After code changes are deployed:
-
-1. **Delete existing data** via SQL (payroll, payroll_earnings, payroll_deductions, email_history for payslips)
-2. **Re-generate payroll** using the fixed bulk generator
-3. **Verify** allowance breakdown shows correct values (only housing + transport from contract)
-4. **Optionally** include ticket allowance when needed by checking the box
+1. **First Send**: Button shows "Email" → After sending → Button shows "Resend" with badge [1]
+2. **Resend**: Admin clicks "Resend" → Email sent → Badge updates to [2]
+3. **Failed**: Button shows red icon, admin can retry
+4. **Multiple Months**: Badge resets per month (January 2026 emails don't show in December 2025)
 
 ---
 
-## Expected Result After Fix
+## Technical Notes
 
-For an employee with contract:
-- Basic: 1,800
-- Housing: 1,000
-- Transport: 700
-- **Total Allowances: 1,700** (NOT 6,400)
-- **Net: 3,500** (correct)
-
-Ticket allowance only added if HR explicitly checks the option.
-
+- Badge uses absolute positioning to overlay on button
+- Green badge indicates successful sends
+- Email history query filtered by month metadata to ensure accurate per-month counting
+- No database schema changes needed - uses existing `email_history` table
