@@ -29,6 +29,7 @@ export interface Contract {
   };
 }
 
+// Fetch contracts for active employees only (excludes Resigned/Terminated)
 export function useContracts() {
   return useQuery({
     queryKey: ['contracts'],
@@ -37,7 +38,27 @@ export function useContracts() {
         .from('contracts')
         .select(`
           *,
-          employees (full_name, photo_url)
+          employees!inner (full_name, photo_url, status)
+        `)
+        .not('employees.status', 'in', '("Resigned","Terminated")')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as Contract[];
+    },
+  });
+}
+
+// Fetch ALL contracts regardless of employee status (for admin oversight)
+export function useAllContracts() {
+  return useQuery({
+    queryKey: ['all-contracts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contracts')
+        .select(`
+          *,
+          employees (full_name, photo_url, status)
         `)
         .order('created_at', { ascending: false });
       

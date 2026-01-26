@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +8,8 @@ import { useContracts } from '@/hooks/useContracts';
 import { useEmployeeHRLetters } from '@/hooks/useHRLetters';
 import { usePerformance } from '@/hooks/usePerformance';
 import { useDiscipline } from '@/hooks/useDiscipline';
+import { useEmployeeEducation, useAddEducation, useDeleteEducation } from '@/hooks/useEducation';
+import { useEducationDocuments, useBulkUploadEducationDocs, useDeleteEducationDoc } from '@/hooks/useEducationDocuments';
 import { useEmployeeGamification, useEmployeeBadges } from '@/hooks/useGamification';
 import { useEmployeeDocuments } from '@/hooks/useDocuments';
 import { useCapacitorNotifications } from '@/hooks/useCapacitorNotifications';
@@ -25,7 +27,7 @@ import {
   Briefcase, Mail, Phone, MapPin, Building2, 
   CalendarDays, TrendingUp, AlertTriangle, FileCheck,
   Loader2, Plus, Star, Shield, Image as ImageIcon, CreditCard,
-  BookOpen, Plane, HeartPulse, UserCircle, Eye
+  BookOpen, Plane, HeartPulse, UserCircle, Eye, GraduationCap, Upload, Trash2, X
 } from 'lucide-react';
 import { ImagePreviewModal } from '@/components/modals/ImagePreviewModal';
 import { PasskeyManagement } from '@/components/PasskeyManagement';
@@ -109,6 +111,24 @@ export default function EmployeeSelfServicePortal() {
   const { data: earnedBadges = [] } = useEmployeeBadges(employee?.id || '');
   const { data: documents = [] } = useEmployeeDocuments(employee?.id || '');
   const { data: leaveBalances = [] } = useLeaveBalances(employee?.id);
+  
+  // Education hooks
+  const { data: educationRecords = [], refetch: refetchEducation } = useEmployeeEducation(employee?.id || '');
+  const addEducation = useAddEducation();
+  const deleteEducation = useDeleteEducation();
+  const { data: educationDocs = [], refetch: refetchEducationDocs } = useEducationDocuments(employee?.id || '');
+  const bulkUploadEducationDocs = useBulkUploadEducationDocs();
+  const deleteEducationDoc = useDeleteEducationDoc();
+  
+  // Education form state
+  const [newEducation, setNewEducation] = useState({
+    certificate_level: '',
+    field_of_study: '',
+    school: '',
+    graduation_year: '',
+  });
+  const [isUploadingDocs, setIsUploadingDocs] = useState(false);
+  const educationFileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch employee data based on logged-in user
   useEffect(() => {
@@ -317,6 +337,7 @@ export default function EmployeeSelfServicePortal() {
     { id: 'leave', label: 'Leave', icon: CalendarDays },
     { id: 'contract', label: 'Contract', icon: FileText },
     { id: 'documents', label: 'Documents', icon: FileCheck },
+    { id: 'education', label: 'Education', icon: GraduationCap },
     { id: 'performance', label: 'Performance', icon: TrendingUp },
     { id: 'achievements', label: 'Achievements', icon: Award },
     { id: 'security', label: 'Security', icon: Shield },
@@ -1109,6 +1130,277 @@ export default function EmployeeSelfServicePortal() {
                     </div>
                   );
                 })()}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="education" className="mt-8 space-y-6">
+            {/* Education Records Card */}
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-card dark:to-muted/20 overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-accent/5 border-b border-border/50">
+                <CardTitle className="flex items-center gap-2">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <GraduationCap className="w-4 h-4 text-primary" />
+                  </div>
+                  Education History
+                </CardTitle>
+                <CardDescription className="mt-2">
+                  Manage your educational background
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                {/* Add Education Form */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-xl border border-border/50">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium">Certificate Level *</Label>
+                    <select
+                      value={newEducation.certificate_level}
+                      onChange={(e) => setNewEducation(prev => ({ ...prev, certificate_level: e.target.value }))}
+                      className="w-full h-10 rounded-lg border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20"
+                    >
+                      <option value="">Select level</option>
+                      <option value="High School">High School</option>
+                      <option value="Vocational">Vocational</option>
+                      <option value="Associate">Associate Degree</option>
+                      <option value="Bachelor">Bachelor's Degree</option>
+                      <option value="Master">Master's Degree</option>
+                      <option value="Doctorate">Doctorate</option>
+                      <option value="Certificate">Professional Certificate</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium">Field of Study</Label>
+                    <Input
+                      placeholder="e.g. Computer Science"
+                      value={newEducation.field_of_study}
+                      onChange={(e) => setNewEducation(prev => ({ ...prev, field_of_study: e.target.value }))}
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium">School/University</Label>
+                    <Input
+                      placeholder="e.g. University of Dubai"
+                      value={newEducation.school}
+                      onChange={(e) => setNewEducation(prev => ({ ...prev, school: e.target.value }))}
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium">Graduation Year</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        placeholder="2020"
+                        value={newEducation.graduation_year}
+                        onChange={(e) => setNewEducation(prev => ({ ...prev, graduation_year: e.target.value }))}
+                        className="h-10 flex-1"
+                      />
+                      <Button 
+                        onClick={async () => {
+                          if (!newEducation.certificate_level || !employee) {
+                            toast.error('Please select a certificate level');
+                            return;
+                          }
+                          await addEducation.mutateAsync({
+                            employee_id: employee.id,
+                            certificate_level: newEducation.certificate_level,
+                            field_of_study: newEducation.field_of_study || undefined,
+                            school: newEducation.school || undefined,
+                            graduation_year: newEducation.graduation_year ? parseInt(newEducation.graduation_year) : undefined,
+                          });
+                          setNewEducation({ certificate_level: '', field_of_study: '', school: '', graduation_year: '' });
+                          refetchEducation();
+                        }}
+                        disabled={addEducation.isPending}
+                        className="h-10"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Education Records List */}
+                {educationRecords.length === 0 ? (
+                  <div className="text-center py-12">
+                    <GraduationCap className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
+                    <p className="text-muted-foreground font-medium">No education records yet</p>
+                    <p className="text-sm text-muted-foreground/60 mt-1">Add your educational background above</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {educationRecords.map((edu: any) => (
+                      <div 
+                        key={edu.id}
+                        className="flex items-center justify-between p-4 bg-gradient-to-r from-muted/40 to-muted/20 rounded-xl border border-border/50 hover:border-primary/30 hover:shadow-md transition-all duration-200"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="p-3 bg-primary/10 rounded-lg">
+                            <GraduationCap className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-foreground">{edu.certificate_level}</p>
+                            {edu.field_of_study && <p className="text-sm text-muted-foreground">{edu.field_of_study}</p>}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {edu.school && <span>{edu.school}</span>}
+                              {edu.school && edu.graduation_year && <span> • </span>}
+                              {edu.graduation_year && <span>{edu.graduation_year}</span>}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            if (confirm('Delete this education record?')) {
+                              await deleteEducation.mutateAsync(edu.id);
+                              refetchEducation();
+                            }
+                          }}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Credentials Upload Card */}
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-card dark:to-muted/20 overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-accent/5 to-primary/5 border-b border-border/50">
+                <CardTitle className="flex items-center gap-2">
+                  <div className="p-2 bg-accent/10 rounded-lg">
+                    <Upload className="w-4 h-4 text-accent-foreground" />
+                  </div>
+                  Upload Credentials
+                </CardTitle>
+                <CardDescription className="mt-2">
+                  Upload your school certificates, diplomas, transcripts, and resume
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                {/* Bulk Upload Dropzone */}
+                <div 
+                  className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-8 text-center cursor-pointer transition-all hover:bg-muted/30"
+                  onClick={() => educationFileInputRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!employee) return;
+                    
+                    const files = Array.from(e.dataTransfer.files);
+                    if (files.length === 0) return;
+                    
+                    setIsUploadingDocs(true);
+                    await bulkUploadEducationDocs.mutateAsync({ employeeId: employee.id, files });
+                    setIsUploadingDocs(false);
+                    refetchEducationDocs();
+                  }}
+                >
+                  {isUploadingDocs ? (
+                    <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+                  ) : (
+                    <Upload className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
+                  )}
+                  <p className="font-medium text-foreground">Drag & drop files or click to browse</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Supported: PDF, JPG, PNG (Max 10 files, 10MB each)
+                  </p>
+                  <input
+                    ref={educationFileInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (files.length === 0 || !employee) return;
+                      
+                      setIsUploadingDocs(true);
+                      await bulkUploadEducationDocs.mutateAsync({ employeeId: employee.id, files });
+                      setIsUploadingDocs(false);
+                      refetchEducationDocs();
+                      if (educationFileInputRef.current) educationFileInputRef.current.value = '';
+                    }}
+                  />
+                </div>
+
+                {/* Uploaded Credentials List */}
+                {educationDocs.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileCheck className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground">No credentials uploaded yet</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    {educationDocs.map((doc: any) => {
+                      const isImage = doc.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_url);
+                      
+                      return (
+                        <div 
+                          key={doc.id}
+                          className="group relative rounded-xl border border-border bg-card hover:border-primary/50 hover:shadow-lg transition-all overflow-hidden"
+                        >
+                          <div 
+                            className="aspect-square flex items-center justify-center p-2 bg-muted/30 cursor-pointer"
+                            onClick={() => {
+                              if (isImage) {
+                                setPreviewImage({ url: doc.file_url, title: doc.name });
+                              } else {
+                                window.open(doc.file_url, '_blank');
+                              }
+                            }}
+                          >
+                            {isImage ? (
+                              <img
+                                src={doc.file_url}
+                                alt={doc.name}
+                                className="w-full h-full rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                                <FileText className="w-6 h-6 text-primary" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-2 space-y-1">
+                            <p className="text-[11px] font-semibold text-foreground line-clamp-1">{doc.name}</p>
+                            <div className="flex items-center justify-between">
+                              <Badge variant="secondary" className="text-[9px]">{doc.category}</Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (confirm('Delete this document?') && employee) {
+                                    await deleteEducationDoc.mutateAsync({ 
+                                      id: doc.id, 
+                                      employeeId: employee.id, 
+                                      fileUrl: doc.file_url 
+                                    });
+                                    refetchEducationDocs();
+                                  }
+                                }}
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

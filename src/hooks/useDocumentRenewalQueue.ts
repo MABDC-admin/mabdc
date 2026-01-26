@@ -51,7 +51,7 @@ export function useDocumentRenewalQueue(daysThreshold = 30) {
       
       if (documentsError) throw documentsError;
       
-      // Fetch active contracts with end dates
+      // Fetch active contracts with end dates (only for active employees)
       const { data: contracts, error: contractsError } = await supabase
         .from('contracts')
         .select(`
@@ -62,6 +62,7 @@ export function useDocumentRenewalQueue(daysThreshold = 30) {
           employees!inner(full_name, photo_url, department, status)
         `)
         .eq('status', 'Active')
+        .eq('employees.status', 'Active')
         .not('end_date', 'is', null);
       
       if (contractsError) throw contractsError;
