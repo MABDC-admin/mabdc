@@ -219,19 +219,35 @@ export function useUpdatePayroll() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, basicSalary, allowances, deductions }: {
+    mutationFn: async ({ 
+      id, 
+      basicSalary, 
+      housingAllowance,
+      transportationAllowance,
+      ticketAllowance,
+      otherAllowances,
+      deductions 
+    }: {
       id: string;
       basicSalary: number;
-      allowances: number;
+      housingAllowance: number;
+      transportationAllowance: number;
+      ticketAllowance: number;
+      otherAllowances: number;
       deductions: number;
     }) => {
-      const netSalary = basicSalary + allowances - deductions;
+      const totalAllowances = housingAllowance + transportationAllowance + ticketAllowance + otherAllowances;
+      const netSalary = basicSalary + totalAllowances - deductions;
       
       const { data, error } = await supabase
         .from('payroll')
         .update({
           basic_salary: basicSalary,
-          allowances,
+          housing_allowance: housingAllowance,
+          transportation_allowance: transportationAllowance,
+          ticket_allowance: ticketAllowance,
+          other_allowances: otherAllowances,
+          allowances: totalAllowances,
           deductions,
           net_salary: netSalary,
         })

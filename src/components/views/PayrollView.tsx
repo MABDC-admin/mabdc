@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { DollarSign, RefreshCw, CheckCircle, Plus, Trash2, Edit2, Download, Printer, CreditCard, Users, FileSpreadsheet, Plane, Mail, Loader2, MailCheck, MailX, Clock } from 'lucide-react';
+import { DollarSign, RefreshCw, CheckCircle, Plus, Trash2, Edit2, Download, Printer, CreditCard, Users, FileSpreadsheet, Plane, Mail, Loader2, MailCheck, MailX, Clock, Bell } from 'lucide-react';
+import { useProcessTicketAllowance } from '@/hooks/useTicketAllowance';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -47,6 +48,10 @@ export function PayrollView() {
   const [bulkEmailSending, setBulkEmailSending] = useState(false);
   const [bulkEmailProgress, setBulkEmailProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
   const [includeTicketInBulk, setIncludeTicketInBulk] = useState(false);
+  const [editTicketIncluded, setEditTicketIncluded] = useState(false);
+  const [editTicketAmount, setEditTicketAmount] = useState(0);
+  
+  const processTicketAllowance = useProcessTicketAllowance();
 
   const [newPayroll, setNewPayroll] = useState({
     employeeId: '',
@@ -114,6 +119,26 @@ export function PayrollView() {
     
     return map;
   }, [emailHistory]);
+
+  // Create ticket eligibility lookup - employees with approved ticket allowance NOT yet in payroll
+  const ticketEligibilityMap = useMemo(() => {
+    const map = new Map<string, { amount: number; recordId: string }>();
+    
+    approvedTicketAllowances.forEach(ticket => {
+      // Find the payroll record for this employee in current month
+      const payrollRecord = filteredPayroll.find(p => p.employee_id === ticket.employee_id);
+      
+      // If payroll exists but no ticket allowance included, mark as eligible
+      if (payrollRecord && (payrollRecord.ticket_allowance || 0) === 0) {
+        map.set(ticket.employee_id, {
+          amount: ticket.amount || 0,
+          recordId: ticket.id
+        });
+      }
+    });
+    
+    return map;
+  }, [approvedTicketAllowances, filteredPayroll]);
 
   const stats = useMemo(() => ({
     totalPayroll: filteredPayroll.reduce((sum, p) => sum + (p.net_salary || 0), 0),
@@ -263,15 +288,35 @@ export function PayrollView() {
 
   const handleEditPayroll = async () => {
     if (!editingPayroll) return;
+    
+    const ticketAmount = editTicketIncluded ? editTicketAmount : 0;
+    
     try {
       await updatePayroll.mutateAsync({
         id: editingPayroll.id,
         basicSalary: editingPayroll.basic_salary,
-        allowances: editingPayroll.allowances,
-        deductions: editingPayroll.deductions,
+        housingAllowance: editingPayroll.housing_allowance || 0,
+        transportationAllowance: editingPayroll.transportation_allowance || 0,
+        ticketAllowance: ticketAmount,
+        otherAllowances: editingPayroll.other_allowances || 0,
+        deductions: editingPayroll.deductions || 0,
       });
+      
+      // If ticket was newly included, mark the ticket allowance record as processed
+      if (editTicketIncluded && ticketEligibilityMap.has(editingPayroll.employee_id)) {
+        const ticketRecord = ticketEligibilityMap.get(editingPayroll.employee_id);
+        if (ticketRecord) {
+          await processTicketAllowance.mutateAsync({
+            id: ticketRecord.recordId,
+            payrollId: editingPayroll.id
+          });
+        }
+      }
+      
       setIsEditOpen(false);
       setEditingPayroll(null);
+      setEditTicketIncluded(false);
+      setEditTicketAmount(0);
     } catch (error) {
       console.error('Failed to update payroll:', error);
     }
@@ -857,6 +902,16 @@ export function PayrollView() {
                         </span>
                       </div>
                     )}
+                    
+                    {/* Ticket Eligibility Indicator - Pulsing Bell */}
+                    {ticketEligibilityMap.has(record.employee_id) && (record.ticket_allowance || 0) === 0 && (
+                      <div className="mt-2 flex items-center gap-1.5 animate-pulse">
+                        <Bell className="w-4 h-4 text-amber-500" />
+                        <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                          Ticket Eligible: AED {ticketEligibilityMap.get(record.employee_id)?.amount.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap">
                     <Button 
@@ -910,7 +965,18 @@ export function PayrollView() {
                           variant="outline" 
                           size="sm"
                           onClick={() => {
-                            setEditingPayroll(record);
+                            const ticketEligible = ticketEligibilityMap.get(record.employee_id);
+                            const hasTicketAlready = (record.ticket_allowance || 0) > 0;
+                            
+                            setEditingPayroll({
+                              ...record,
+                              housing_allowance: record.housing_allowance || 0,
+                              transportation_allowance: record.transportation_allowance || 0,
+                              ticket_allowance: record.ticket_allowance || 0,
+                              other_allowances: record.other_allowances || 0,
+                            });
+                            setEditTicketIncluded(hasTicketAlready);
+                            setEditTicketAmount(hasTicketAlready ? (record.ticket_allowance || 0) : (ticketEligible?.amount || 0));
                             setIsEditOpen(true);
                           }}
                           className="border-border"
@@ -962,7 +1028,7 @@ export function PayrollView() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Payroll - Add Deductions</DialogTitle>
           </DialogHeader>
@@ -972,6 +1038,7 @@ export function PayrollView() {
                 <p className="text-sm font-medium">{editingPayroll.employees?.full_name}</p>
                 <p className="text-xs text-muted-foreground">{editingPayroll.employees?.hrms_no} • {editingPayroll.employees?.department}</p>
               </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Basic Salary (AED)</Label>
@@ -982,14 +1049,51 @@ export function PayrollView() {
                   />
                 </div>
                 <div>
-                  <Label>Allowances (AED)</Label>
+                  <Label>Housing (AED)</Label>
                   <Input
                     type="number"
-                    value={editingPayroll.allowances}
-                    onChange={(e) => setEditingPayroll({...editingPayroll, allowances: Number(e.target.value)})}
+                    value={editingPayroll.housing_allowance}
+                    onChange={(e) => setEditingPayroll({...editingPayroll, housing_allowance: Number(e.target.value)})}
+                  />
+                </div>
+                <div>
+                  <Label>Transport (AED)</Label>
+                  <Input
+                    type="number"
+                    value={editingPayroll.transportation_allowance}
+                    onChange={(e) => setEditingPayroll({...editingPayroll, transportation_allowance: Number(e.target.value)})}
+                  />
+                </div>
+                <div>
+                  <Label>Other Allowances (AED)</Label>
+                  <Input
+                    type="number"
+                    value={editingPayroll.other_allowances}
+                    onChange={(e) => setEditingPayroll({...editingPayroll, other_allowances: Number(e.target.value)})}
                   />
                 </div>
               </div>
+              
+              {/* Ticket Allowance Option */}
+              {(ticketEligibilityMap.has(editingPayroll.employee_id) || (editingPayroll.ticket_allowance || 0) > 0) && editTicketAmount > 0 && (
+                <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <Checkbox 
+                    id="editTicketAllowance"
+                    checked={editTicketIncluded}
+                    onCheckedChange={(checked) => setEditTicketIncluded(!!checked)}
+                  />
+                  <label htmlFor="editTicketAllowance" className="flex-1 text-sm cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Plane className="w-4 h-4 text-blue-500" />
+                      <span className="font-medium">Include Ticket Allowance</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Add AED {editTicketAmount.toLocaleString()} for biennial ticket allowance
+                    </p>
+                  </label>
+                </div>
+              )}
+              
               <div className="border-t border-border pt-4">
                 <Label className="text-destructive">Deductions (AED)</Label>
                 <Input
@@ -1000,24 +1104,45 @@ export function PayrollView() {
                 />
                 <p className="text-xs text-muted-foreground mt-1">Add absences, loan repayments, or other deductions</p>
               </div>
+              
               <div className="bg-secondary/50 rounded-lg p-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Gross Salary:</span>
-                  <span className="font-medium">AED {(editingPayroll.basic_salary + editingPayroll.allowances).toLocaleString()}</span>
+                  <span className="font-medium">AED {(
+                    editingPayroll.basic_salary + 
+                    (editingPayroll.housing_allowance || 0) + 
+                    (editingPayroll.transportation_allowance || 0) + 
+                    (editTicketIncluded ? editTicketAmount : 0) + 
+                    (editingPayroll.other_allowances || 0)
+                  ).toLocaleString()}</span>
                 </div>
+                {editTicketIncluded && (
+                  <div className="flex justify-between text-sm mt-1 text-blue-600">
+                    <span>+ Ticket Allowance:</span>
+                    <span className="font-medium">AED {editTicketAmount.toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm mt-1">
                   <span className="text-muted-foreground">Deductions:</span>
-                  <span className="text-destructive">-AED {editingPayroll.deductions?.toLocaleString()}</span>
+                  <span className="text-destructive">-AED {(editingPayroll.deductions || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold mt-2 pt-2 border-t border-border">
                   <span>Net Salary:</span>
                   <span className="text-primary">
-                    AED {(editingPayroll.basic_salary + editingPayroll.allowances - editingPayroll.deductions).toLocaleString()}
+                    AED {(
+                      editingPayroll.basic_salary + 
+                      (editingPayroll.housing_allowance || 0) + 
+                      (editingPayroll.transportation_allowance || 0) + 
+                      (editTicketIncluded ? editTicketAmount : 0) + 
+                      (editingPayroll.other_allowances || 0) - 
+                      (editingPayroll.deductions || 0)
+                    ).toLocaleString()}
                   </span>
                 </div>
               </div>
-              <Button onClick={handleEditPayroll} disabled={updatePayroll.isPending} className="w-full">
-                {updatePayroll.isPending ? 'Saving...' : 'Save Changes'}
+              
+              <Button onClick={handleEditPayroll} disabled={updatePayroll.isPending || processTicketAllowance.isPending} className="w-full">
+                {(updatePayroll.isPending || processTicketAllowance.isPending) ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           )}

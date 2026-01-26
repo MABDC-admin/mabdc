@@ -122,7 +122,10 @@ export function AdminPayrollReport() {
       await updatePayroll.mutateAsync({
         id: editPayroll.id,
         basicSalary: editPayroll.basicSalary,
-        allowances: editPayroll.allowances,
+        housingAllowance: 0,
+        transportationAllowance: 0,
+        ticketAllowance: 0,
+        otherAllowances: editPayroll.allowances,
         deductions: editPayroll.deductions,
       });
       setIsEditOpen(false);
