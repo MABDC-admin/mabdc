@@ -1,106 +1,164 @@
 
-# Plan: Add HR Email as CC on Leave/Appeal Decision Notifications
+# Plan: Email HR When Employee Submits Leave Request (with Attachment)
 
-## Summary
+## Current Situation
 
-When sending approval/rejection emails to employees, HR will also receive a copy (CC) as confirmation that the notification was sent successfully.
+When an employee submits a leave request:
+1. The request is saved to the database
+2. Any attachment is uploaded to the `leave-attachments` bucket
+3. **Currently**: No notification is sent to HR
+
+HR only receives notifications after **approving/rejecting** (as CC), not when the request is **submitted**.
 
 ---
 
 ## Implementation Details
 
-### 1. Update `send-leave-decision-notification/index.ts`
+### 1. Create New Edge Function: `send-leave-request-notification`
 
-**Current Code (Lines 234-240):**
+**File:** `supabase/functions/send-leave-request-notification/index.ts`
+
+This function will:
+1. Receive the `leave_id` after successful submission
+2. Fetch the complete leave record with employee details
+3. Fetch the attachment URL if present
+4. Send an HTML email to HR (`HR_NOTIFICATION_EMAIL`)
+5. Include a link/preview of the attachment in the email
+
+**Payload:**
 ```typescript
-// Send email via Resend
-const emailResponse = await resend.emails.send({
-  from: `MABDC HRMS <${fromEmail}>`,
-  to: [recipientEmail],
-  subject: subject,
-  html: emailHtml,
-});
+{
+  leave_id: string;
+}
 ```
 
-**Updated Code:**
-```typescript
-// Get HR email for CC
-const hrEmail = Deno.env.get("HR_NOTIFICATION_EMAIL");
+**Email Content:**
+- Employee name, HRMS No, Department
+- Leave type, dates, duration
+- Employee's reason
+- Request submitted timestamp
+- **Attachment link** (if provided) - clickable button to view/download
+- Action buttons: Link to Admin Dashboard to review
 
-// Send email via Resend
-const emailResponse = await resend.emails.send({
-  from: `MABDC HRMS <${fromEmail}>`,
-  to: [recipientEmail],
-  cc: hrEmail ? [hrEmail] : undefined,  // CC HR for confirmation
-  subject: subject,
-  html: emailHtml,
-});
+---
+
+### 2. Update `supabase/config.toml`
+
+Add configuration for the new function:
+
+```toml
+[functions.send-leave-request-notification]
+verify_jwt = false
 ```
 
 ---
 
-### 2. Update `send-appeal-decision-notification/index.ts`
+### 3. Modify `src/hooks/useLeave.ts`
 
-**Current Code (Lines 235-241):**
+**Location:** `useAddLeave` mutation's `onSuccess` callback (Line 459-464)
+
+After the leave request is created, call the edge function:
+
 ```typescript
-// Send email via Resend
-const emailResponse = await resend.emails.send({
-  from: `MABDC HRMS <${fromEmail}>`,
-  to: [recipientEmail],
-  subject: subject,
-  html: emailHtml,
-});
-```
-
-**Updated Code:**
-```typescript
-// Get HR email for CC
-const hrEmail = Deno.env.get("HR_NOTIFICATION_EMAIL");
-
-// Send email via Resend
-const emailResponse = await resend.emails.send({
-  from: `MABDC HRMS <${fromEmail}>`,
-  to: [recipientEmail],
-  cc: hrEmail ? [hrEmail] : undefined,  // CC HR for confirmation
-  subject: subject,
-  html: emailHtml,
-});
+onSuccess: (data) => {
+  queryClient.invalidateQueries({ queryKey: ['leave'] });
+  queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
+  queryClient.invalidateQueries({ queryKey: ['all_leave_balances'] });
+  toast.success('Leave request submitted');
+  
+  // Send email notification to HR about new leave request
+  if (data?.id) {
+    supabase.functions.invoke('send-leave-request-notification', {
+      body: { leave_id: data.id }
+    }).catch(err => console.error('Failed to send leave request notification:', err));
+  }
+},
 ```
 
 ---
 
-## How It Works
+## Email Template Design
 
-| Field | Value |
-|-------|-------|
-| **To** | Employee's work email (e.g., `ramirezmarkjohn@gmail.com`) |
-| **CC** | HR email from `HR_NOTIFICATION_EMAIL` secret (`myranelsotto@gmail.com`) |
-| **From** | `MABDC HRMS <{SMTP_FROM_EMAIL}>` |
+**Subject:** `📩 New Leave Request: [Employee Name] - [Leave Type]`
+
+**Email Body:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 📩 NEW LEAVE REQUEST                                        │
+│                                                             │
+│ From: Mark John J. Ramirez                                  │
+│ HRMS No: HRMS NO. 0015                                      │
+│ Department: Finance                                         │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 📋 Leave Details                                            │
+├─────────────────────────────────────────────────────────────┤
+│ Type:        Sick Leave                                     │
+│ Duration:    Jan 27, 2026 (1 day)                          │
+│ Reason:      Fever                                          │
+│                                                             │
+│ ⏱️ Submitted: Jan 26, 2026 at 6:44 PM                       │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 📎 ATTACHMENT                                               │
+│                                                             │
+│ [View/Download Attachment]  ← Clickable button              │
+└─────────────────────────────────────────────────────────────┘
+
+Please review and approve/reject this request in the HRMS portal.
+
+---
+MABDC HR System
+```
 
 ---
 
-## Files to Modify
+## Files to Create/Modify
 
-| File | Change |
-|------|--------|
-| `supabase/functions/send-leave-decision-notification/index.ts` | Add `cc` field with HR email |
-| `supabase/functions/send-appeal-decision-notification/index.ts` | Add `cc` field with HR email |
+| File | Action | Description |
+|------|--------|-------------|
+| `supabase/functions/send-leave-request-notification/index.ts` | **Create** | Edge function to email HR on new leave requests with attachments |
+| `supabase/config.toml` | Modify | Add function configuration |
+| `src/hooks/useLeave.ts` | Modify | Add edge function call in `useAddLeave.onSuccess` |
 
 ---
 
-## Email Flow After Implementation
+## Technical Flow
 
 ```
-HR Approves Leave Request
+Employee Submits Leave Request
          │
          ▼
-Email Sent via Resend
-  To: ramirezmarkjohn@gmail.com (Employee)
-  CC: myranelsotto@gmail.com (HR - confirmation copy)
+LeaveRequestModal.handleSubmit()
          │
-         ├──► Employee receives: "✅ Leave Approved: Sick Leave"
+         ├── Upload attachment to 'leave-attachments' bucket
          │
-         └──► HR receives same email as CC (confirmation)
+         └── addLeave.mutate({ ..., attachment_url })
+                  │
+                  ▼
+         Database Insert ✓
+                  │
+                  ▼
+         onSuccess callback
+                  │
+                  ▼
+         supabase.functions.invoke('send-leave-request-notification')
+                  │
+                  ▼
+         Edge Function:
+           1. Fetch leave record (incl. attachment_url)
+           2. Fetch employee details
+           3. Get HR email from HR_NOTIFICATION_EMAIL
+           4. Send email with attachment link
+                  │
+                  ▼
+         HR receives email:
+           - Employee info
+           - Leave details
+           - Attachment link (if any)
+           - Request timestamp
 ```
 
 ---
@@ -109,6 +167,9 @@ Email Sent via Resend
 
 | Feature | Description |
 |---------|-------------|
-| CC Recipient | HR email from `HR_NOTIFICATION_EMAIL` secret |
-| Purpose | HR receives confirmation that approval/rejection email was sent |
-| Fallback | If `HR_NOTIFICATION_EMAIL` not set, CC is omitted (email still sent to employee) |
+| Trigger | When employee submits leave request |
+| Recipient | HR email from `HR_NOTIFICATION_EMAIL` |
+| Content | Employee info, leave details, reason, timestamps |
+| Attachment | Included as clickable link/button in email |
+| Email Service | Resend API (same as other notifications) |
+| Error Handling | Non-blocking - leave request still succeeds if email fails |
