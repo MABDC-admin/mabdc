@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { DollarSign, RefreshCw, CheckCircle, Plus, Trash2, Edit2, Download, Printer, CreditCard, Users, FileSpreadsheet, Plane, Mail, Loader2, MailCheck, MailX, Clock } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { generatePayslipPDF, generateBulkPayrollPDF } from '@/utils/payrollPdf';
@@ -45,6 +46,7 @@ export function PayrollView() {
   const [isBulkEmailOpen, setIsBulkEmailOpen] = useState(false);
   const [bulkEmailSending, setBulkEmailSending] = useState(false);
   const [bulkEmailProgress, setBulkEmailProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
+  const [includeTicketInBulk, setIncludeTicketInBulk] = useState(false);
 
   const [newPayroll, setNewPayroll] = useState({
     employeeId: '',
@@ -201,14 +203,17 @@ export function PayrollView() {
     for (const emp of employeesWithoutPayroll) {
       const contract = contracts.find(c => c.employee_id === emp.id && c.status === 'Active');
       
-      // Check for approved ticket allowance for this employee
-      const ticketAllowance = approvedTicketAllowances.find(t => t.employee_id === emp.id);
-      const ticketAmount = ticketAllowance?.amount || 0;
-      
       const basicSalary = contract?.basic_salary || emp.basic_salary || 0;
       const housingAllowance = contract?.housing_allowance || 0;
       const transportAllowance = contract?.transportation_allowance || 0;
-      const otherAllowances = emp.allowance || 0;
+      
+      // FIX: Only use other_allowances as fallback when NO contract exists
+      const otherAllowances = contract ? 0 : (emp.allowance || 0);
+      
+      // FIX: Ticket allowance only included if checkbox is checked (optional)
+      const ticketAmount = includeTicketInBulk 
+        ? (approvedTicketAllowances.find(t => t.employee_id === emp.id)?.amount || 0) 
+        : 0;
 
       try {
         await generatePayroll.mutateAsync({
@@ -554,6 +559,28 @@ export function PayrollView() {
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+                  
+                  {/* Optional: Include Ticket Allowance */}
+                  {approvedTicketAllowances.length > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <Checkbox 
+                        id="includeTicket"
+                        checked={includeTicketInBulk}
+                        onCheckedChange={(checked) => setIncludeTicketInBulk(!!checked)}
+                      />
+                      <label htmlFor="includeTicket" className="flex-1 text-sm cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <Plane className="w-4 h-4 text-blue-500" />
+                          <span className="font-medium">Include Ticket Allowance</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {approvedTicketAllowances.filter(t => 
+                            employeesWithoutPayroll.some(e => e.id === t.employee_id)
+                          ).length} employees eligible for ticket allowance this month
+                        </p>
+                      </label>
                     </div>
                   )}
                   
