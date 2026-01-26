@@ -228,9 +228,12 @@ const handler = async (req: Request): Promise<Response> => {
     const statusIcon = status === 'Approved' ? '✅' : '❌';
     const subject = `${statusIcon} Leave ${status}: ${leaveRecord.leave_type} - ${leaveRecord.start_date}`;
 
+    // Get the from email - use SMTP_FROM_EMAIL if set, otherwise fallback
+    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "onboarding@resend.dev";
+
     // Send email via Resend
     const emailResponse = await resend.emails.send({
-      from: "MABDC HRMS <onboarding@resend.dev>",
+      from: `MABDC HRMS <${fromEmail}>`,
       to: [recipientEmail],
       subject: subject,
       html: emailHtml,
