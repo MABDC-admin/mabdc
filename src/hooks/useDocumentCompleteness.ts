@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useMemo } from 'react';
 
-// The 7 required document categories
+// The 7 required document categories (Contract is checked separately via contracts table)
 const REQUIRED_CATEGORIES = [
   'Emirates ID',
   'Visa',
@@ -21,9 +21,15 @@ export interface DocumentCompleteness {
   uploadedCategories: string[];
 }
 
+interface Contract {
+  id: string;
+  employee_id: string;
+  status: string;
+}
+
 export function useDocumentCompleteness() {
   // Fetch all active (non-renewed) documents for all employees
-  const { data: allDocuments = [], isLoading } = useQuery({
+  const { data: allDocuments = [], isLoading: docsLoading } = useQuery({
     queryKey: ['all-documents-completeness'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -35,6 +41,22 @@ export function useDocumentCompleteness() {
       return data;
     },
   });
+
+  // Fetch all active contracts to check "Contract" completeness
+  const { data: activeContracts = [], isLoading: contractsLoading } = useQuery({
+    queryKey: ['contracts-for-completeness'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contracts')
+        .select('id, employee_id, status')
+        .eq('status', 'Active');
+      
+      if (error) throw error;
+      return data as Contract[];
+    },
+  });
+
+  const isLoading = docsLoading || contractsLoading;
 
   // Calculate completeness per employee
   const completenessMap = useMemo(() => {
@@ -61,6 +83,14 @@ export function useDocumentCompleteness() {
       }
     });
     
+    // Mark "Contract" as complete for employees with active contracts
+    activeContracts.forEach(contract => {
+      if (!docsByEmployee[contract.employee_id]) {
+        docsByEmployee[contract.employee_id] = new Set();
+      }
+      docsByEmployee[contract.employee_id].add('Contract');
+    });
+    
     // Calculate completeness for each employee
     Object.entries(docsByEmployee).forEach(([employeeId, categories]) => {
       const uploadedCategories = Array.from(categories);
@@ -78,7 +108,7 @@ export function useDocumentCompleteness() {
     });
     
     return map;
-  }, [allDocuments]);
+  }, [allDocuments, activeContracts]);
 
   // Helper to get completeness for a specific employee
   const getCompleteness = (employeeId: string): DocumentCompleteness => {

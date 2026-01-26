@@ -50,6 +50,7 @@ interface Payroll {
   ticket_allowance_status?: 'eligible' | 'not_eligible' | 'processed' | 'pending';
 }
 
+// Fetch payroll for active employees only (excludes Resigned/Terminated)
 export function usePayroll() {
   return useQuery({
     queryKey: ['payroll'],
@@ -58,13 +59,14 @@ export function usePayroll() {
         .from('payroll')
         .select(`
           *,
-          employees (
+          employees!inner (
             full_name, hrms_no, bank_name, iban, bank_account_no, 
-            department, job_position, photo_url, work_email, joining_date, birthday
+            department, job_position, photo_url, work_email, joining_date, birthday, status
           ),
           payroll_earnings (id, earning_type, description, amount),
           payroll_deductions (id, deduction_type, reason, amount, days)
         `)
+        .not('employees.status', 'in', '("Resigned","Terminated")')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
