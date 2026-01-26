@@ -340,8 +340,7 @@ export function useCheckOutByHRMS() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
-      const undertimeText = data.status?.includes('Undertime') ? ' (Undertime)' : '';
-      toast.success(`${data.employeeName} checked out successfully${undertimeText}`);
+      toast.success(`${data.employeeName} checked out successfully`);
     },
     onError: (error: Error) => {
       toast.error(error.message);
