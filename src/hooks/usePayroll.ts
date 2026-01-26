@@ -226,7 +226,8 @@ export function useUpdatePayroll() {
       transportationAllowance,
       ticketAllowance,
       otherAllowances,
-      deductions 
+      deductions,
+      deductionReason = ''
     }: {
       id: string;
       basicSalary: number;
@@ -235,6 +236,7 @@ export function useUpdatePayroll() {
       ticketAllowance: number;
       otherAllowances: number;
       deductions: number;
+      deductionReason?: string;
     }) => {
       const totalAllowances = housingAllowance + transportationAllowance + ticketAllowance + otherAllowances;
       const netSalary = basicSalary + totalAllowances - deductions;
@@ -249,6 +251,7 @@ export function useUpdatePayroll() {
           other_allowances: otherAllowances,
           allowances: totalAllowances,
           deductions,
+          deduction_reason: deductionReason,
           net_salary: netSalary,
         })
         .eq('id', id)
