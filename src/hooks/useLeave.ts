@@ -456,16 +456,20 @@ export function useAddLeave() {
       
       // MANDATORY: Send email notification to HR about new leave request
       if (data?.id) {
-        console.log('Sending leave request notification for leave_id:', data.id);
-        const { error: notifyError } = await supabase.functions.invoke('send-leave-request-notification', {
-          body: { leave_id: data.id }
-        });
-        
-        if (notifyError) {
-          console.error('Failed to notify HR of leave request:', notifyError);
-          // Continue - don't fail the entire request, but log it
-        } else {
-          console.log('Leave request notification sent successfully');
+        try {
+          console.log('[LEAVE NOTIFICATION] Starting notification for leave_id:', data.id);
+          
+          const { data: invokeData, error: notifyError } = await supabase.functions.invoke('send-leave-request-notification', {
+            body: { leave_id: data.id }
+          });
+          
+          if (notifyError) {
+            console.error('[LEAVE NOTIFICATION] Edge function error:', notifyError);
+          } else {
+            console.log('[LEAVE NOTIFICATION] Success:', invokeData);
+          }
+        } catch (err) {
+          console.error('[LEAVE NOTIFICATION] Exception caught:', err);
         }
       }
       
