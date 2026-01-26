@@ -15,14 +15,22 @@ export interface ShiftTimes {
  * Priority: Override → Permanent Assignment → Default
  */
 export async function getEmployeeShiftTimes(employeeId: string, date: string): Promise<ShiftTimes> {
-  // Priority 1: Check for override on this date
-  const { data: override } = await supabase
-    .from('employee_shift_overrides')
-    .select('shift_start_time, shift_end_time')
-    .eq('employee_id', employeeId)
-    .eq('override_date', date)
-    .maybeSingle();
+  // Run both queries in parallel instead of sequential for better performance
+  const [{ data: override }, { data: shift }] = await Promise.all([
+    supabase
+      .from('employee_shift_overrides')
+      .select('shift_start_time, shift_end_time')
+      .eq('employee_id', employeeId)
+      .eq('override_date', date)
+      .maybeSingle(),
+    supabase
+      .from('employee_shifts')
+      .select('shift_type')
+      .eq('employee_id', employeeId)
+      .maybeSingle()
+  ]);
 
+  // Priority 1: Override
   if (override) {
     return {
       start: override.shift_start_time.substring(0, 5),
@@ -31,24 +39,13 @@ export async function getEmployeeShiftTimes(employeeId: string, date: string): P
     };
   }
 
-  // Priority 2: Check permanent shift assignment
-  const { data: shift } = await supabase
-    .from('employee_shifts')
-    .select('shift_type')
-    .eq('employee_id', employeeId)
-    .maybeSingle();
-
+  // Priority 2: Permanent shift
   if (shift?.shift_type) {
     const shiftType = shift.shift_type as ShiftType;
     if (shiftType === 'morning' || shiftType === 'afternoon') {
       const def = SHIFT_DEFINITIONS[shiftType];
-      return {
-        start: def.start!,
-        end: def.end!,
-        shiftType
-      };
+      return { start: def.start!, end: def.end!, shiftType };
     }
-    // Flexible without override - use default times
     if (shiftType === 'flexible') {
       return { ...DEFAULT_SHIFT, shiftType: 'flexible' };
     }
