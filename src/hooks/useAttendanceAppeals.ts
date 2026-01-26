@@ -57,6 +57,22 @@ export function useAddAttendanceAppeal() {
         .select()
         .single();
       if (error) throw error;
+      
+      // MANDATORY: Send email notification to HR about new appeal
+      if (data?.id) {
+        console.log('Sending appeal request notification for appeal_id:', data.id);
+        const { error: notifyError } = await supabase.functions.invoke('send-appeal-request-notification', {
+          body: { appeal_id: data.id }
+        });
+        
+        if (notifyError) {
+          console.error('Failed to notify HR of appeal:', notifyError);
+          // Continue - don't fail the entire request, but log it
+        } else {
+          console.log('Appeal request notification sent successfully');
+        }
+      }
+      
       return data;
     },
     onSuccess: () => {
