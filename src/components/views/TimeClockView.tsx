@@ -37,7 +37,7 @@ import { ShiftOverrideDialog } from '@/components/modals/ShiftOverrideDialog';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
-type TimeClockStatus = 'early_in' | 'late_entry' | 'early_out' | 'late_exit' | 'miss_punch_in' | 'miss_punch_out' | 'on_time' | 'appealed';
+type TimeClockStatus = 'early_in' | 'late_entry' | 'early_out' | 'late_exit' | 'miss_punch_in' | 'miss_punch_out' | 'on_time' | 'appealed' | 'absent';
 
 interface TimeClockRecord {
   employeeId: string;
@@ -61,7 +61,8 @@ const STATUS_LABELS: Record<TimeClockStatus, string> = {
   miss_punch_in: 'Miss Punch In',
   miss_punch_out: 'Miss Punch Out',
   on_time: 'Present',
-  appealed: 'Appealed'
+  appealed: 'Appealed',
+  absent: 'Absent'
 };
 
 const STATUS_COLORS: Record<TimeClockStatus, string> = {
@@ -72,7 +73,8 @@ const STATUS_COLORS: Record<TimeClockStatus, string> = {
   miss_punch_in: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
   miss_punch_out: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
   on_time: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  appealed: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300'
+  appealed: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+  absent: 'bg-gray-500 text-white dark:bg-gray-600 dark:text-gray-100'
 };
 
 const SHIFT_TIMES = {
@@ -197,7 +199,7 @@ export default function TimeClockView() {
       'Missed Punch': 'miss_punch_in',
       'Miss Punch In': 'miss_punch_in',
       'Appealed': 'appealed',
-      'Absent': 'miss_punch_in',
+      'Absent': 'absent',
       'Half Day': 'early_out',
       'On Leave': 'on_time',
       'Holiday': 'on_time'
@@ -237,8 +239,15 @@ export default function TimeClockView() {
     const earlyThreshold = `${String(startHour - 1).padStart(2, '0')}:${String(startMin).padStart(2, '0')}`;
 
     if (!checkIn) {
-      // Only mark as miss punch if past shift start time (for today) or if viewing past date
-      if (isPastDate || (isViewingToday && now > new Date(`${dateStr}T${shiftStartTime}:00`))) {
+      // Check if shift has ended (absent) or just started (miss punch in)
+      const isPastShiftEnd = isPastDate || (isViewingToday && now > new Date(`${dateStr}T${shiftEndTime}:00`));
+      const isPastShiftStart = isPastDate || (isViewingToday && now > new Date(`${dateStr}T${shiftStartTime}:00`));
+      
+      if (isPastShiftEnd) {
+        // Shift has ended with no check-in = Absent
+        statuses.push('absent');
+      } else if (isPastShiftStart) {
+        // Shift started but not ended = Miss Punch In (can still come)
         statuses.push('miss_punch_in');
       }
     } else {
@@ -371,7 +380,8 @@ export default function TimeClockView() {
       miss_punch_in: 0,
       miss_punch_out: 0,
       on_time: 0,
-      appealed: 0
+      appealed: 0,
+      absent: 0
     };
     
     timeClockRecords.forEach(record => {
@@ -454,7 +464,8 @@ export default function TimeClockView() {
       late_exit: 'Present',
       miss_punch_in: 'Missed Punch',
       miss_punch_out: 'Missed Punch',
-      appealed: 'Appealed'
+      appealed: 'Appealed',
+      absent: 'Absent'
     };
     
     const dbStatus = statusMap[editStatus] || 'Present';
