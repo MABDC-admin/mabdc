@@ -231,11 +231,15 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Get the from email - use SMTP_FROM_EMAIL if set, otherwise fallback
     const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "onboarding@resend.dev";
+    
+    // Get HR email for CC confirmation
+    const hrEmail = Deno.env.get("HR_NOTIFICATION_EMAIL");
 
     // Send email via Resend
     const emailResponse = await resend.emails.send({
       from: `MABDC HRMS <${fromEmail}>`,
       to: [recipientEmail],
+      cc: hrEmail ? [hrEmail] : undefined,
       subject: subject,
       html: emailHtml,
     });
