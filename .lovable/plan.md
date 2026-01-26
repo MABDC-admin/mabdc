@@ -1,255 +1,121 @@
 
-# Plan: Auto Email Notifications for Leave/Appeal Decisions + Timestamps
+# Plan: Fix Email Sending for Leave/Appeal Decision Notifications
 
-## Current Situation
+## Problem Identified
 
-You have **3 pending leave requests** that can be used for testing:
+The Edge Function logs clearly show the error:
 
-| Employee | Leave Type | Dates | Reason | Submitted At (UTC) |
-|----------|-----------|-------|--------|-------------------|
-| Mark John J. Ramirez | Sick Leave | Jan 27 | Fever | 2026-01-26 14:44:34 |
-| Christine Mari M. Jonson | Sick Leave | Jan 19 | Fever/flu | 2026-01-26 08:13:20 |
-| Glorie Ann I. Espinosa | Sick Leave | Jan 26 | Muscle pain, unable to stand/walk | 2026-01-26 06:15:46 |
+```
+You can only send testing emails to your own email address (stfxsa2024@gmail.com). 
+To send emails to other recipients, please verify a domain at resend.com/domains, 
+and change the `from` address to an email using this domain.
+```
 
----
-
-## Implementation Details
-
-### 1. Create Edge Function: `send-leave-decision-notification`
-
-**File:** `supabase/functions/send-leave-decision-notification/index.ts`
-
-This function will:
-1. Receive leave_id and new status (Approved/Rejected)
-2. Fetch leave record details including **created_at timestamp**
-3. Fetch employee details (name, email, HRMS, department)
-4. Send HTML email to employee's work_email via Resend API
-5. Include the **Request Submitted At** timestamp in the email
-
-**Payload:**
+**Root Cause:** Both `send-leave-decision-notification` and `send-appeal-decision-notification` are using the hardcoded test sender:
 ```typescript
-{
-  leave_id: string;
-  status: 'Approved' | 'Rejected';
-  rejection_reason?: string;
-}
+from: "MABDC HRMS <onboarding@resend.dev>"
 ```
 
-### 2. Create Edge Function: `send-appeal-decision-notification`
+This only allows sending to `stfxsa2024@gmail.com` (the Resend account owner).
 
-**File:** `supabase/functions/send-appeal-decision-notification/index.ts`
+---
 
-This function will:
-1. Receive appeal_id and new status
-2. Fetch appeal record details including **created_at timestamp**
-3. Fetch employee details
-4. Send HTML email to employee's work_email via Resend API
-5. Include the **Appeal Submitted At** timestamp in the email
+## Why Payslip Emails Work
 
-**Payload:**
+The `send-payslip-email` function correctly uses the verified domain:
 ```typescript
-{
-  appeal_id: string;
-  status: 'Approved' | 'Rejected';
-  rejection_reason?: string;
-}
+const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "onboarding@resend.dev";
+
+await resend.emails.send({
+  from: `${companyName} <${fromEmail}>`,
+  to: [employeeEmail],
+  // ...
+});
 ```
+
+The `SMTP_FROM_EMAIL` secret contains a verified domain email that can send to any recipient.
 
 ---
 
-### 3. Update `supabase/config.toml`
+## Solution
 
-Add configurations for both new functions:
+Update both edge functions to use `SMTP_FROM_EMAIL` instead of the hardcoded test address.
 
-```toml
-[functions.send-leave-decision-notification]
-verify_jwt = false
+### 1. Fix `send-leave-decision-notification/index.ts`
 
-[functions.send-appeal-decision-notification]
-verify_jwt = false
-```
-
----
-
-### 4. Modify `src/hooks/useLeave.ts`
-
-**Location:** `useUpdateLeaveStatus` mutation's `onSuccess` callback
-
-After the status update succeeds, call the edge function:
-
+**Current (Line 232-237):**
 ```typescript
-onSuccess: async (data, variables) => {
-  queryClient.invalidateQueries({ queryKey: ['leave'] });
-  queryClient.invalidateQueries({ queryKey: ['leave_balances'] });
-  queryClient.invalidateQueries({ queryKey: ['all_leave_balances'] });
-  toast.success(`Leave request ${variables.status.toLowerCase()}`);
-  
-  // Send email notification to employee
-  if (variables.status === 'Approved' || variables.status === 'Rejected') {
-    supabase.functions.invoke('send-leave-decision-notification', {
-      body: {
-        leave_id: variables.id,
-        status: variables.status,
-        rejection_reason: variables.rejection_reason
-      }
-    }).catch(err => console.error('Failed to send leave notification:', err));
-  }
-},
+const emailResponse = await resend.emails.send({
+  from: "MABDC HRMS <onboarding@resend.dev>",
+  to: [recipientEmail],
+  subject: subject,
+  html: emailHtml,
+});
 ```
 
----
-
-### 5. Modify `src/hooks/useAttendanceAppeals.ts`
-
-**Location:** `useUpdateAttendanceAppeal` mutation's `onSuccess` callback
-
+**Fixed:**
 ```typescript
-onSuccess: async (data) => {
-  queryClient.invalidateQueries({ queryKey: ['attendance_appeals'] });
-  queryClient.invalidateQueries({ queryKey: ['attendance'] });
-  
-  // Send email notification to employee
-  if (data.status === 'Approved' || data.status === 'Rejected') {
-    supabase.functions.invoke('send-appeal-decision-notification', {
-      body: {
-        appeal_id: data.id,
-        status: data.status,
-        rejection_reason: data.rejection_reason
-      }
-    }).catch(err => console.error('Failed to send appeal notification:', err));
-  }
-},
+// Get the from email - use SMTP_FROM_EMAIL if set, otherwise fallback
+const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "onboarding@resend.dev";
+
+const emailResponse = await resend.emails.send({
+  from: `MABDC HRMS <${fromEmail}>`,
+  to: [recipientEmail],
+  subject: subject,
+  html: emailHtml,
+});
 ```
 
 ---
 
-## Email Template Design
+### 2. Fix `send-appeal-decision-notification/index.ts`
 
-### Leave Decision Email (with Timestamp)
-
-**Subject (Approved):** `✅ Leave Approved: Sick Leave - Jan 27, 2026`
-**Subject (Rejected):** `❌ Leave Rejected: Sick Leave - Jan 27, 2026`
-
-**Email Body:**
-```
-Dear Mark John J. Ramirez,
-
-Your leave request has been APPROVED.
-
-┌─────────────────────────────────────────┐
-│ Leave Details                           │
-├─────────────────────────────────────────┤
-│ Type:        Sick Leave                 │
-│ Duration:    Jan 27, 2026 (1 day)       │
-│ Your Reason: Fever                      │
-│                                         │
-│ ⏱️ Requested: Jan 26, 2026 at 6:44 PM   │
-│ ✅ Approved:  Jan 26, 2026 at 10:05 PM  │
-└─────────────────────────────────────────┘
-
-Enjoy your time off!
-
----
-MABDC HR System
+**Current (Line 233-238):**
+```typescript
+const emailResponse = await resend.emails.send({
+  from: "MABDC HRMS <onboarding@resend.dev>",
+  to: [recipientEmail],
+  subject: subject,
+  html: emailHtml,
+});
 ```
 
-### Appeal Decision Email (with Timestamp)
+**Fixed:**
+```typescript
+// Get the from email - use SMTP_FROM_EMAIL if set, otherwise fallback
+const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "onboarding@resend.dev";
 
-**Subject (Approved):** `✅ Attendance Appeal Approved - Jan 25, 2026`
-**Subject (Rejected):** `❌ Attendance Appeal Rejected - Jan 25, 2026`
-
-**Email Body:**
-```
-Dear Employee Name,
-
-Your time correction appeal has been APPROVED.
-
-┌─────────────────────────────────────────┐
-│ Appeal Details                          │
-├─────────────────────────────────────────┤
-│ Date:           Jan 25, 2026            │
-│ Corrected Time: In: 08:00 | Out: 17:00  │
-│ Your Message:   [Appeal message]        │
-│                                         │
-│ ⏱️ Submitted: Jan 25, 2026 at 5:30 PM   │
-│ ✅ Approved:  Jan 26, 2026 at 10:15 AM  │
-└─────────────────────────────────────────┘
-
-Your attendance record has been updated.
-
----
-MABDC HR System
+const emailResponse = await resend.emails.send({
+  from: `MABDC HRMS <${fromEmail}>`,
+  to: [recipientEmail],
+  subject: subject,
+  html: emailHtml,
+});
 ```
 
 ---
 
-## Files to Create/Modify
+## Files to Modify
 
-| File | Action | Description |
-|------|--------|-------------|
-| `supabase/functions/send-leave-decision-notification/index.ts` | Create | Edge function for leave decision emails with timestamps |
-| `supabase/functions/send-appeal-decision-notification/index.ts` | Create | Edge function for appeal decision emails with timestamps |
-| `supabase/config.toml` | Modify | Add function configurations |
-| `src/hooks/useLeave.ts` | Modify | Add edge function call in `useUpdateLeaveStatus.onSuccess` |
-| `src/hooks/useAttendanceAppeals.ts` | Modify | Add edge function call in `useUpdateAttendanceAppeal.onSuccess` |
+| File | Change |
+|------|--------|
+| `supabase/functions/send-leave-decision-notification/index.ts` | Use `SMTP_FROM_EMAIL` for sender |
+| `supabase/functions/send-appeal-decision-notification/index.ts` | Use `SMTP_FROM_EMAIL` for sender |
 
 ---
 
-## Testing Plan
+## Testing After Fix
 
-After implementation, we will test by:
-
-1. **Deploy the edge functions**
-2. **Approve one of the 3 pending leave requests** from the Admin Dashboard
-3. **Check if the employee receives the email** at their work_email address
-
-The 3 employees who will receive test emails upon approval/rejection:
-- **Mark John J. Ramirez** → ramirezmarkjohn@gmail.com
-- **Christine Mari M. Jonson** → cmjonson01@yahoo.com  
-- **Glorie Ann I. Espinosa** → espinosaglorieann@gmail.com
-
----
-
-## Technical Flow
-
-```
-HR Approves/Rejects Leave
-         │
-         ▼
-useUpdateLeaveStatus.mutate()
-         │
-         ▼
-Database Updated ✓
-         │
-         ▼
-onSuccess callback
-         │
-         ▼
-supabase.functions.invoke('send-leave-decision-notification')
-         │
-         ▼
-Edge Function:
-  1. Fetch leave record (incl. created_at timestamp)
-  2. Fetch employee work_email
-  3. Send email via Resend API
-         │
-         ▼
-Employee receives email with:
-  - Leave details
-  - Their reason
-  - Request timestamp
-  - Decision timestamp
-```
+1. Deploy the updated edge functions
+2. Approve one of the pending leave requests from the Admin Dashboard
+3. Verify the email is received by the employee (e.g., `ramirezmarkjohn@gmail.com`)
 
 ---
 
 ## Summary
 
-| Feature | Description |
-|---------|-------------|
-| Leave Decision Email | Sent to employee when HR approves/rejects leave |
-| Appeal Decision Email | Sent to employee when HR approves/rejects appeal |
-| Timestamps Included | Both request submission time and decision time |
-| Recipient | Employee's `work_email` from database |
-| Email Service | Resend API (same as payslip/absent notifications) |
-| Error Handling | Non-blocking - UI update still succeeds if email fails |
+| Issue | The sender email was hardcoded to `onboarding@resend.dev` |
+|-------|----------------------------------------------------------|
+| Effect | Resend blocks sending to external recipients with test domain |
+| Solution | Use `SMTP_FROM_EMAIL` environment variable (verified domain) |
+| Pattern | Same approach as the working `send-payslip-email` function |
