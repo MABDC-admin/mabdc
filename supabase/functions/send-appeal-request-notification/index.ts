@@ -54,7 +54,9 @@ function generateAppealRequestEmail(
   requestedCheckIn: string | null,
   requestedCheckOut: string | null,
   appealMessage: string,
-  submittedAt: string
+  submittedAt: string,
+  approveUrl: string,
+  rejectUrl: string
 ): string {
   return `
 <!DOCTYPE html>
@@ -145,12 +147,38 @@ function generateAppealRequestEmail(
         </table>
       </div>
       
-      <div style="background-color: #fef3c7; border-radius: 8px; padding: 16px; margin-top: 24px; text-align: center;">
-        <p style="margin: 0; color: #92400e; font-weight: 600;">
-          ⏳ This appeal is pending your review
+      <!-- Quick Action Buttons -->
+      <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; padding: 24px; margin-top: 24px; margin-bottom: 24px; text-align: center; border: 2px solid #86efac;">
+        <h3 style="margin: 0 0 8px 0; color: #166534; font-size: 18px;">
+          ⚡ Quick Actions
+        </h3>
+        <p style="margin: 0 0 20px 0; color: #15803d; font-size: 14px;">
+          Click a button below to process this appeal directly from email
         </p>
-        <p style="margin: 8px 0 0 0; color: #78350f; font-size: 14px;">
-          Please log in to the HRMS Admin Dashboard to approve or reject this appeal.
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px; width: 50%;">
+              <a href="${approveUrl}" 
+                 style="display: block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; padding: 16px 24px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 16px; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);">
+                ✅ APPROVE
+              </a>
+            </td>
+            <td style="padding: 8px; width: 50%;">
+              <a href="${rejectUrl}" 
+                 style="display: block; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 16px 24px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 16px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);">
+                ❌ REJECT
+              </a>
+            </td>
+          </tr>
+        </table>
+        <p style="margin: 16px 0 0 0; color: #6b7280; font-size: 12px;">
+          Links expire in 7 days. For rejection with reason, please use the dashboard.
+        </p>
+      </div>
+      
+      <div style="background-color: #f1f5f9; border-radius: 8px; padding: 16px; text-align: center;">
+        <p style="margin: 0; color: #64748b; font-size: 14px;">
+          Or log in to the <strong>HRMS Admin Dashboard</strong> for more options
         </p>
       </div>
       
@@ -221,9 +249,40 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Create approval tokens
+    const { data: approveToken, error: approveError } = await supabase
+      .from("email_approval_tokens")
+      .insert({
+        request_type: "attendance_appeal",
+        request_id: appeal_id,
+        action: "approve",
+      })
+      .select("token")
+      .single();
+
+    const { data: rejectToken, error: rejectError } = await supabase
+      .from("email_approval_tokens")
+      .insert({
+        request_type: "attendance_appeal",
+        request_id: appeal_id,
+        action: "reject",
+      })
+      .select("token")
+      .single();
+
+    if (approveError || rejectError) {
+      console.error("Failed to create approval tokens:", approveError || rejectError);
+      throw new Error("Failed to generate approval links");
+    }
+
+    // Build approval URLs
+    const baseUrl = `${supabaseUrl}/functions/v1/process-email-approval`;
+    const approveUrl = `${baseUrl}?token=${approveToken.token}`;
+    const rejectUrl = `${baseUrl}?token=${rejectToken.token}`;
+
     const employee = appealRecord.employees;
     
-    // Generate email HTML
+    // Generate email HTML with action buttons
     const emailHtml = generateAppealRequestEmail(
       employee?.full_name || 'Unknown Employee',
       employee?.hrms_no || 'N/A',
@@ -232,7 +291,9 @@ const handler = async (req: Request): Promise<Response> => {
       appealRecord.requested_check_in,
       appealRecord.requested_check_out,
       appealRecord.appeal_message,
-      appealRecord.created_at
+      appealRecord.created_at,
+      approveUrl,
+      rejectUrl
     );
 
     const subject = `📩 New Attendance Appeal: ${employee?.full_name || 'Employee'} - ${formatDate(appealRecord.appeal_date)}`;
@@ -263,7 +324,8 @@ const handler = async (req: Request): Promise<Response> => {
       metadata: {
         appeal_id: appeal_id,
         appeal_date: appealRecord.appeal_date,
-        submitted_at: appealRecord.created_at
+        submitted_at: appealRecord.created_at,
+        has_quick_actions: true
       }
     });
 
