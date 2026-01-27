@@ -442,6 +442,42 @@ export type Database = {
         }
         Relationships: []
       }
+      email_approval_tokens: {
+        Row: {
+          action: string
+          created_at: string
+          expires_at: string
+          id: string
+          request_id: string
+          request_type: string
+          token: string
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          request_id: string
+          request_type: string
+          token?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          request_id?: string
+          request_type?: string
+          token?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
       email_history: {
         Row: {
           created_at: string
