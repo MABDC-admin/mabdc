@@ -92,6 +92,10 @@ export function DashboardView() {
   const lateToday = todayAttendance.filter(a => a.status === 'Late').length;
   
   const expiringVisas = employees.filter(e => {
+    // Exclude terminated, resigned, or archived employees from visa alerts
+    const status = e.status as string;
+    if (status === 'Terminated' || status === 'Resigned' || status === 'Archived') return false;
+    
     if (!e.visa_expiration) return false;
     const days = Math.ceil((new Date(e.visa_expiration).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
     return days > 0 && days <= expiryThreshold;
