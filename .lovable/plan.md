@@ -1,109 +1,125 @@
 
-# Plan: Fix Contract Expiry Alerts Showing Archived Contracts
+# Plan: Exclude Terminated and Archived Employees from ALL Alerts
 
-## Root Cause Identified
+## Summary of Findings
 
-The system is showing **8 contracts expiring soon** when only **3 are truly expiring**. The 5 extra false alerts are from **Archived contracts** that were superseded by new contracts but still have their old `end_date` values.
-
-### Data Evidence
-
-| Contract Status | Count | Should Show Alert? |
-|-----------------|-------|-------------------|
-| Active | 3 | ✅ Yes |
-| Archived | 5 | ❌ No (superseded contracts) |
-| **Total Displayed** | **8** | **Should be 3** |
-
-### Specific False Positives Found
-
-| Employee | Archived Contract | Days Remaining | Has New Active Contract |
-|----------|------------------|----------------|------------------------|
-| Jecille F. Buizon | MB260249481AE | 10 days | ✅ MB308937462AE (1040 days) |
-| Glorie Ann I. Espinosa | MOL-1768387021275 | 10 days | ✅ MB308610035AE (1040 days) |
-| Princess Jesa D. Tagulao | MB260252057AE | 10 days | ✅ MB308866261AE (753 days) |
-| Johnny Boy L. Dadula | MB260224075AE | 10 days | ✅ MB308637683AE (24 days) |
-| Sheila Mae P. Dadula | MB260475973AE | 13 days | ✅ MB308609136AE (749 days) |
+After thorough investigation, I found that while several hooks and edge functions already filter by employee status, there are still **gaps where terminated/archived employees could appear in alerts**.
 
 ---
 
-## Code Issue Analysis
+## Current Status by Component
 
-The `getContractExpiryStatus` function in both views only excludes `'Expired'` and `'Terminated'` status:
+| Component | Current Filtering | Issue |
+|-----------|-------------------|-------|
+| `useEmployees` hook | ✅ Filters out Resigned/Terminated | OK |
+| `useDocumentRenewalQueue` hook | ✅ Uses `.eq('status', 'Active')` | OK |
+| `send-document-expiry-notification` | ✅ Uses `.eq("status", "Active")` | OK |
+| `check-contract-expiry` | ✅ Uses `.in("status", ["Active", "Approved"])` on contracts | OK |
+| **DashboardView `expiringVisas`** | ❌ No employee status check | **NEEDS FIX** |
+| **DashboardView contract alerts** | ✅ Recently fixed for Archived | OK |
+| `useDocumentExpiryPriority` hook | Relies on passed employees array | Depends on caller |
+| `EmployeeProfileModal` expiry alerts | Displays for any employee viewed | Acceptable (viewing profile) |
+
+---
+
+## Issue Identified
+
+In `DashboardView.tsx`, the **expiringVisas** calculation (lines 94-98) doesn't filter by employee status:
 
 ```typescript
-// Current (buggy) code:
-if (contract.status === 'Expired' || contract.status === 'Terminated') return 'expired';
+// Current code - NO STATUS CHECK
+const expiringVisas = employees.filter(e => {
+  if (!e.visa_expiration) return false;
+  const days = Math.ceil((new Date(e.visa_expiration).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+  return days > 0 && days <= expiryThreshold;
+});
 ```
 
-It should also exclude `'Archived'`:
-
-```typescript
-// Fixed code:
-if (contract.status === 'Expired' || contract.status === 'Terminated' || contract.status === 'Archived') return 'expired';
-```
+While `useEmployees` already filters out Resigned/Terminated employees, adding an explicit check provides:
+1. **Defense in depth** - protects against future changes to the hook
+2. **Clarity** - makes the business logic explicit
+3. **Consistency** - matches the pattern used elsewhere
 
 ---
 
 ## Files to Modify
 
-### 1. `src/components/views/ContractsView.tsx`
+### 1. `src/components/views/DashboardView.tsx`
 
-**Line 138-145**: Update `getContractExpiryStatus` to exclude Archived contracts
+**Add explicit employee status check to `expiringVisas` calculation:**
 
 ```typescript
-const getContractExpiryStatus = (contract: typeof contracts[0]) => {
-  if (contract.status === 'Expired') {
-    return { status: 'expired', label: 'Expired', icon: XCircle, color: 'bg-destructive/10 text-destructive border-destructive/30', daysLeft: null };
+// Lines 94-98: Add status filter
+const expiringVisas = employees.filter(e => {
+  // Exclude terminated, resigned, or archived employees
+  const status = e.status as string;
+  if (status === 'Terminated' || status === 'Resigned' || status === 'Archived') return false;
+  
+  if (!e.visa_expiration) return false;
+  const days = Math.ceil((new Date(e.visa_expiration).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+  return days > 0 && days <= expiryThreshold;
+});
+```
+
+### 2. `src/hooks/useDocumentExpiryPriority.ts`
+
+**Add status validation at the start of employee processing:**
+
+Although the hook receives employees from `useEmployees` (which already filters), adding a defensive check ensures robustness:
+
+```typescript
+// Line 59: Add status filter before processing
+employees.forEach((employee) => {
+  // Skip terminated/resigned/archived employees
+  const status = employee.status as string;
+  if (status === 'Terminated' || status === 'Resigned' || status === 'Archived') {
+    return; // Skip this employee
   }
   
-  // NEW: Also treat Archived and Terminated contracts as inactive
-  if (contract.status === 'Terminated' || contract.status === 'Archived') {
-    return { status: 'terminated', label: contract.status, icon: XCircle, color: 'bg-muted/50 text-muted-foreground border-border', daysLeft: null };
-  }
-  // ... rest of function
-};
-```
-
-### 2. `src/components/views/DashboardView.tsx`
-
-**Line 101-109**: Update `getContractExpiryStatus` to exclude Archived contracts
-
-```typescript
-const getContractExpiryStatus = (contract: typeof contracts[0]) => {
-  // Exclude Archived, Expired, and Terminated from alerts
-  if (contract.status === 'Expired' || contract.status === 'Terminated' || contract.status === 'Archived') {
-    return 'expired';
-  }
-  if (!contract.end_date) return 'active';
-  const daysUntilExpiry = differenceInDays(parseISO(contract.end_date), new Date());
-  if (daysUntilExpiry < 0) return 'expired';
-  if (daysUntilExpiry <= expiryThreshold) return 'expiring';
-  if (daysUntilExpiry <= expiryThreshold * 2) return 'nearing';
-  return 'active';
-};
+  const expiringDocuments: ExpiringDocument[] = [];
+  // ... rest of processing
+});
 ```
 
 ---
 
-## Verification Points
+## What's Already Correctly Filtered (No Changes Needed)
 
-After the fix:
-- Dashboard "Contract Expiry Alerts" should show **3 contracts** (not 8)
-- ContractsView "expiring" count should show **3 contracts** (not 8)
-- The 5 Archived contracts should appear under "terminated" filter (grayed out)
-
----
-
-## What's Already Correct (No Changes Needed)
-
-| Component | Status | Reason |
-|-----------|--------|--------|
-| `check-contract-expiry` edge function | ✅ OK | Already filters to `["Active", "Approved"]` only |
-| `useDocumentExpiryPriority` hook | ✅ OK | Already checks for `'Active'` or `'Approved'` status |
-| `useContracts` hook query | ✅ OK | Fetches all contracts, filtering is done in UI |
-| `useDocumentCompleteness` hook | ✅ OK | Uses `status === 'Active'` filter |
+| Component | Filter Used | Status |
+|-----------|-------------|--------|
+| `useDocumentRenewalQueue` | `.eq('status', 'Active')` | ✅ |
+| `useDocumentRenewalQueue` documents | `doc.employees?.status !== 'Active'` check | ✅ |
+| `useDocumentRenewalQueue` contracts | `.eq('employees.status', 'Active')` | ✅ |
+| `send-document-expiry-notification` | `.eq("status", "Active")` | ✅ |
+| `check-contract-expiry` | `.in("status", ["Active", "Approved"])` for contracts | ✅ |
+| `ContractsView` expiry status | Recently fixed to exclude Archived | ✅ |
+| `AdminContractsSection` expiry | Recently fixed to exclude Archived | ✅ |
+| `DashboardView` contract alerts | Recently fixed to exclude Archived | ✅ |
 
 ---
 
-## Summary
+## Changes Summary
 
-A simple 2-line fix in two files will resolve the contract expiry alert discrepancy. The root cause is that the `'Archived'` contract status was not being filtered out in UI calculations, causing old superseded contracts to trigger false alerts.
+| File | Change Description |
+|------|-------------------|
+| `src/components/views/DashboardView.tsx` | Add explicit status filter to `expiringVisas` calculation |
+| `src/hooks/useDocumentExpiryPriority.ts` | Add defensive status check in employee processing loop |
+
+---
+
+## Technical Notes
+
+- **Status values to exclude**: `'Terminated'`, `'Resigned'`, `'Archived'`
+- **Status values to include**: `'Active'`, `'On Leave'`
+- Using `as string` type cast for TypeScript compatibility with status comparisons
+- The defensive checks provide extra safety even when upstream hooks already filter
+
+---
+
+## Expected Result
+
+After implementation:
+- Dashboard "Visa Alerts" will show only active employees
+- Document expiry priority sorting will skip inactive employees
+- All expiry-related UI counts will be accurate
+- System stability improved by consistent filtering across all alert touchpoints
