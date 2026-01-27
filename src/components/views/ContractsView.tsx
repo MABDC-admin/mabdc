@@ -136,12 +136,14 @@ export function ContractsView() {
   };
 
   const getContractExpiryStatus = (contract: typeof contracts[0]) => {
-    if (contract.status === 'Expired') {
+    const status = contract.status as string;
+    if (status === 'Expired') {
       return { status: 'expired', label: 'Expired', icon: XCircle, color: 'bg-destructive/10 text-destructive border-destructive/30', daysLeft: null };
     }
     
-    if (contract.status === 'Terminated') {
-      return { status: 'terminated', label: 'Terminated', icon: XCircle, color: 'bg-muted/50 text-muted-foreground border-border', daysLeft: null };
+    // Exclude Archived and Terminated contracts from expiry alerts
+    if (status === 'Terminated' || status === 'Archived') {
+      return { status: 'terminated', label: status, icon: XCircle, color: 'bg-muted/50 text-muted-foreground border-border', daysLeft: null };
     }
 
     // Always check end_date if it exists, regardless of contract type

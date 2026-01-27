@@ -83,7 +83,9 @@ export function AdminContractsSection() {
 
   // Calculate days until expiry for a contract
   const getDaysUntilExpiry = (contract: typeof contracts[0]): number | null => {
-    if (!contract.end_date || contract.status === 'Expired' || contract.status === 'Terminated') {
+    const status = contract.status as string;
+    // Exclude Archived, Expired, and Terminated contracts from expiry calculations
+    if (!contract.end_date || status === 'Expired' || status === 'Terminated' || status === 'Archived') {
       return null;
     }
     return differenceInDays(parseISO(contract.end_date), new Date());
