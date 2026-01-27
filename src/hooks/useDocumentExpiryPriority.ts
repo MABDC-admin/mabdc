@@ -57,6 +57,12 @@ export function useDocumentExpiryPriority(
     const today = new Date();
 
     employees.forEach((employee) => {
+      // Skip terminated/resigned/archived employees from expiry calculations
+      const employeeStatus = employee.status as string;
+      if (employeeStatus === 'Terminated' || employeeStatus === 'Resigned' || employeeStatus === 'Archived') {
+        return; // Skip this employee
+      }
+      
       const expiringDocuments: ExpiringDocument[] = [];
       
       // Check visa expiration
