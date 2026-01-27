@@ -1,119 +1,201 @@
 
 
-# Plan: Add Database Trigger for Attendance Appeal HR Notifications
+# Plan: Convert All Timestamps to UAE Time (UTC+4)
 
-## Current Situation
+## Problem Identified
 
-The Leave Request notification now works reliably because we added a **PostgreSQL trigger** that calls the edge function server-side. However, Attendance Appeals still relies only on the frontend code, which can fail due to caching issues.
+The system currently uses UTC or server default timezone for datetime formatting in edge functions. Several functions have inconsistent timezone handling:
 
-## Solution: Create Same Database Trigger Pattern for Appeals
-
-We will create an identical trigger pattern on the `attendance_appeals` table to ensure HR receives notifications for new appeals, regardless of frontend state.
+| Function | Current Behavior | Issue |
+|----------|------------------|-------|
+| `send-leave-request-notification` | No timezone specified in `formatDateTime()` | Shows UTC time |
+| `send-appeal-request-notification` | No timezone specified in `formatDateTime()` | Shows UTC time |
+| `send-leave-decision-notification` | No timezone specified in `formatDateTime()` | Shows UTC time |
+| `send-appeal-decision-notification` | No timezone specified in `formatDateTime()` | Shows UTC time |
+| `send-late-notification` | ✅ Already uses `Asia/Dubai` | Correct |
+| `send-daily-summary` | ✅ Already uses `Asia/Dubai` | Correct |
+| `send-absent-notification` | Uses manual UTC+4 offset | Works but inconsistent approach |
 
 ---
 
-## Database Migration
+## Solution: Add `timeZone: 'Asia/Dubai'` to All Date Formatters
 
-Create a new trigger function and attach it to the `attendance_appeals` table:
+### Files to Update
 
-```sql
--- Trigger function: after an appeal is inserted, enqueue HTTP call to notification function
-CREATE OR REPLACE FUNCTION public.trigger_appeal_request_notify_hr()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  -- Only notify HR for newly submitted appeals with 'Pending' status
-  IF NEW.status IS DISTINCT FROM 'Pending' THEN
-    RETURN NEW;
-  END IF;
+### 1. `supabase/functions/send-leave-request-notification/index.ts`
 
-  -- Prevent duplicates if the frontend already sent it
-  IF EXISTS (
-    SELECT 1
-    FROM public.email_history eh
-    WHERE eh.email_type = 'appeal_request'
-      AND (eh.metadata->>'appeal_id') = NEW.id::text
-  ) THEN
-    RETURN NEW;
-  END IF;
+**Update `formatDate` (Lines 16-23):**
+```typescript
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { 
+    timeZone: 'Asia/Dubai',
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric' 
+  });
+}
+```
 
-  -- Enqueue async HTTP request (pg_net)
-  PERFORM net.http_post(
-    url := 'https://fwdtjszxnnfqxjevlasm.supabase.co/functions/v1/send-appeal-request-notification',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || '<anon_key>'
-    ),
-    body := jsonb_build_object('appeal_id', NEW.id)
-  );
-
-  RETURN NEW;
-END;
-$$;
-
--- Create trigger on attendance_appeals table
-DROP TRIGGER IF EXISTS trg_appeal_request_notify_hr ON public.attendance_appeals;
-CREATE TRIGGER trg_appeal_request_notify_hr
-AFTER INSERT ON public.attendance_appeals
-FOR EACH ROW
-EXECUTE FUNCTION public.trigger_appeal_request_notify_hr();
+**Update `formatDateTime` (Lines 25-35):**
+```typescript
+function formatDateTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleString('en-US', { 
+    timeZone: 'Asia/Dubai',
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+}
 ```
 
 ---
 
-## How It Works
+### 2. `supabase/functions/send-appeal-request-notification/index.ts`
 
-```text
-Employee Submits Attendance Appeal
-         │
-         ▼
-INSERT INTO attendance_appeals (status = 'Pending')
-         │
-         ▼
-PostgreSQL Trigger Fires (trg_appeal_request_notify_hr)
-         │
-         ├── Check: Is status 'Pending'? ✓
-         ├── Check: Already in email_history? ✗
-         │
-         ▼
-net.http_post() → Edge Function (async)
-         │
-         ▼
-send-appeal-request-notification
-         │
-         ├── Fetch appeal + employee details
-         ├── Send email to HR
-         └── Log to email_history
-         │
-         ▼
-HR receives: "📩 New Attendance Appeal: [Employee Name]"
+**Update `formatDate` (Lines 16-23):**
+```typescript
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { 
+    timeZone: 'Asia/Dubai',
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric' 
+  });
+}
+```
+
+**Update `formatDateTime` (Lines 35-45):**
+```typescript
+function formatDateTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleString('en-US', { 
+    timeZone: 'Asia/Dubai',
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+}
 ```
 
 ---
 
-## Files to Create/Modify
+### 3. `supabase/functions/send-leave-decision-notification/index.ts`
 
-| File | Action | Description |
-|------|--------|-------------|
-| `supabase/migrations/[timestamp]_appeal_notify_trigger.sql` | Create | Database trigger for appeal notifications |
+**Update `formatDate` (Lines 18-25):**
+```typescript
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { 
+    timeZone: 'Asia/Dubai',
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric' 
+  });
+}
+```
+
+**Update `formatDateTime` (Lines 27-37):**
+```typescript
+function formatDateTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleString('en-US', { 
+    timeZone: 'Asia/Dubai',
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+```
 
 ---
 
-## Benefits
+### 4. `supabase/functions/send-appeal-decision-notification/index.ts`
 
-| Feature | Description |
-|---------|-------------|
-| Server-side execution | Works even if frontend is cached/outdated |
-| Duplicate prevention | Checks `email_history` before sending |
-| Async processing | Uses `pg_net` for non-blocking HTTP calls |
-| Consistent pattern | Same approach as working leave request trigger |
+**Update `formatDate` (Lines 18-25):**
+```typescript
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { 
+    timeZone: 'Asia/Dubai',
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric' 
+  });
+}
+```
+
+**Update `formatDateTime` (Lines 27-37):**
+```typescript
+function formatDateTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleString('en-US', { 
+    timeZone: 'Asia/Dubai',
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+```
 
 ---
 
-## Summary
+### 5. `supabase/functions/send-absent-notification/index.ts`
 
-This migration creates a PostgreSQL trigger that fires immediately after any new attendance appeal is inserted. It will call the `send-appeal-request-notification` edge function server-side, ensuring HR always receives the notification regardless of the employee's browser/app state.
+**Simplify UAE date calculation (Lines 49-53):**
+
+Current complex approach:
+```typescript
+const now = new Date();
+const uaeOffset = 4 * 60; // UAE is UTC+4
+const uaeTime = new Date(now.getTime() + (uaeOffset + now.getTimezoneOffset()) * 60000);
+const todayStr = uaeTime.toISOString().split('T')[0];
+```
+
+Simplified to:
+```typescript
+const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dubai' });
+```
+
+---
+
+## Files Summary
+
+| File | Changes |
+|------|---------|
+| `supabase/functions/send-leave-request-notification/index.ts` | Add `timeZone: 'Asia/Dubai'` to `formatDate` and `formatDateTime` |
+| `supabase/functions/send-appeal-request-notification/index.ts` | Add `timeZone: 'Asia/Dubai'` to `formatDate` and `formatDateTime` |
+| `supabase/functions/send-leave-decision-notification/index.ts` | Add `timeZone: 'Asia/Dubai'` to `formatDate` and `formatDateTime` |
+| `supabase/functions/send-appeal-decision-notification/index.ts` | Add `timeZone: 'Asia/Dubai'` to `formatDate` and `formatDateTime` |
+| `supabase/functions/send-absent-notification/index.ts` | Simplify UAE date calculation to use `toLocaleDateString` with timezone |
+
+---
+
+## Before vs After Example
+
+**UTC (Before):**
+- Submitted: Jan 26, 2026, 6:30 PM ← Actually 10:30 PM in UAE
+
+**UAE Time (After):**
+- Submitted: Jan 26, 2026, 10:30 PM ← Correct UAE time
+
+---
+
+## Technical Note
+
+The `timeZone: 'Asia/Dubai'` option in JavaScript's `toLocaleString()` and `toLocaleDateString()` methods tells the formatter to convert the UTC timestamp to UAE local time (UTC+4) before displaying. This is the standard approach used in `send-late-notification` and `send-daily-summary` which are already working correctly.
 
