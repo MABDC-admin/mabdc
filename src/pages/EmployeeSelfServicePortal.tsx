@@ -72,9 +72,17 @@ export default function EmployeeSelfServicePortal() {
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
+    // Personal Information
+    gender: '',
+    birthday: '',
     personal_phone: '',
     personal_email: '',
     current_address: '',
+    place_of_birth: '',
+    country_of_birth: '',
+    family_status: '',
+    number_of_children: 0,
+    // Emergency Contact
     emergency_contact_name: '',
     emergency_contact_phone: '',
     emergency_contact_relationship: '',
@@ -283,9 +291,15 @@ export default function EmployeeSelfServicePortal() {
 
   const handleOpenEditProfile = () => {
     setProfileForm({
+      gender: (employee as any)?.gender || '',
+      birthday: (employee as any)?.birthday || '',
       personal_phone: (employee as any)?.personal_phone || '',
       personal_email: (employee as any)?.personal_email || '',
       current_address: (employee as any)?.current_address || '',
+      place_of_birth: (employee as any)?.place_of_birth || '',
+      country_of_birth: (employee as any)?.country_of_birth || '',
+      family_status: (employee as any)?.family_status || '',
+      number_of_children: (employee as any)?.number_of_children || 0,
       emergency_contact_name: (employee as any)?.emergency_contact_name || '',
       emergency_contact_phone: (employee as any)?.emergency_contact_phone || '',
       emergency_contact_relationship: (employee as any)?.emergency_contact_relationship || '',
@@ -299,9 +313,15 @@ export default function EmployeeSelfServicePortal() {
     try {
       await updateEmployee.mutateAsync({
         id: employee.id,
+        gender: profileForm.gender,
+        birthday: profileForm.birthday || null,
         personal_phone: profileForm.personal_phone,
         personal_email: profileForm.personal_email,
         current_address: profileForm.current_address,
+        place_of_birth: profileForm.place_of_birth,
+        country_of_birth: profileForm.country_of_birth,
+        family_status: profileForm.family_status,
+        number_of_children: profileForm.number_of_children,
         emergency_contact_name: profileForm.emergency_contact_name,
         emergency_contact_phone: profileForm.emergency_contact_phone,
         emergency_contact_relationship: profileForm.emergency_contact_relationship,
@@ -1679,47 +1699,133 @@ export default function EmployeeSelfServicePortal() {
 
       {/* Edit Profile Dialog */}
       <Dialog open={isEditingProfile} onOpenChange={setIsEditingProfile}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Edit className="w-5 h-5 text-primary" />
               Edit Personal Information
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="personal_phone">Personal Phone</Label>
-              <Input
-                id="personal_phone"
-                placeholder="Enter your personal phone"
-                value={profileForm.personal_phone}
-                onChange={(e) => setProfileForm({ ...profileForm, personal_phone: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="personal_email">Personal Email</Label>
-              <Input
-                id="personal_email"
-                type="email"
-                placeholder="Enter your personal email"
-                value={profileForm.personal_email}
-                onChange={(e) => setProfileForm({ ...profileForm, personal_email: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="current_address">Current Address</Label>
-              <Textarea
-                id="current_address"
-                placeholder="Enter your current address"
-                value={profileForm.current_address}
-                onChange={(e) => setProfileForm({ ...profileForm, current_address: e.target.value })}
-                rows={3}
-              />
+          <div className="max-h-[60vh] overflow-y-auto space-y-4 py-4 pr-2">
+            {/* Personal Information Section */}
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-primary flex items-center gap-2">
+                <User className="w-4 h-4" />
+                Personal Information
+              </p>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Gender</Label>
+                  <select
+                    id="gender"
+                    value={profileForm.gender}
+                    onChange={(e) => setProfileForm({ ...profileForm, gender: e.target.value })}
+                    className="w-full p-2 rounded-lg bg-background border border-input text-foreground text-sm"
+                  >
+                    <option value="">Select...</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="birthday">Birthday</Label>
+                  <Input
+                    id="birthday"
+                    type="date"
+                    value={profileForm.birthday}
+                    onChange={(e) => setProfileForm({ ...profileForm, birthday: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="personal_phone">Personal Phone</Label>
+                  <Input
+                    id="personal_phone"
+                    placeholder="Enter phone number"
+                    value={profileForm.personal_phone}
+                    onChange={(e) => setProfileForm({ ...profileForm, personal_phone: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="personal_email">Personal Email</Label>
+                  <Input
+                    id="personal_email"
+                    type="email"
+                    placeholder="Enter email"
+                    value={profileForm.personal_email}
+                    onChange={(e) => setProfileForm({ ...profileForm, personal_email: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="current_address">Current Address</Label>
+                <Textarea
+                  id="current_address"
+                  placeholder="Enter your current address"
+                  value={profileForm.current_address}
+                  onChange={(e) => setProfileForm({ ...profileForm, current_address: e.target.value })}
+                  rows={2}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="place_of_birth">Place of Birth</Label>
+                  <Input
+                    id="place_of_birth"
+                    placeholder="City/Town"
+                    value={profileForm.place_of_birth}
+                    onChange={(e) => setProfileForm({ ...profileForm, place_of_birth: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="country_of_birth">Country of Birth</Label>
+                  <Input
+                    id="country_of_birth"
+                    placeholder="Country"
+                    value={profileForm.country_of_birth}
+                    onChange={(e) => setProfileForm({ ...profileForm, country_of_birth: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="family_status">Family Status</Label>
+                  <select
+                    id="family_status"
+                    value={profileForm.family_status}
+                    onChange={(e) => setProfileForm({ ...profileForm, family_status: e.target.value })}
+                    className="w-full p-2 rounded-lg bg-background border border-input text-foreground text-sm"
+                  >
+                    <option value="">Select...</option>
+                    <option value="Single">Single</option>
+                    <option value="Married">Married</option>
+                    <option value="Divorced">Divorced</option>
+                    <option value="Widowed">Widowed</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="number_of_children">Number of Children</Label>
+                  <Input
+                    id="number_of_children"
+                    type="number"
+                    min={0}
+                    value={profileForm.number_of_children}
+                    onChange={(e) => setProfileForm({ ...profileForm, number_of_children: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
             </div>
             
             {/* Emergency Contact Section */}
-            <div className="pt-4 border-t">
-              <p className="text-sm font-semibold text-destructive mb-3 flex items-center gap-2">
+            <div className="pt-4 border-t space-y-3">
+              <p className="text-sm font-semibold text-destructive flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
                 Emergency Contact
               </p>
               <div className="space-y-3">
@@ -1732,37 +1838,39 @@ export default function EmployeeSelfServicePortal() {
                     onChange={(e) => setProfileForm({ ...profileForm, emergency_contact_name: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="emergency_phone">Phone Number</Label>
-                  <Input
-                    id="emergency_phone"
-                    placeholder="Enter emergency contact phone"
-                    value={profileForm.emergency_contact_phone}
-                    onChange={(e) => setProfileForm({ ...profileForm, emergency_contact_phone: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="emergency_relationship">Relationship</Label>
-                  <select
-                    id="emergency_relationship"
-                    value={profileForm.emergency_contact_relationship}
-                    onChange={(e) => setProfileForm({ ...profileForm, emergency_contact_relationship: e.target.value })}
-                    className="w-full p-2 rounded-lg bg-background border border-input text-foreground"
-                  >
-                    <option value="">Select relationship...</option>
-                    <option value="Spouse">Spouse</option>
-                    <option value="Parent">Parent</option>
-                    <option value="Sibling">Sibling</option>
-                    <option value="Child">Child</option>
-                    <option value="Friend">Friend</option>
-                    <option value="Other">Other</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency_phone">Phone Number</Label>
+                    <Input
+                      id="emergency_phone"
+                      placeholder="Phone number"
+                      value={profileForm.emergency_contact_phone}
+                      onChange={(e) => setProfileForm({ ...profileForm, emergency_contact_phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency_relationship">Relationship</Label>
+                    <select
+                      id="emergency_relationship"
+                      value={profileForm.emergency_contact_relationship}
+                      onChange={(e) => setProfileForm({ ...profileForm, emergency_contact_relationship: e.target.value })}
+                      className="w-full p-2 rounded-lg bg-background border border-input text-foreground text-sm"
+                    >
+                      <option value="">Select...</option>
+                      <option value="Spouse">Spouse</option>
+                      <option value="Parent">Parent</option>
+                      <option value="Sibling">Sibling</option>
+                      <option value="Child">Child</option>
+                      <option value="Friend">Friend</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
             
             <p className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-              Note: Work email, department, position, and other HR-managed fields cannot be edited. Please contact HR for any changes.
+              Note: Work email, HRMS number, department, position, salary, and bank details cannot be edited. Please contact HR for changes.
             </p>
           </div>
           <DialogFooter>
