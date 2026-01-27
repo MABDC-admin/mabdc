@@ -16,6 +16,7 @@ interface LeaveRequestPayload {
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
   return date.toLocaleDateString('en-US', { 
+    timeZone: 'Asia/Dubai',
     month: 'short', 
     day: 'numeric', 
     year: 'numeric' 
@@ -25,6 +26,7 @@ function formatDate(dateStr: string): string {
 function formatDateTime(dateStr: string): string {
   const date = new Date(dateStr);
   return date.toLocaleString('en-US', { 
+    timeZone: 'Asia/Dubai',
     month: 'short', 
     day: 'numeric', 
     year: 'numeric',

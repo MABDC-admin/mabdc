@@ -46,11 +46,9 @@ serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const resend = new Resend(resendApiKey);
 
-    // Get today's date in UAE timezone (UTC+4)
-    const now = new Date();
-    const uaeOffset = 4 * 60; // UAE is UTC+4
-    const uaeTime = new Date(now.getTime() + (uaeOffset + now.getTimezoneOffset()) * 60000);
-    const todayStr = uaeTime.toISOString().split('T')[0]; // YYYY-MM-DD
+    // Get today's date in UAE timezone (Asia/Dubai)
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dubai' });
+    const uaeTimeStr = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Dubai', hour: '2-digit', minute: '2-digit' });
 
     console.log(`Checking absences for date: ${todayStr}`);
 
@@ -313,7 +311,7 @@ serve(async (req: Request) => {
             
             <div class="footer">
               <p>This is an automated message from MABDC HRMS</p>
-              <p>Generated at ${uaeTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} UAE Time</p>
+              <p>Generated at ${uaeTimeStr} UAE Time</p>
             </div>
           </div>
         </body>
