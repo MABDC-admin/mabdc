@@ -99,7 +99,9 @@ export function DashboardView() {
 
   // Contract expiry calculations - uses configurable threshold
   const getContractExpiryStatus = (contract: typeof contracts[0]) => {
-    if (contract.status === 'Expired' || contract.status === 'Terminated') return 'expired';
+    const status = contract.status as string;
+    // Exclude Archived, Expired, and Terminated contracts from expiry alerts
+    if (status === 'Expired' || status === 'Terminated' || status === 'Archived') return 'expired';
     if (!contract.end_date) return 'active';
     const daysUntilExpiry = differenceInDays(parseISO(contract.end_date), new Date());
     if (daysUntilExpiry < 0) return 'expired';
