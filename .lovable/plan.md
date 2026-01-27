@@ -1,82 +1,119 @@
 
-# Plan: Fix Leave Request & Appeal Notifications - Ensure Mandatory Execution
 
-## Root Cause Analysis
+# Plan: Add Database Trigger for Attendance Appeal HR Notifications
 
-After investigating the edge function logs, database records, and network activity:
+## Current Situation
 
-1. **The edge function `send-leave-request-notification` works correctly** - when called directly, it successfully sent the email to HR
-2. **The leave request was created successfully** at 18:27:24 and the balance was updated at 18:27:25
-3. **The edge function was NEVER invoked** by the frontend during the leave submission
-4. **Cause**: The code changes were made but the user's browser was still running a cached version, or the deployment hadn't fully propagated
+The Leave Request notification now works reliably because we added a **PostgreSQL trigger** that calls the edge function server-side. However, Attendance Appeals still relies only on the frontend code, which can fail due to caching issues.
 
-## Solution: Make Notifications Absolutely Mandatory
+## Solution: Create Same Database Trigger Pattern for Appeals
 
-To prevent this from happening again and ensure 100% reliability:
+We will create an identical trigger pattern on the `attendance_appeals` table to ensure HR receives notifications for new appeals, regardless of frontend state.
 
-### 1. Add Error Logging to Email Notification Call
+---
 
-**File:** `src/hooks/useLeave.ts` (Lines 457-470)
+## Database Migration
 
-Add try-catch wrapper and more detailed logging to catch any silent failures:
+Create a new trigger function and attach it to the `attendance_appeals` table:
 
-```typescript
-// MANDATORY: Send email notification to HR about new leave request
-if (data?.id) {
-  try {
-    console.log('[LEAVE NOTIFICATION] Starting notification for leave_id:', data.id);
-    
-    const { data: invokeData, error: notifyError } = await supabase.functions.invoke('send-leave-request-notification', {
-      body: { leave_id: data.id }
-    });
-    
-    if (notifyError) {
-      console.error('[LEAVE NOTIFICATION] Edge function error:', notifyError);
-    } else {
-      console.log('[LEAVE NOTIFICATION] Success:', invokeData);
-    }
-  } catch (err) {
-    console.error('[LEAVE NOTIFICATION] Exception caught:', err);
-  }
-}
+```sql
+-- Trigger function: after an appeal is inserted, enqueue HTTP call to notification function
+CREATE OR REPLACE FUNCTION public.trigger_appeal_request_notify_hr()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Only notify HR for newly submitted appeals with 'Pending' status
+  IF NEW.status IS DISTINCT FROM 'Pending' THEN
+    RETURN NEW;
+  END IF;
+
+  -- Prevent duplicates if the frontend already sent it
+  IF EXISTS (
+    SELECT 1
+    FROM public.email_history eh
+    WHERE eh.email_type = 'appeal_request'
+      AND (eh.metadata->>'appeal_id') = NEW.id::text
+  ) THEN
+    RETURN NEW;
+  END IF;
+
+  -- Enqueue async HTTP request (pg_net)
+  PERFORM net.http_post(
+    url := 'https://fwdtjszxnnfqxjevlasm.supabase.co/functions/v1/send-appeal-request-notification',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || '<anon_key>'
+    ),
+    body := jsonb_build_object('appeal_id', NEW.id)
+  );
+
+  RETURN NEW;
+END;
+$$;
+
+-- Create trigger on attendance_appeals table
+DROP TRIGGER IF EXISTS trg_appeal_request_notify_hr ON public.attendance_appeals;
+CREATE TRIGGER trg_appeal_request_notify_hr
+AFTER INSERT ON public.attendance_appeals
+FOR EACH ROW
+EXECUTE FUNCTION public.trigger_appeal_request_notify_hr();
 ```
 
-### 2. Same Pattern for Attendance Appeal Notifications
+---
 
-**File:** `src/hooks/useAttendanceAppeals.ts`
+## How It Works
 
-Apply the same try-catch logging pattern to ensure visibility of any failures.
-
-### 3. Redeploy Edge Functions
-
-Explicitly redeploy both edge functions to ensure they are running the latest code:
-- `send-leave-request-notification`
-- `send-appeal-request-notification`
+```text
+Employee Submits Attendance Appeal
+         │
+         ▼
+INSERT INTO attendance_appeals (status = 'Pending')
+         │
+         ▼
+PostgreSQL Trigger Fires (trg_appeal_request_notify_hr)
+         │
+         ├── Check: Is status 'Pending'? ✓
+         ├── Check: Already in email_history? ✗
+         │
+         ▼
+net.http_post() → Edge Function (async)
+         │
+         ▼
+send-appeal-request-notification
+         │
+         ├── Fetch appeal + employee details
+         ├── Send email to HR
+         └── Log to email_history
+         │
+         ▼
+HR receives: "📩 New Attendance Appeal: [Employee Name]"
+```
 
 ---
 
-## Files to Modify
+## Files to Create/Modify
 
-| File | Change |
-|------|--------|
-| `src/hooks/useLeave.ts` | Add try-catch with detailed console logging around notification call |
-| `src/hooks/useAttendanceAppeals.ts` | Add try-catch with detailed console logging around notification call |
-
----
-
-## Testing After Implementation
-
-1. Ask Dennis to submit a new test leave request
-2. Verify in edge function logs that the function was invoked
-3. Confirm HR receives the email with attachment link
+| File | Action | Description |
+|------|--------|-------------|
+| `supabase/migrations/[timestamp]_appeal_notify_trigger.sql` | Create | Database trigger for appeal notifications |
 
 ---
 
-## Technical Summary
+## Benefits
 
-The current code is correct but may have been affected by caching. The changes will:
-1. Add explicit try-catch blocks to catch any JavaScript exceptions
-2. Add tagged console logs `[LEAVE NOTIFICATION]` for easy debugging
-3. Force redeploy of edge functions to ensure latest code is running
+| Feature | Description |
+|---------|-------------|
+| Server-side execution | Works even if frontend is cached/outdated |
+| Duplicate prevention | Checks `email_history` before sending |
+| Async processing | Uses `pg_net` for non-blocking HTTP calls |
+| Consistent pattern | Same approach as working leave request trigger |
 
-This ensures that even if the notification fails, we will have clear visibility into the failure reason.
+---
+
+## Summary
+
+This migration creates a PostgreSQL trigger that fires immediately after any new attendance appeal is inserted. It will call the `send-appeal-request-notification` edge function server-side, ensuring HR always receives the notification regardless of the employee's browser/app state.
+
