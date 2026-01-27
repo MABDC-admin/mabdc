@@ -1,201 +1,109 @@
 
+# Plan: Fix Contract Expiry Alerts Showing Archived Contracts
 
-# Plan: Convert All Timestamps to UAE Time (UTC+4)
+## Root Cause Identified
 
-## Problem Identified
+The system is showing **8 contracts expiring soon** when only **3 are truly expiring**. The 5 extra false alerts are from **Archived contracts** that were superseded by new contracts but still have their old `end_date` values.
 
-The system currently uses UTC or server default timezone for datetime formatting in edge functions. Several functions have inconsistent timezone handling:
+### Data Evidence
 
-| Function | Current Behavior | Issue |
-|----------|------------------|-------|
-| `send-leave-request-notification` | No timezone specified in `formatDateTime()` | Shows UTC time |
-| `send-appeal-request-notification` | No timezone specified in `formatDateTime()` | Shows UTC time |
-| `send-leave-decision-notification` | No timezone specified in `formatDateTime()` | Shows UTC time |
-| `send-appeal-decision-notification` | No timezone specified in `formatDateTime()` | Shows UTC time |
-| `send-late-notification` | ✅ Already uses `Asia/Dubai` | Correct |
-| `send-daily-summary` | ✅ Already uses `Asia/Dubai` | Correct |
-| `send-absent-notification` | Uses manual UTC+4 offset | Works but inconsistent approach |
+| Contract Status | Count | Should Show Alert? |
+|-----------------|-------|-------------------|
+| Active | 3 | ✅ Yes |
+| Archived | 5 | ❌ No (superseded contracts) |
+| **Total Displayed** | **8** | **Should be 3** |
+
+### Specific False Positives Found
+
+| Employee | Archived Contract | Days Remaining | Has New Active Contract |
+|----------|------------------|----------------|------------------------|
+| Jecille F. Buizon | MB260249481AE | 10 days | ✅ MB308937462AE (1040 days) |
+| Glorie Ann I. Espinosa | MOL-1768387021275 | 10 days | ✅ MB308610035AE (1040 days) |
+| Princess Jesa D. Tagulao | MB260252057AE | 10 days | ✅ MB308866261AE (753 days) |
+| Johnny Boy L. Dadula | MB260224075AE | 10 days | ✅ MB308637683AE (24 days) |
+| Sheila Mae P. Dadula | MB260475973AE | 13 days | ✅ MB308609136AE (749 days) |
 
 ---
 
-## Solution: Add `timeZone: 'Asia/Dubai'` to All Date Formatters
+## Code Issue Analysis
 
-### Files to Update
+The `getContractExpiryStatus` function in both views only excludes `'Expired'` and `'Terminated'` status:
 
-### 1. `supabase/functions/send-leave-request-notification/index.ts`
-
-**Update `formatDate` (Lines 16-23):**
 ```typescript
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { 
-    timeZone: 'Asia/Dubai',
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric' 
-  });
-}
+// Current (buggy) code:
+if (contract.status === 'Expired' || contract.status === 'Terminated') return 'expired';
 ```
 
-**Update `formatDateTime` (Lines 25-35):**
+It should also exclude `'Archived'`:
+
 ```typescript
-function formatDateTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleString('en-US', { 
-    timeZone: 'Asia/Dubai',
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  });
-}
+// Fixed code:
+if (contract.status === 'Expired' || contract.status === 'Terminated' || contract.status === 'Archived') return 'expired';
 ```
 
 ---
 
-### 2. `supabase/functions/send-appeal-request-notification/index.ts`
+## Files to Modify
 
-**Update `formatDate` (Lines 16-23):**
+### 1. `src/components/views/ContractsView.tsx`
+
+**Line 138-145**: Update `getContractExpiryStatus` to exclude Archived contracts
+
 ```typescript
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { 
-    timeZone: 'Asia/Dubai',
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric' 
-  });
-}
+const getContractExpiryStatus = (contract: typeof contracts[0]) => {
+  if (contract.status === 'Expired') {
+    return { status: 'expired', label: 'Expired', icon: XCircle, color: 'bg-destructive/10 text-destructive border-destructive/30', daysLeft: null };
+  }
+  
+  // NEW: Also treat Archived and Terminated contracts as inactive
+  if (contract.status === 'Terminated' || contract.status === 'Archived') {
+    return { status: 'terminated', label: contract.status, icon: XCircle, color: 'bg-muted/50 text-muted-foreground border-border', daysLeft: null };
+  }
+  // ... rest of function
+};
 ```
 
-**Update `formatDateTime` (Lines 35-45):**
+### 2. `src/components/views/DashboardView.tsx`
+
+**Line 101-109**: Update `getContractExpiryStatus` to exclude Archived contracts
+
 ```typescript
-function formatDateTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleString('en-US', { 
-    timeZone: 'Asia/Dubai',
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  });
-}
-```
-
----
-
-### 3. `supabase/functions/send-leave-decision-notification/index.ts`
-
-**Update `formatDate` (Lines 18-25):**
-```typescript
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { 
-    timeZone: 'Asia/Dubai',
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric' 
-  });
-}
-```
-
-**Update `formatDateTime` (Lines 27-37):**
-```typescript
-function formatDateTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleString('en-US', { 
-    timeZone: 'Asia/Dubai',
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  });
-}
+const getContractExpiryStatus = (contract: typeof contracts[0]) => {
+  // Exclude Archived, Expired, and Terminated from alerts
+  if (contract.status === 'Expired' || contract.status === 'Terminated' || contract.status === 'Archived') {
+    return 'expired';
+  }
+  if (!contract.end_date) return 'active';
+  const daysUntilExpiry = differenceInDays(parseISO(contract.end_date), new Date());
+  if (daysUntilExpiry < 0) return 'expired';
+  if (daysUntilExpiry <= expiryThreshold) return 'expiring';
+  if (daysUntilExpiry <= expiryThreshold * 2) return 'nearing';
+  return 'active';
+};
 ```
 
 ---
 
-### 4. `supabase/functions/send-appeal-decision-notification/index.ts`
+## Verification Points
 
-**Update `formatDate` (Lines 18-25):**
-```typescript
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { 
-    timeZone: 'Asia/Dubai',
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric' 
-  });
-}
-```
-
-**Update `formatDateTime` (Lines 27-37):**
-```typescript
-function formatDateTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleString('en-US', { 
-    timeZone: 'Asia/Dubai',
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  });
-}
-```
+After the fix:
+- Dashboard "Contract Expiry Alerts" should show **3 contracts** (not 8)
+- ContractsView "expiring" count should show **3 contracts** (not 8)
+- The 5 Archived contracts should appear under "terminated" filter (grayed out)
 
 ---
 
-### 5. `supabase/functions/send-absent-notification/index.ts`
+## What's Already Correct (No Changes Needed)
 
-**Simplify UAE date calculation (Lines 49-53):**
-
-Current complex approach:
-```typescript
-const now = new Date();
-const uaeOffset = 4 * 60; // UAE is UTC+4
-const uaeTime = new Date(now.getTime() + (uaeOffset + now.getTimezoneOffset()) * 60000);
-const todayStr = uaeTime.toISOString().split('T')[0];
-```
-
-Simplified to:
-```typescript
-const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dubai' });
-```
+| Component | Status | Reason |
+|-----------|--------|--------|
+| `check-contract-expiry` edge function | ✅ OK | Already filters to `["Active", "Approved"]` only |
+| `useDocumentExpiryPriority` hook | ✅ OK | Already checks for `'Active'` or `'Approved'` status |
+| `useContracts` hook query | ✅ OK | Fetches all contracts, filtering is done in UI |
+| `useDocumentCompleteness` hook | ✅ OK | Uses `status === 'Active'` filter |
 
 ---
 
-## Files Summary
+## Summary
 
-| File | Changes |
-|------|---------|
-| `supabase/functions/send-leave-request-notification/index.ts` | Add `timeZone: 'Asia/Dubai'` to `formatDate` and `formatDateTime` |
-| `supabase/functions/send-appeal-request-notification/index.ts` | Add `timeZone: 'Asia/Dubai'` to `formatDate` and `formatDateTime` |
-| `supabase/functions/send-leave-decision-notification/index.ts` | Add `timeZone: 'Asia/Dubai'` to `formatDate` and `formatDateTime` |
-| `supabase/functions/send-appeal-decision-notification/index.ts` | Add `timeZone: 'Asia/Dubai'` to `formatDate` and `formatDateTime` |
-| `supabase/functions/send-absent-notification/index.ts` | Simplify UAE date calculation to use `toLocaleDateString` with timezone |
-
----
-
-## Before vs After Example
-
-**UTC (Before):**
-- Submitted: Jan 26, 2026, 6:30 PM ← Actually 10:30 PM in UAE
-
-**UAE Time (After):**
-- Submitted: Jan 26, 2026, 10:30 PM ← Correct UAE time
-
----
-
-## Technical Note
-
-The `timeZone: 'Asia/Dubai'` option in JavaScript's `toLocaleString()` and `toLocaleDateString()` methods tells the formatter to convert the UTC timestamp to UAE local time (UTC+4) before displaying. This is the standard approach used in `send-late-notification` and `send-daily-summary` which are already working correctly.
-
+A simple 2-line fix in two files will resolve the contract expiry alert discrepancy. The root cause is that the `'Archived'` contract status was not being filtered out in UI calculations, causing old superseded contracts to trigger false alerts.
