@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { 
   Clock, CheckCircle, XCircle, AlertTriangle, 
   User, Calendar, MessageSquare, Filter, CalendarIcon
@@ -290,7 +292,7 @@ export function AttendanceAppealsView() {
         <CardHeader>
           <CardTitle className="text-lg">Appeals List</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
             <div className="text-center py-8">
               <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
@@ -302,72 +304,123 @@ export function AttendanceAppealsView() {
               <p>No appeals found</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredAppeals.map((appeal) => {
-                const employeePhoto = getEmployeePhoto(appeal.employee_id);
-                const employeeName = getEmployeeName(appeal.employee_id);
-                
-                return (
-                  <div
-                    key={appeal.id}
-                    onClick={() => appeal.status === 'Pending' && setSelectedAppeal(appeal)}
-                    className={cn(
-                      "p-4 rounded-lg border transition-all",
-                      appeal.status === 'Pending' 
-                        ? "bg-amber-500/5 border-amber-500/30 cursor-pointer hover:bg-amber-500/10" 
-                        : appeal.status === 'Approved'
-                        ? "bg-green-500/5 border-green-500/30"
-                        : "bg-red-500/5 border-red-500/30"
-                    )}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        {employeePhoto ? (
-                          <img src={employeePhoto} alt={employeeName} className="w-10 h-10 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                            <User className="w-5 h-5 text-primary" />
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-medium text-foreground">{employeeName}</p>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                            <Calendar className="w-3 h-3" />
-                            <span>{format(parseISO(appeal.appeal_date), 'dd MMM yyyy')}</span>
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                            "{appeal.appeal_message}"
-                          </p>
-                          {appeal.requested_check_in && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Requested: {appeal.requested_check_in} - {appeal.requested_check_out || 'N/A'}
-                            </p>
+            <>
+              {/* Column Headers */}
+              <div className="flex items-center gap-3 px-4 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/30 sticky top-0">
+                <div className="w-7 flex-shrink-0" />
+                <div className="w-28 flex-shrink-0">Employee</div>
+                <div className="w-24 flex-shrink-0">Date</div>
+                <div className="w-28 flex-shrink-0">Time Request</div>
+                <div className="flex-1 min-w-0">Message</div>
+                <div className="w-20 flex-shrink-0 text-center">Status</div>
+                <div className="w-16 flex-shrink-0 text-center">Action</div>
+              </div>
+              
+              {/* Scrollable List */}
+              <ScrollArea className="h-[420px]">
+                <div className="space-y-1 p-2">
+                  <TooltipProvider>
+                    {filteredAppeals.map((appeal) => {
+                      const employeePhoto = getEmployeePhoto(appeal.employee_id);
+                      const employeeName = getEmployeeName(appeal.employee_id);
+                      
+                      return (
+                        <div
+                          key={appeal.id}
+                          onClick={() => appeal.status === 'Pending' && setSelectedAppeal(appeal)}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2 rounded-md border-l-2 transition-all",
+                            appeal.status === 'Pending' 
+                              ? "bg-amber-500/5 border-l-amber-500 cursor-pointer hover:bg-amber-500/10" 
+                              : appeal.status === 'Approved'
+                              ? "bg-green-500/5 border-l-green-500"
+                              : "bg-red-500/5 border-l-red-500"
                           )}
+                        >
+                          {/* Compact Avatar */}
+                          <div className="flex-shrink-0">
+                            {employeePhoto ? (
+                              <img src={employeePhoto} alt={employeeName} className="w-7 h-7 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center">
+                                <User className="w-3.5 h-3.5 text-primary" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Name */}
+                          <div className="w-28 flex-shrink-0 truncate text-sm font-medium text-foreground">
+                            {employeeName}
+                          </div>
+
+                          {/* Date */}
+                          <div className="w-24 flex-shrink-0 text-xs text-muted-foreground">
+                            {format(parseISO(appeal.appeal_date), 'dd MMM yyyy')}
+                          </div>
+
+                          {/* Time Request */}
+                          <div className="w-28 flex-shrink-0 text-xs font-mono">
+                            {appeal.requested_check_in || 'N/A'} → {appeal.requested_check_out || 'N/A'}
+                          </div>
+
+                          {/* Message with Tooltip */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex-1 min-w-0 text-xs text-muted-foreground truncate cursor-default">
+                                {appeal.appeal_message}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <p className="text-sm">{appeal.appeal_message}</p>
+                              {appeal.status !== 'Pending' && appeal.reviewed_at && (
+                                <div className="mt-2 pt-2 border-t border-border text-xs text-muted-foreground">
+                                  <p>Reviewed by {appeal.reviewed_by}</p>
+                                  <p>{format(parseISO(appeal.reviewed_at), 'dd MMM yyyy HH:mm')}</p>
+                                  {appeal.rejection_reason && (
+                                    <p className="text-red-500 mt-1">Reason: {appeal.rejection_reason}</p>
+                                  )}
+                                </div>
+                              )}
+                            </TooltipContent>
+                          </Tooltip>
+
+                          {/* Status Badge - Compact */}
+                          <div className="w-20 flex-shrink-0 flex justify-center">
+                            <Badge className={cn(
+                              "text-xs px-2 py-0.5",
+                              appeal.status === 'Pending' && "bg-amber-500/20 text-amber-500",
+                              appeal.status === 'Approved' && "bg-green-500/20 text-green-500",
+                              appeal.status === 'Rejected' && "bg-red-500/20 text-red-500"
+                            )}>
+                              {appeal.status}
+                            </Badge>
+                          </div>
+
+                          {/* Review Button (pending only) */}
+                          <div className="w-16 flex-shrink-0 flex justify-center">
+                            {appeal.status === 'Pending' ? (
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="h-7 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedAppeal(appeal);
+                                }}
+                              >
+                                Review
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      <Badge className={cn(
-                        appeal.status === 'Pending' && "bg-amber-500/20 text-amber-500 animate-pulse",
-                        appeal.status === 'Approved' && "bg-green-500/20 text-green-500",
-                        appeal.status === 'Rejected' && "bg-red-500/20 text-red-500"
-                      )}>
-                        {appeal.status}
-                      </Badge>
-                    </div>
-                    
-                    {appeal.status !== 'Pending' && appeal.reviewed_at && (
-                      <div className="mt-3 pt-3 border-t border-border">
-                        <p className="text-xs text-muted-foreground">
-                          Reviewed by {appeal.reviewed_by} on {format(parseISO(appeal.reviewed_at), 'dd MMM yyyy HH:mm')}
-                        </p>
-                        {appeal.rejection_reason && (
-                          <p className="text-xs text-red-500 mt-1">Reason: {appeal.rejection_reason}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                      );
+                    })}
+                  </TooltipProvider>
+                </div>
+              </ScrollArea>
+            </>
           )}
         </CardContent>
       </Card>
