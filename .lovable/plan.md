@@ -1,125 +1,242 @@
 
-# Plan: Exclude Terminated and Archived Employees from ALL Alerts
 
-## Summary of Findings
+# Plan: Compact Appeal List View with Scrollbar
 
-After thorough investigation, I found that while several hooks and edge functions already filter by employee status, there are still **gaps where terminated/archived employees could appear in alerts**.
+## Overview
 
----
-
-## Current Status by Component
-
-| Component | Current Filtering | Issue |
-|-----------|-------------------|-------|
-| `useEmployees` hook | ✅ Filters out Resigned/Terminated | OK |
-| `useDocumentRenewalQueue` hook | ✅ Uses `.eq('status', 'Active')` | OK |
-| `send-document-expiry-notification` | ✅ Uses `.eq("status", "Active")` | OK |
-| `check-contract-expiry` | ✅ Uses `.in("status", ["Active", "Approved"])` on contracts | OK |
-| **DashboardView `expiringVisas`** | ❌ No employee status check | **NEEDS FIX** |
-| **DashboardView contract alerts** | ✅ Recently fixed for Archived | OK |
-| `useDocumentExpiryPriority` hook | Relies on passed employees array | Depends on caller |
-| `EmployeeProfileModal` expiry alerts | Displays for any employee viewed | Acceptable (viewing profile) |
+Transform the current Appeals List from a spacious card-based layout to a compact, table-like list view that displays all essential details while saving vertical space. Add a scrollable container to handle long lists efficiently.
 
 ---
 
-## Issue Identified
+## Current Issues
 
-In `DashboardView.tsx`, the **expiringVisas** calculation (lines 94-98) doesn't filter by employee status:
+1. **Excessive vertical space** - Each appeal card takes 4-5 lines of height with generous padding
+2. **No scroll containment** - The entire page scrolls when many appeals exist
+3. **Inconsistent density** - Information is spread out, making it hard to scan quickly
 
-```typescript
-// Current code - NO STATUS CHECK
-const expiringVisas = employees.filter(e => {
-  if (!e.visa_expiration) return false;
-  const days = Math.ceil((new Date(e.visa_expiration).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-  return days > 0 && days <= expiryThreshold;
-});
+---
+
+## Solution Design
+
+### Compact List Row Layout
+
+Each appeal will be displayed as a compact horizontal row with:
+
+```text
++----------------------------------------------------------------------------------------------------------+
+| [Avatar] Name         | Date        | Time Request       | Message (truncated) | Status  | Action     |
++----------------------------------------------------------------------------------------------------------+
+| [Photo] John Doe      | 28 Jan 2026 | 08:00 → 17:00      | "I forgot to..."    | Pending | [Review]   |
++----------------------------------------------------------------------------------------------------------+
 ```
 
-While `useEmployees` already filters out Resigned/Terminated employees, adding an explicit check provides:
-1. **Defense in depth** - protects against future changes to the hook
-2. **Clarity** - makes the business logic explicit
-3. **Consistency** - matches the pattern used elsewhere
+### Key Features
+
+- **Single-line per appeal** with all essential info visible at a glance
+- **Fixed-height scrollable container** (max 400-500px) with custom scrollbar
+- **Hover state** for pending items to indicate they're clickable
+- **Compact avatar** (28x28px instead of 40x40px)
+- **Inline time display** formatted as "HH:mm → HH:mm"
+- **Truncated message** with ellipsis (visible on hover via tooltip)
 
 ---
 
 ## Files to Modify
 
-### 1. `src/components/views/DashboardView.tsx`
+### `src/components/views/AttendanceAppealsView.tsx`
 
-**Add explicit employee status check to `expiringVisas` calculation:**
+**Changes:**
 
+1. **Add ScrollArea import:**
 ```typescript
-// Lines 94-98: Add status filter
-const expiringVisas = employees.filter(e => {
-  // Exclude terminated, resigned, or archived employees
-  const status = e.status as string;
-  if (status === 'Terminated' || status === 'Resigned' || status === 'Archived') return false;
-  
-  if (!e.visa_expiration) return false;
-  const days = Math.ceil((new Date(e.visa_expiration).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-  return days > 0 && days <= expiryThreshold;
-});
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 ```
 
-### 2. `src/hooks/useDocumentExpiryPriority.ts`
-
-**Add status validation at the start of employee processing:**
-
-Although the hook receives employees from `useEmployees` (which already filters), adding a defensive check ensures robustness:
-
+2. **Wrap Appeals List with ScrollArea:**
 ```typescript
-// Line 59: Add status filter before processing
-employees.forEach((employee) => {
-  // Skip terminated/resigned/archived employees
-  const status = employee.status as string;
-  if (status === 'Terminated' || status === 'Resigned' || status === 'Archived') {
-    return; // Skip this employee
-  }
-  
-  const expiringDocuments: ExpiringDocument[] = [];
-  // ... rest of processing
-});
+<ScrollArea className="h-[400px]">
+  {/* Appeals rows go here */}
+</ScrollArea>
+```
+
+3. **Replace current card layout with compact table-like rows:**
+
+**Current (lines 305-369):**
+```typescript
+<div className="space-y-3">
+  {filteredAppeals.map((appeal) => {
+    // ... full card layout with stacked content
+  })}
+</div>
+```
+
+**New compact layout:**
+```typescript
+<div className="space-y-1">
+  {filteredAppeals.map((appeal) => (
+    <div className="flex items-center gap-3 px-3 py-2 rounded-md border ...">
+      {/* Compact avatar (28x28) */}
+      {/* Employee name - fixed width */}
+      {/* Date - fixed width */}
+      {/* Time request - fixed width */}
+      {/* Message - truncated with tooltip */}
+      {/* Status badge - compact */}
+      {/* Review button for pending */}
+    </div>
+  ))}
+</div>
 ```
 
 ---
 
-## What's Already Correctly Filtered (No Changes Needed)
+## Detailed UI Changes
 
-| Component | Filter Used | Status |
-|-----------|-------------|--------|
-| `useDocumentRenewalQueue` | `.eq('status', 'Active')` | ✅ |
-| `useDocumentRenewalQueue` documents | `doc.employees?.status !== 'Active'` check | ✅ |
-| `useDocumentRenewalQueue` contracts | `.eq('employees.status', 'Active')` | ✅ |
-| `send-document-expiry-notification` | `.eq("status", "Active")` | ✅ |
-| `check-contract-expiry` | `.in("status", ["Active", "Approved"])` for contracts | ✅ |
-| `ContractsView` expiry status | Recently fixed to exclude Archived | ✅ |
-| `AdminContractsSection` expiry | Recently fixed to exclude Archived | ✅ |
-| `DashboardView` contract alerts | Recently fixed to exclude Archived | ✅ |
+### Row Structure
+
+| Element | Width | Content |
+|---------|-------|---------|
+| Avatar | 28px | Employee photo or initials |
+| Name | ~120px | Employee full name (truncated if needed) |
+| Date | ~90px | "28 Jan 2026" |
+| Time | ~110px | "08:00 → 17:00" or "N/A" |
+| Message | flex-1 | Truncated message with tooltip |
+| Status | ~80px | Compact badge |
+| Action | ~70px | "Review" button (pending only) |
+
+### Visual Styling
+
+- **Pending rows:** Subtle amber background (`bg-amber-500/5`), left border accent
+- **Approved rows:** Green tint (`bg-green-500/5`)
+- **Rejected rows:** Red tint (`bg-red-500/5`)
+- **Row height:** ~44px (compact but readable)
+- **Spacing between rows:** 4px (`space-y-1`)
+
+### Scroll Container
+
+```typescript
+<ScrollArea className="h-[420px] pr-2">
+  {/* Compact list rows */}
+</ScrollArea>
+```
+
+- Fixed height of 420px (shows ~9-10 rows before scrolling)
+- Visible scrollbar when content overflows
+- Smooth scroll behavior
 
 ---
 
-## Changes Summary
+## Implementation Details
 
-| File | Change Description |
-|------|-------------------|
-| `src/components/views/DashboardView.tsx` | Add explicit status filter to `expiringVisas` calculation |
-| `src/hooks/useDocumentExpiryPriority.ts` | Add defensive status check in employee processing loop |
+### Compact Row Component
+
+```typescript
+<div
+  key={appeal.id}
+  onClick={() => appeal.status === 'Pending' && setSelectedAppeal(appeal)}
+  className={cn(
+    "flex items-center gap-3 px-3 py-2 rounded-md border-l-2 transition-all",
+    appeal.status === 'Pending' 
+      ? "bg-amber-500/5 border-l-amber-500 cursor-pointer hover:bg-amber-500/10" 
+      : appeal.status === 'Approved'
+      ? "bg-green-500/5 border-l-green-500"
+      : "bg-red-500/5 border-l-red-500"
+  )}
+>
+  {/* Compact Avatar */}
+  <div className="flex-shrink-0">
+    {employeePhoto ? (
+      <img src={employeePhoto} className="w-7 h-7 rounded-full object-cover" />
+    ) : (
+      <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center">
+        <User className="w-3.5 h-3.5 text-primary" />
+      </div>
+    )}
+  </div>
+
+  {/* Name */}
+  <div className="w-28 truncate text-sm font-medium">{employeeName}</div>
+
+  {/* Date */}
+  <div className="w-24 text-xs text-muted-foreground">
+    {format(parseISO(appeal.appeal_date), 'dd MMM yyyy')}
+  </div>
+
+  {/* Time Request */}
+  <div className="w-28 text-xs">
+    {appeal.requested_check_in || 'N/A'} → {appeal.requested_check_out || 'N/A'}
+  </div>
+
+  {/* Message with Tooltip */}
+  <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex-1 text-xs text-muted-foreground truncate">
+          {appeal.appeal_message}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <p className="text-sm">{appeal.appeal_message}</p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+
+  {/* Status Badge - Compact */}
+  <Badge className={cn("text-xs px-2 py-0.5", statusStyles)}>
+    {appeal.status}
+  </Badge>
+
+  {/* Review Button (pending only) */}
+  {appeal.status === 'Pending' && (
+    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
+      Review
+    </Button>
+  )}
+</div>
+```
 
 ---
 
-## Technical Notes
+## Additional Enhancements
 
-- **Status values to exclude**: `'Terminated'`, `'Resigned'`, `'Archived'`
-- **Status values to include**: `'Active'`, `'On Leave'`
-- Using `as string` type cast for TypeScript compatibility with status comparisons
-- The defensive checks provide extra safety even when upstream hooks already filter
+1. **Column Headers** - Add a sticky header row above the list:
+```typescript
+<div className="flex items-center gap-3 px-3 py-2 text-xs font-medium text-muted-foreground border-b mb-1">
+  <div className="w-7" /> {/* Avatar space */}
+  <div className="w-28">Employee</div>
+  <div className="w-24">Date</div>
+  <div className="w-28">Time Request</div>
+  <div className="flex-1">Message</div>
+  <div className="w-16">Status</div>
+  <div className="w-16">Action</div>
+</div>
+```
+
+2. **Reviewed Info on Hover** - For approved/rejected items, show reviewer info in tooltip
+
+3. **Empty State** - Keep current empty state but adjust for compact layout
+
+---
+
+## Summary of Changes
+
+| Component | Change |
+|-----------|--------|
+| Appeals List Container | Wrap with `ScrollArea` (height: 420px) |
+| Individual Appeal Items | Convert from cards to compact single-line rows |
+| Avatar Size | Reduce from 40x40px to 28x28px |
+| Padding | Reduce from `p-4` to `px-3 py-2` |
+| Message Display | Truncate with ellipsis, full text in tooltip |
+| Row Spacing | Reduce from `space-y-3` to `space-y-1` |
+| Visual Indicators | Add left border accent for status |
+| Column Headers | Add sticky header row for clarity |
 
 ---
 
 ## Expected Result
 
-After implementation:
-- Dashboard "Visa Alerts" will show only active employees
-- Document expiry priority sorting will skip inactive employees
-- All expiry-related UI counts will be accurate
-- System stability improved by consistent filtering across all alert touchpoints
+- **Before:** ~5-6 appeals visible before scrolling page
+- **After:** ~9-10 appeals visible in compact scrollable container
+- **Benefit:** HR can quickly scan and process multiple appeals without excessive scrolling
+- **UX:** Clear visual hierarchy, all important info at a glance, smooth scrolling experience
+
