@@ -139,6 +139,46 @@ export default function AttendanceScanner() {
     }
   };
 
+  const sendUndertimeNotification = async (employeeData: {
+    employeeName: string;
+    employeeId: string;
+    hrmsNo: string;
+    department: string;
+    jobPosition: string;
+    employeeEmail: string;
+    checkOutTime: string;
+    scheduledEndTime: string;
+  }) => {
+    try {
+      const [hours, minutes] = employeeData.checkOutTime.split(':').map(Number);
+      const checkOutMinutes = hours * 60 + minutes;
+      
+      const [endHours, endMins] = employeeData.scheduledEndTime.split(':').map(Number);
+      const scheduledMinutes = endHours * 60 + endMins;
+      
+      const minutesEarly = scheduledMinutes - checkOutMinutes;
+
+      if (minutesEarly > 0) {
+        await supabase.functions.invoke('send-undertime-notification', {
+          body: {
+            employeeName: employeeData.employeeName,
+            employeeId: employeeData.employeeId,
+            hrmsNo: employeeData.hrmsNo,
+            department: employeeData.department,
+            jobPosition: employeeData.jobPosition,
+            employeeEmail: employeeData.employeeEmail,
+            checkOutTime: employeeData.checkOutTime,
+            scheduledEndTime: employeeData.scheduledEndTime,
+            minutesEarly,
+          },
+        });
+        console.log('Undertime notification sent successfully');
+      }
+    } catch (error) {
+      console.error('Failed to send undertime notification:', error);
+    }
+  };
+
   const handleScan = async (result: string) => {
     if (!result || scannerState !== 'scanning') return;
     
@@ -192,6 +232,27 @@ export default function AttendanceScanner() {
           checkOutTime: data.checkOutTime,
           mode: 'check-out',
         });
+
+        // Send undertime notification if employee is leaving early
+        if (data.status?.includes('Undertime')) {
+          // Fetch employee email for notification
+          const { data: empData } = await supabase
+            .from('employees')
+            .select('work_email')
+            .eq('hrms_no', result)
+            .single();
+          
+          sendUndertimeNotification({
+            employeeName: data.employeeName,
+            employeeId: data.employee_id || '',
+            hrmsNo: result,
+            department: data.department || '',
+            jobPosition: data.jobPosition || '',
+            employeeEmail: empData?.work_email || '',
+            checkOutTime: data.checkOutTime,
+            scheduledEndTime: '17:00', // Default shift end
+          });
+        }
       }
       
       // Show result for 5 seconds, then keep camera on for 10 more seconds
@@ -265,6 +326,27 @@ export default function AttendanceScanner() {
           checkOutTime: data.checkOutTime,
           mode: 'check-out',
         });
+
+        // Send undertime notification if employee is leaving early
+        if (data.status?.includes('Undertime')) {
+          // Fetch employee email for notification
+          const { data: empData } = await supabase
+            .from('employees')
+            .select('work_email')
+            .eq('id', employeeId)
+            .single();
+          
+          sendUndertimeNotification({
+            employeeName: data.employeeName,
+            employeeId: employeeId,
+            hrmsNo: hrmsNo,
+            department: data.department || '',
+            jobPosition: data.jobPosition || '',
+            employeeEmail: empData?.work_email || '',
+            checkOutTime: data.checkOutTime,
+            scheduledEndTime: '17:00', // Default shift end
+          });
+        }
       }
       
       setScannerState('result');

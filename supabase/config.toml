@@ -86,3 +86,6 @@ verify_jwt = false
 
 [functions.process-email-approval]
 verify_jwt = false
+
+[functions.send-undertime-notification]
+verify_jwt = false
