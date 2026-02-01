@@ -1,79 +1,151 @@
 
-# Plan: Fix Undertime Display for Appealed Records in Monthly Matrix
+# Plan: Fix Appealed Status Display When Requested Times Are NULL
 
-## Problem Summary
+## Problem Identified
 
-When an employee's attendance appeal is approved (for example, for undertime), the Monthly Matrix incorrectly shows "P" (Present) instead of the appropriate status like "UT" (Undertime). This happens because the system currently treats ALL approved appeals as "Present" without considering what the original issue was.
+When employees submit appeals, they sometimes fill in only the appeal message without providing the requested check-out time. For example:
+- Appeal message: *"5:00pm please mam due to pre schoolers field trip"*
+- `requested_check_out`: **NULL**
+
+When this appeal is approved:
+1. The attendance record's `check_out` gets set to NULL
+2. The Monthly Matrix code skips the undertime check (since `check_out` is falsy)
+3. The employee shows as **P (Present)** instead of **UT (Undertime)**
+
+## Root Cause
+
+The current approval flow in `AttendanceAppealsView.tsx` blindly copies `requested_check_out` to the attendance record, even when it's NULL:
+```typescript
+check_out: selectedAppeal.requested_check_out, // Can be NULL!
+```
+
+This overwrites the original check-out time with NULL.
 
 ## Solution
 
-Instead of blindly showing all "Appealed" records as Present, we will analyze the **actual times** on the record to determine the correct status:
+### Two-Part Fix
 
-- If the check-out time is still early → Show as **UT** (Undertime)
-- If the check-in time is late → Show as **L** (Late)
-- If both issues exist → Show as **L** (Late takes priority in the current design)
-- If times are within normal range → Show as **P** (Present)
+**Part 1: Preserve Original Times When Requested Times Are NULL (Approval Logic)**
+
+When approving an appeal, if `requested_check_in` or `requested_check_out` is NULL, keep the original attendance record's time instead of overwriting it.
+
+**Part 2: Handle NULL in Matrix Display (Fallback Safety)**
+
+In the Monthly Matrix, when an "Appealed" record has NULL check_out, show as **UT** (since if someone appealed without specifying a checkout time, they likely had an undertime issue).
 
 ---
 
 ## Technical Changes
 
-### File: `src/components/attendance/MonthlyMatrixView.tsx`
+### File 1: `src/components/views/AttendanceAppealsView.tsx`
 
-**Current behavior (line 249-250):**
+**Current behavior (lines 100-106):**
 ```typescript
-// Appealed - Show as Present (approved appeal = Present)
-if (status === 'appealed') return 'P';
+await updateAttendance.mutateAsync({
+  id: selectedAppeal.attendance_id,
+  check_in: selectedAppeal.requested_check_in,
+  check_out: selectedAppeal.requested_check_out,
+  status: 'Appealed',
+  admin_remarks: `[Appeal Approved] Time corrected: ${selectedAppeal.appeal_message}`,
+});
 ```
 
 **New behavior:**
 ```typescript
-// Appealed - Analyze actual times to determine display status
+// Fetch original attendance record to preserve times if not specified in appeal
+const { data: originalAttendance } = await supabase
+  .from('attendance')
+  .select('check_in, check_out')
+  .eq('id', selectedAppeal.attendance_id)
+  .single();
+
+await updateAttendance.mutateAsync({
+  id: selectedAppeal.attendance_id,
+  // Use requested time if provided, otherwise keep original
+  check_in: selectedAppeal.requested_check_in || originalAttendance?.check_in,
+  check_out: selectedAppeal.requested_check_out || originalAttendance?.check_out,
+  status: 'Appealed',
+  admin_remarks: `[Appeal Approved] Time corrected: ${selectedAppeal.appeal_message}`,
+});
+```
+
+### File 2: `src/components/attendance/MonthlyMatrixView.tsx`
+
+**Current behavior (lines 250-273):**
+```typescript
 if (status === 'appealed') {
-  // Check if still undertime based on check_out time
+  if (attendance.check_out) {
+    // ... undertime check
+  }
+  if (attendance.check_in) {
+    // ... late check
+  }
+  return 'P';
+}
+```
+
+**New behavior:**
+```typescript
+if (status === 'appealed') {
+  // Check if undertime based on check_out time
   if (attendance.check_out) {
     const [hours, minutes] = attendance.check_out.split(':').map(Number);
     const checkOutMinutes = hours * 60 + minutes;
-    const shiftEndMinutes = 17 * 60; // Default: 5:00 PM = 1020 minutes
-    
-    // If checked out more than 15 minutes early, still undertime
+    const shiftEndMinutes = 17 * 60;
     if (checkOutMinutes < shiftEndMinutes - 15) {
       return 'UT';
     }
+  } else {
+    // No check_out time means the appeal was likely for undertime/missed punch
+    // Show as UT since the original issue wasn't fully resolved
+    return 'UT';
   }
-  // Check if still late based on check_in time
+  
+  // Check if late based on check_in time
   if (attendance.check_in) {
     const [hours, minutes] = attendance.check_in.split(':').map(Number);
     const checkInMinutes = hours * 60 + minutes;
-    const shiftStartMinutes = 8 * 60; // Default: 8:00 AM = 480 minutes
-    
-    // If checked in more than 5 minutes late
+    const shiftStartMinutes = 8 * 60;
     if (checkInMinutes > shiftStartMinutes + 5) {
       return 'L';
     }
   }
-  return 'P'; // Times are within acceptable range
+  return 'P';
 }
 ```
 
-**For a more accurate solution**, we should use the employee's actual shift times. However, this would require async calls which complicate the synchronous `getDayStatus` function. A simpler approach is to:
+### File 3: `supabase/functions/process-email-approval/index.ts`
 
-1. Use a reasonable default shift (08:00 - 17:00)
-2. Apply a small grace period for both late (5 min) and undertime (15 min)
+Same fix for email-based approvals (lines 283-292):
+```typescript
+// Fetch original attendance to preserve times if appeal didn't specify them
+const { data: originalAtt } = await supabase
+  .from("attendance")
+  .select("check_in, check_out")
+  .eq("id", existingAttendance.id)
+  .single();
 
----
-
-## Alternative Approach: Store Original Status
-
-A cleaner long-term solution would be to store the **original status** when the appeal is approved, but this requires database changes. For now, the time-based calculation provides an accurate fix without schema changes.
+await supabase
+  .from("attendance")
+  .update({
+    check_in: appealRecord.requested_check_in || originalAtt?.check_in,
+    check_out: appealRecord.requested_check_out || originalAtt?.check_out,
+    status: "Appealed",
+    modified_at: new Date().toISOString(),
+    modified_by: "Email Approval",
+  })
+  .eq("id", existingAttendance.id);
+```
 
 ---
 
 ## Summary of Changes
 
-| Location | Change |
-|----------|--------|
-| `MonthlyMatrixView.tsx` lines 249-250 | Replace simple "P" return with time-based status calculation |
+| File | Change |
+|------|--------|
+| `AttendanceAppealsView.tsx` | Preserve original check-in/check-out when appeal's requested times are NULL |
+| `MonthlyMatrixView.tsx` | Show "UT" when check_out is NULL for appealed records (instead of "P") |
+| `process-email-approval/index.ts` | Same preservation logic for email-based approvals |
 
 ---
 
@@ -81,9 +153,9 @@ A cleaner long-term solution would be to store the **original status** when the 
 
 | Scenario | Before | After |
 |----------|--------|-------|
-| Appeal approved, checkout at 4:00 PM | P | UT |
-| Appeal approved, checkout at 5:05 PM | P | P |
-| Appeal approved, check-in at 8:30 AM | P | L |
-| Appeal approved, times are normal | P | P |
+| Appeal with `requested_check_out: NULL`, original checkout was 16:00 | P | UT |
+| Appeal with `requested_check_out: 17:00` | P | P |
+| Appeal with `requested_check_out: 16:00` | UT | UT |
+| Appeal with no original attendance and no requested checkout | P | UT |
 
-This ensures HR reports accurately reflect attendance issues even after appeals are approved.
+This ensures appeals are displayed correctly based on whether they cover the full shift or acknowledge an undertime situation.
