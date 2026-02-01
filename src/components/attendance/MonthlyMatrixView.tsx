@@ -258,6 +258,10 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
         if (checkOutMinutes < shiftEndMinutes - 15) {
           return 'UT';
         }
+      } else {
+        // No check_out time means the appeal was likely for undertime/missed punch
+        // Show as UT since the original issue wasn't fully resolved
+        return 'UT';
       }
       // Check if still late based on check_in time (default shift start: 08:00)
       if (attendance.check_in) {
