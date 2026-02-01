@@ -246,8 +246,32 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     // Map attendance status - check DB status FIRST before raw punch data
     const status = attendance.status?.toLowerCase() || '';
     
-    // Appealed - Show as Present (approved appeal = Present)
-    if (status === 'appealed') return 'P';
+    // Appealed - Analyze actual times to determine correct display status
+    if (status === 'appealed') {
+      // Check if still undertime based on check_out time (default shift end: 17:00)
+      if (attendance.check_out) {
+        const [hours, minutes] = attendance.check_out.split(':').map(Number);
+        const checkOutMinutes = hours * 60 + minutes;
+        const shiftEndMinutes = 17 * 60; // 5:00 PM = 1020 minutes
+        
+        // If checked out more than 15 minutes early, still undertime
+        if (checkOutMinutes < shiftEndMinutes - 15) {
+          return 'UT';
+        }
+      }
+      // Check if still late based on check_in time (default shift start: 08:00)
+      if (attendance.check_in) {
+        const [hours, minutes] = attendance.check_in.split(':').map(Number);
+        const checkInMinutes = hours * 60 + minutes;
+        const shiftStartMinutes = 8 * 60; // 8:00 AM = 480 minutes
+        
+        // If checked in more than 5 minutes late
+        if (checkInMinutes > shiftStartMinutes + 5) {
+          return 'L';
+        }
+      }
+      return 'P'; // Times are within acceptable range
+    }
     
     // Missed Punch statuses - Orange
     if (status.includes('miss punch') || status === 'missed punch') return 'MP';
