@@ -280,11 +280,18 @@ const handler = async (req: Request): Promise<Response> => {
           .single();
 
         if (existingAttendance) {
+          // Fetch original attendance to preserve times if appeal didn't specify them
+          const { data: originalAtt } = await supabase
+            .from("attendance")
+            .select("check_in, check_out")
+            .eq("id", existingAttendance.id)
+            .single();
+
           await supabase
             .from("attendance")
             .update({
-              check_in: appealRecord.requested_check_in,
-              check_out: appealRecord.requested_check_out,
+              check_in: appealRecord.requested_check_in || originalAtt?.check_in,
+              check_out: appealRecord.requested_check_out || originalAtt?.check_out,
               status: "Appealed",
               modified_at: new Date().toISOString(),
               modified_by: "Email Approval",

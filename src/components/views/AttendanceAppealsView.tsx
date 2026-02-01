@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { useAttendanceAppeals, useUpdateAttendanceAppeal } from '@/hooks/useAttendanceAppeals';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useUpdateAttendance, useCreateAttendance } from '@/hooks/useAttendance';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export function AttendanceAppealsView() {
@@ -96,11 +97,18 @@ export function AttendanceAppealsView() {
       // If approved, update or create the attendance record with "Appealed" status
       if (action === 'approve') {
         if (selectedAppeal.attendance_id) {
-          // Update existing attendance record
+          // Fetch original attendance record to preserve times if not specified in appeal
+          const { data: originalAttendance } = await supabase
+            .from('attendance')
+            .select('check_in, check_out')
+            .eq('id', selectedAppeal.attendance_id)
+            .single();
+
+          // Update existing attendance record - use requested time if provided, otherwise keep original
           await updateAttendance.mutateAsync({
             id: selectedAppeal.attendance_id,
-            check_in: selectedAppeal.requested_check_in,
-            check_out: selectedAppeal.requested_check_out,
+            check_in: selectedAppeal.requested_check_in || originalAttendance?.check_in,
+            check_out: selectedAppeal.requested_check_out || originalAttendance?.check_out,
             status: 'Appealed',
             admin_remarks: `[Appeal Approved] Time corrected: ${selectedAppeal.appeal_message}`,
           });
