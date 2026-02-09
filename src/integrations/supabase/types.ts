@@ -169,6 +169,45 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          description: string
+          id: string
+          ip_address: unknown
+          level: string
+          metadata: Json | null
+          user_agent: string | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          description: string
+          id?: string
+          ip_address?: unknown
+          level: string
+          metadata?: Json | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          description?: string
+          id?: string
+          ip_address?: unknown
+          level?: string
+          metadata?: Json | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       company_files: {
         Row: {
           created_at: string
@@ -2403,7 +2442,26 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      audit_log_summary: {
+        Row: {
+          action: string | null
+          event_count: number | null
+          level: string | null
+          log_date: string | null
+          unique_users: number | null
+        }
+        Relationships: []
+      }
+      contract_integrity_violations: {
+        Row: {
+          active_contract_count: number | null
+          description: string | null
+          employee_id: string | null
+          full_name: string | null
+          issue_type: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       calculate_tenure_based_leave:
@@ -2412,6 +2470,7 @@ export type Database = {
             Args: { p_as_of_date?: string; p_joining_date: string }
             Returns: number
           }
+      cleanup_old_audit_logs: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2419,9 +2478,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      pg_advisory_lock: { Args: { key: number }; Returns: boolean }
+      pg_advisory_locked: { Args: { key: number }; Returns: boolean }
+      pg_advisory_unlock: { Args: { key: number }; Returns: boolean }
+      pg_try_advisory_lock: { Args: { key: number }; Returns: boolean }
       process_monthly_leave_accrual: {
         Args: { target_month?: number; target_year?: number }
         Returns: Json
+      }
+      validate_contract_integrity: {
+        Args: never
+        Returns: {
+          active_contract_count: number
+          employee_id: string
+          issue_type: string
+        }[]
       }
     }
     Enums: {
