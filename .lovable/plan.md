@@ -1,63 +1,113 @@
 
 
-# Plan: Universal Employee Search Box
+# Plan: Undertime Must Stay UT Even After Appeal
 
-## Overview
+## Problem
 
-Add a powerful search bar at the top of the main content area (above all views) that lets you quickly search for any employee and see a summary of all their related data -- attendance, leave requests, appeals, contracts, documents, etc. -- in a dropdown results panel.
+When an employee's attendance is marked as "Appealed," the Monthly Matrix re-evaluates the actual check-in/check-out times. If the times appear within the normal range (e.g., the appeal corrected times to look acceptable), the code returns "P" (Present) at line 277.
 
-## How It Will Work
+The business rule is: **Undertime must always show as UT, regardless of whether an appeal was filed.** An appeal does not erase the undertime — it only acknowledges the reason.
 
-1. A search input appears at the top of the main content area, always visible regardless of which view you're on
-2. As you type an employee name or HRMS number, a dropdown shows matching employees
-3. Clicking an employee opens their full profile modal (already exists: `EmployeeProfileModal`)
-4. Each search result shows a quick summary: department, status, and key flags (pending leaves, recent appeals, attendance issues)
-
-## Technical Details
-
-### New Component: `src/components/UniversalSearchBar.tsx`
-
-- Uses the existing `Command` (cmdk) component for keyboard-friendly search
-- Queries the `employees` table client-side (already loaded via `useEmployees`)
-- Also fetches summary counts from `attendance`, `leave_records`, `attendance_appeals` for matched employees
-- Search filters by: `full_name`, `hrms_no`, `department`, `job_position`, `work_email`
-- Results grouped by relevance with employee photo/avatar, name, HRMS number, department
-- Each result shows badges: pending leave count, recent appeals, attendance status today
-- Clicking a result opens `EmployeeProfileModal` with that employee selected
-- Keyboard shortcut: `Ctrl+K` / `Cmd+K` to focus the search
-
-### Modified File: `src/pages/Index.tsx`
-
-- Import and render `UniversalSearchBar` above `{renderView()}` inside the `<main>` element
-- Pass a callback to open the employee profile modal
-
-### Data Strategy
-
-- Employees list is already cached via React Query (`useEmployees`)
-- Search filtering happens client-side for instant results (no extra API calls while typing)
-- Summary badges (leave, appeals, attendance) fetched once on component mount and cached
-- No new database tables or migrations needed
-
-### Component Structure
+## Current Logic (Appealed status, lines 250-277)
 
 ```
-Index.tsx
-  +-- UniversalSearchBar (new)
-  |     +-- Search Input (Ctrl+K shortcut)
-  |     +-- Dropdown Results (cmdk Command component)
-  |           +-- Employee cards with summary badges
-  |           +-- Click -> opens EmployeeProfileModal
-  +-- {renderView()} (existing)
+Appealed record?
+  -> Has check_out AND left early? -> UT (correct)
+  -> No check_out? -> UT (but should be A if no check_in either)
+  -> Late check_in? -> L
+  -> Otherwise? -> P   <-- PROBLEM: masks undertime
 ```
 
-## Files to Create/Modify
+## Two Fixes Needed
 
-| File | Action |
+### Fix 1: No check_in AND no check_out = Absent (from previous approved plan)
+
+Lines 261-264: When both check_in and check_out are missing, the employee never showed up. Mark as **A** (Absent), not UT.
+
+```
+Before: No check_out -> always UT
+After:  No check_out + no check_in -> A (Absent)
+        No check_out + has check_in -> UT (missed punch out)
+```
+
+### Fix 2: Check undertime AFTER late check (the main fix)
+
+Line 277 currently returns 'P' as the fallback. This misses the case where:
+- check_out exists and is within range (e.g., 16:50 which is within 15 min of 17:00)
+- BUT the original issue was undertime
+
+Since the status is "Appealed" and we already checked for early departure at line 252-259, the only way we reach line 277 is if check_out is within the acceptable window. However, the admin_remarks field often contains the original reason (e.g., "Doctor appointment", "miss punch").
+
+The safest approach: also check if admin_remarks contains undertime-related keywords, OR keep the check_out threshold evaluation but with a stricter boundary. But the simplest and most correct fix based on the user's rule is:
+
+**For Appealed records, if check_out is before shift end time (17:00) at all (not just 15 min early), mark as UT.** The 15-minute grace period should not apply to appealed records — the appeal itself is the acknowledgment.
+
+Updated logic:
+```
+Appealed record?
+  -> No check_out + no check_in -> A (Absent)
+  -> No check_out + has check_in -> UT (missed punch out)
+  -> Has check_out AND check_out < 17:00 -> UT (undertime, no grace for appeals)
+  -> Has check_in AND check_in > 08:05 -> L (late)
+  -> Otherwise -> P (genuinely on time and full day)
+```
+
+## File Change
+
+**File:** `src/components/attendance/MonthlyMatrixView.tsx` (lines 250-277)
+
+Replace the Appealed block with:
+
+```typescript
+if (status === 'appealed') {
+  if (attendance.check_out && attendance.check_out.trim() !== '') {
+    const [hours, minutes] = attendance.check_out.split(':').map(Number);
+    const checkOutMinutes = hours * 60 + minutes;
+    const shiftEndMinutes = 17 * 60; // 5:00 PM
+
+    // For appealed records: any check_out before shift end = UT (no grace period)
+    if (checkOutMinutes < shiftEndMinutes) {
+      return 'UT';
+    }
+  } else {
+    // No check_out
+    if (!attendance.check_in || attendance.check_in.trim() === '') {
+      return 'A'; // No check_in either = Absent
+    }
+    return 'UT'; // Has check_in but no check_out = missed punch out
+  }
+
+  // Check late
+  if (attendance.check_in) {
+    const [hours, minutes] = attendance.check_in.split(':').map(Number);
+    const checkInMinutes = hours * 60 + minutes;
+    const shiftStartMinutes = 8 * 60;
+    if (checkInMinutes > shiftStartMinutes + 5) {
+      return 'L';
+    }
+  }
+
+  return 'P'; // Full day, on time
+}
+```
+
+## Expected Results
+
+| Scenario | check_in | check_out | Before | After |
+|----------|----------|-----------|--------|-------|
+| No show, appealed | NULL | NULL | UT | **A** |
+| Came in, no punch out | 07:59 | NULL | UT | **UT** |
+| Left at noon (doctor) | 07:59 | 12:00 | UT | **UT** |
+| Left at 4:50 PM (was within grace) | 08:00 | 16:50 | **P** | **UT** |
+| Full day, on time | 07:30 | 17:00 | P | P |
+| Full day, late | 08:10 | 17:00 | L | L |
+
+## Summary
+
+| Item | Detail |
 |------|--------|
-| `src/components/UniversalSearchBar.tsx` | **Create** -- search component with cmdk |
-| `src/pages/Index.tsx` | **Modify** -- add search bar above view content |
-
-## No Database Changes Required
-
-All data is already available through existing hooks and tables.
+| Files modified | `src/components/attendance/MonthlyMatrixView.tsx` (1 block, ~20 lines) |
+| Key change | Remove 15-min grace period for Appealed records; any departure before 17:00 = UT |
+| Also fixes | No check_in + no check_out = Absent (from earlier approved plan) |
+| Risk | Low -- only affects Appealed records display in the matrix |
 
