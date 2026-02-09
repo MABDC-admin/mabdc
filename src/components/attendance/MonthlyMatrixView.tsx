@@ -248,33 +248,34 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     
     // Appealed - Analyze actual times to determine correct display status
     if (status === 'appealed') {
-      // Check if still undertime based on check_out time (default shift end: 17:00)
       if (attendance.check_out && attendance.check_out.trim() !== '') {
         const [hours, minutes] = attendance.check_out.split(':').map(Number);
         const checkOutMinutes = hours * 60 + minutes;
-        const shiftEndMinutes = 17 * 60; // 5:00 PM = 1020 minutes
-        
-        // If checked out more than 15 minutes early, still undertime
-        if (checkOutMinutes < shiftEndMinutes - 15) {
+        const shiftEndMinutes = 17 * 60; // 5:00 PM
+
+        // For appealed records: any check_out before shift end = UT (no grace period)
+        if (checkOutMinutes < shiftEndMinutes) {
           return 'UT';
         }
       } else {
-        // No check_out time means the appeal was likely for undertime/missed punch
-        // Show as UT since the original issue wasn't fully resolved
-        return 'UT';
+        // No check_out
+        if (!attendance.check_in || attendance.check_in.trim() === '') {
+          return 'A'; // No check_in either = Absent
+        }
+        return 'UT'; // Has check_in but no check_out = missed punch out
       }
-      // Check if still late based on check_in time (default shift start: 08:00)
+
+      // Check late
       if (attendance.check_in) {
         const [hours, minutes] = attendance.check_in.split(':').map(Number);
         const checkInMinutes = hours * 60 + minutes;
-        const shiftStartMinutes = 8 * 60; // 8:00 AM = 480 minutes
-        
-        // If checked in more than 5 minutes late
+        const shiftStartMinutes = 8 * 60;
         if (checkInMinutes > shiftStartMinutes + 5) {
           return 'L';
         }
       }
-      return 'P'; // Times are within acceptable range
+
+      return 'P'; // Full day, on time
     }
     
     // Missed Punch statuses - Orange
