@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { DashboardView } from '@/components/views/DashboardView';
 import { EmployeesView } from '@/components/views/EmployeesView';
@@ -21,11 +22,19 @@ import { OrgChartView } from '@/components/views/OrgChartView';
 import { CompanyDocsView } from '@/components/views/CompanyDocsView';
 import { VisaProcessView } from '@/components/views/VisaProcessView';
 import { ReportsView } from '@/components/views/ReportsView';
+import { UniversalSearchBar } from '@/components/UniversalSearchBar';
+import { EmployeeProfileModal } from '@/components/modals/EmployeeProfileModal';
 import { useHRStore } from '@/store/hrStore';
+import type { Employee } from '@/types/hr';
 
 const Index = () => {
-  const { currentView } = useHRStore();
+  const { currentView, setCurrentEmployee } = useHRStore();
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
+  const handleEmployeeSelect = (employee: Employee) => {
+    setCurrentEmployee(employee);
+    setIsProfileOpen(true);
+  };
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
@@ -81,8 +90,10 @@ const Index = () => {
     <div className="flex min-h-screen">
       <Sidebar />
       <main className="flex-1 lg:ml-0 p-4 lg:p-6 pt-16 lg:pt-6 overflow-x-hidden">
+        <UniversalSearchBar onEmployeeSelect={handleEmployeeSelect} />
         {renderView()}
       </main>
+      <EmployeeProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
     </div>
   );
 };
