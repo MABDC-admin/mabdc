@@ -23,6 +23,39 @@ const handler = async (req: Request): Promise<Response> => {
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dubai' });
     console.log("Fetching attendance for date:", today);
 
+    // Weekend check - skip sending on non-working days
+    const { data: companySettings } = await supabase
+      .from('company_settings')
+      .select('work_week_start, work_week_end')
+      .limit(1)
+      .single();
+
+    const workWeekStart = companySettings?.work_week_start || 'Monday';
+    const workWeekEnd = companySettings?.work_week_end || 'Friday';
+
+    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const startIdx = dayNames.indexOf(workWeekStart);
+    const endIdx = dayNames.indexOf(workWeekEnd);
+
+    const workingDays: number[] = [];
+    let currentDay = startIdx;
+    for (let i = 0; i < 7; i++) {
+      workingDays.push(currentDay);
+      if (currentDay === endIdx) break;
+      currentDay = (currentDay + 1) % 7;
+    }
+    const weekendDays = [0,1,2,3,4,5,6].filter(d => !workingDays.includes(d));
+
+    const todayDate = new Date(today + 'T00:00:00+04:00');
+    const todayDayOfWeek = todayDate.getDay();
+
+    if (weekendDays.includes(todayDayOfWeek)) {
+      console.log(`Today (${dayNames[todayDayOfWeek]}) is a weekend day. Skipping daily summary.`);
+      return new Response(JSON.stringify({ 
+        message: "Skipped: weekend day", skipped: true 
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Fetch today's attendance with employee details
     const { data: attendanceData, error: attendanceError } = await supabase
       .from('attendance')
@@ -58,7 +91,11 @@ const handler = async (req: Request): Promise<Response> => {
     // Appealed counts as Present in daily summary
     const presentCount = attendanceData?.filter(a => a.status === 'Present' || a.status === 'Appealed').length || 0;
     const lateCount = attendanceData?.filter(a => a.status === 'Late').length || 0;
-    const absentCount = totalEmployees - (presentCount + lateCount);
+    // Count ALL employees with any attendance record (regardless of status)
+    const employeesWithRecords = new Set(
+      (attendanceData || []).map(a => a.employee_id)
+    ).size;
+    const absentCount = totalEmployees - employeesWithRecords;
 
     // Get late employees details
     const lateEmployees = attendanceData?.filter(a => a.status === 'Late') || [];

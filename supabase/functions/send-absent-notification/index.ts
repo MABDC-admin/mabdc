@@ -52,6 +52,39 @@ serve(async (req: Request) => {
 
     console.log(`Checking absences for date: ${todayStr}`);
 
+    // Weekend check - skip sending on non-working days
+    const { data: companySettings } = await supabase
+      .from('company_settings')
+      .select('work_week_start, work_week_end')
+      .limit(1)
+      .single();
+
+    const workWeekStart = companySettings?.work_week_start || 'Monday';
+    const workWeekEnd = companySettings?.work_week_end || 'Friday';
+
+    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const startIdx = dayNames.indexOf(workWeekStart);
+    const endIdx = dayNames.indexOf(workWeekEnd);
+
+    const workingDays: number[] = [];
+    let currentDay = startIdx;
+    for (let i = 0; i < 7; i++) {
+      workingDays.push(currentDay);
+      if (currentDay === endIdx) break;
+      currentDay = (currentDay + 1) % 7;
+    }
+    const weekendDays = [0,1,2,3,4,5,6].filter(d => !workingDays.includes(d));
+
+    const todayDate = new Date(todayStr + 'T00:00:00+04:00');
+    const todayDayOfWeek = todayDate.getDay();
+
+    if (weekendDays.includes(todayDayOfWeek)) {
+      console.log(`Today (${dayNames[todayDayOfWeek]}) is a weekend day. Skipping absent notification.`);
+      return new Response(JSON.stringify({ 
+        message: "Skipped: weekend day", skipped: true 
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Fetch all active employees
     const { data: employees, error: empError } = await supabase
       .from('employees')
@@ -75,21 +108,21 @@ serve(async (req: Request) => {
     // Fetch all attendance records for today
     const { data: attendance, error: attError } = await supabase
       .from('attendance')
-      .select('employee_id, check_in')
+      .select('employee_id, check_in, check_out')
       .eq('date', todayStr);
 
     if (attError) {
       throw new Error(`Failed to fetch attendance: ${attError.message}`);
     }
 
-    // Create a map of employees who checked in
-    const checkedInEmployees = new Set(
+    // Include employees who have ANY attendance record (check_in OR check_out)
+    const employeesWithAttendance = new Set(
       (attendance || [])
-        .filter(a => a.check_in !== null)
+        .filter(a => a.check_in !== null || a.check_out !== null)
         .map(a => a.employee_id)
     );
 
-    console.log(`${checkedInEmployees.size} employees checked in today`);
+    console.log(`${employeesWithAttendance.size} employees with attendance records today`);
 
     // Fetch employee shifts
     const { data: shifts, error: shiftError } = await supabase
@@ -144,7 +177,7 @@ serve(async (req: Request) => {
 
     for (const emp of employees) {
       // Skip if checked in
-      if (checkedInEmployees.has(emp.id)) continue;
+      if (employeesWithAttendance.has(emp.id)) continue;
       
       // Skip if on approved leave
       if (employeesOnLeave.has(emp.id)) continue;
@@ -341,7 +374,7 @@ serve(async (req: Request) => {
         success: true,
         date: todayStr,
         totalEmployees: employees.length,
-        checkedIn: checkedInEmployees.size,
+        checkedIn: employeesWithAttendance.size,
         onLeave: employeesOnLeave.size,
         absentCount: absentEmployees.length,
         emailSent: true,
