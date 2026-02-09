@@ -1,80 +1,52 @@
 
+# Plan: Mark Appealed Records with No Check-In/Out as Absent
 
-# Plan: Verify and Reinforce Appealed Undertime Display in Monthly Matrix
+## Problem
 
-## Current Situation
+Arianne's January 29 record:
+- Status: **Appealed**
+- check_in: **NULL**
+- check_out: **NULL**
+- She did not report to duty at all
 
-After checking the database and the code:
+Currently the Monthly Matrix shows this as **UT** (Undertime), but it should show **A** (Absent) since she never checked in or out.
 
-**Arianne's record for January 29:**
-- check_in: NULL
-- check_out: NULL  
-- status: **Appealed**
+## Root Cause
 
-**Arianne's record for January 30:**
-- check_in: 07:49
-- check_out: **12:01**
-- status: **Undertime**
+In `MonthlyMatrixView.tsx` lines 261-264, when an Appealed record has no `check_out`, the code defaults to `'UT'` without checking whether `check_in` also exists. If both are missing, the employee simply didn't show up -- that's Absent, not Undertime.
 
-## Code Already Fixed (Earlier in This Conversation)
+## Fix
 
-The MonthlyMatrixView code at lines 250-264 already handles both cases correctly:
+**File:** `src/components/attendance/MonthlyMatrixView.tsx`
 
-1. **Jan 29 (Appealed, NULL check_out):** Goes to the `else` branch at line 261, returns **UT** -- correct
-2. **Jan 30 (Undertime status):** Matched by line 284 `if (status === 'undertime') return 'UT'` -- correct
+Update the `else` branch (lines 261-264) to distinguish between:
+- **No check_out but HAS check_in** --> UT (they came but left without punching out)
+- **No check_in AND no check_out** --> A (Absent -- never showed up)
 
-The fix applied earlier in this conversation should already resolve this. However, to make absolutely sure, here is what we will do:
-
-## Additional Safeguard Changes
-
-### 1. Add explicit handling for 'Appealed' records that were originally undertime
-
-The current logic already works, but we can add a more robust approach:
-- For **Appealed** records: always check if the original appeal was for undertime by also looking at the `admin_remarks` field (which contains the appeal message)
-- Ensure that `check_out` with seconds format (`12:01:00`) is properly parsed
-
-### 2. Ensure the `useAttendance` query returns complete data
-
-Currently fetching all 824 records (under the 1000 limit) -- no issue here.
-
-## Changes Needed
-
-### File: `src/components/attendance/MonthlyMatrixView.tsx`
-
-No logic changes are actually needed -- the existing code already handles both scenarios correctly:
-
-| Date | Status | check_out | Code Path | Result |
-|------|--------|-----------|-----------|--------|
-| Jan 29 | Appealed | NULL | Line 261-264: else branch | **UT** |
-| Jan 30 | Undertime | 12:01:00 | Line 284: status === 'undertime' | **UT** |
-
-## What This Means
-
-The fix from earlier in this conversation already resolves the problem. If you're still seeing "P" for January 29, it may be because:
-1. The preview hasn't fully reloaded with the updated code
-2. Browser cache is showing the old version
-
-To confirm the fix is working, I will add a small defensive improvement to the appealed logic to also handle edge cases where `check_out` might be an empty string (not just null/undefined), and add a console log during development to trace exactly what the matrix is computing for each cell.
-
-### Minimal Code Change
-
-In `MonthlyMatrixView.tsx`, strengthen the check_out truthiness check from:
 ```typescript
-if (attendance.check_out) {
-```
-to:
-```typescript
-if (attendance.check_out && attendance.check_out.trim() !== '') {
+} else {
+  // No check_out time
+  if (!attendance.check_in || attendance.check_in.trim() === '') {
+    // No check_in either - employee never showed up, mark Absent
+    return 'A';
+  }
+  // Has check_in but no check_out - missed punch out, show as UT
+  return 'UT';
+}
 ```
 
-This ensures empty strings are also treated as missing check_out, defaulting to UT.
+## Expected Results
+
+| Employee | Date | check_in | check_out | Status | Before | After |
+|----------|------|----------|-----------|--------|--------|-------|
+| Arianne | Jan 29 | NULL | NULL | Appealed | UT | **A** |
+| Arianne | Jan 30 | 07:49 | 12:01 | Undertime | UT | UT (unchanged) |
+| Any employee | Any | 08:00 | NULL | Appealed | UT | UT (unchanged) |
 
 ## Summary
 
 | Item | Detail |
 |------|--------|
-| Root cause | Already fixed in earlier conversation turn |
-| Additional safeguard | Strengthen empty-string check for check_out |
-| Files to modify | `src/components/attendance/MonthlyMatrixView.tsx` (1 line) |
-| Risk | None -- purely defensive improvement |
-
+| Files to modify | `src/components/attendance/MonthlyMatrixView.tsx` (1 block, ~4 lines) |
+| Logic change | Appealed + no check_in + no check_out = Absent |
+| Risk | None -- only affects the specific edge case of appealed records with zero punches |
