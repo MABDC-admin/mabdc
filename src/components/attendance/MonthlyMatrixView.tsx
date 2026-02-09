@@ -249,7 +249,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
     // Appealed - Analyze actual times to determine correct display status
     if (status === 'appealed') {
       // Check if still undertime based on check_out time (default shift end: 17:00)
-      if (attendance.check_out) {
+      if (attendance.check_out && attendance.check_out.trim() !== '') {
         const [hours, minutes] = attendance.check_out.split(':').map(Number);
         const checkOutMinutes = hours * 60 + minutes;
         const shiftEndMinutes = 17 * 60; // 5:00 PM = 1020 minutes
