@@ -5,6 +5,8 @@ import { useAttendanceByDate, useUpdateAttendance, useCreateAttendance } from '@
 import { useTimeShifts, SHIFT_DEFINITIONS } from '@/hooks/useTimeShifts';
 import { useShiftOverrides } from '@/hooks/useShiftOverrides';
 import { useLeave } from '@/hooks/useLeave';
+import { useAttendanceAppeals } from '@/hooks/useAttendanceAppeals';
+import { evaluateAttendanceDay, resolveShiftTimes, type AppealStatus } from '@/utils/attendanceEvaluator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -97,6 +99,7 @@ export default function TimeClockView() {
   const { data: shifts = [] } = useTimeShifts();
   const { data: shiftOverrides = [] } = useShiftOverrides(dateString);
   const { data: leaveRecords = [] } = useLeave();
+  const { data: appeals = [] } = useAttendanceAppeals();
   const updateAttendance = useUpdateAttendance();
   const createAttendance = useCreateAttendance();
 
@@ -110,8 +113,8 @@ export default function TimeClockView() {
   const [autoCalculateStatus, setAutoCalculateStatus] = useState(true);
 
   const shiftMap = useMemo(() => {
-    const map = new Map<string, 'morning' | 'afternoon'>();
-    shifts.forEach(s => map.set(s.employee_id, s.shift_type as 'morning' | 'afternoon'));
+    const map = new Map<string, string>();
+    shifts.forEach(s => map.set(s.employee_id, s.shift_type));
     return map;
   }, [shifts]);
 
@@ -119,13 +122,31 @@ export default function TimeClockView() {
   const overridesMap = useMemo(() => {
     const map = new Map<string, { start: string; end: string; reason?: string }>();
     shiftOverrides.forEach(override => {
-      // Convert time format from HH:MM:SS to HH:MM if needed
       const start = override.shift_start_time.substring(0, 5);
       const end = override.shift_end_time.substring(0, 5);
       map.set(override.employee_id, { start, end, reason: override.reason || undefined });
     });
     return map;
   }, [shiftOverrides]);
+
+  // Build appeals lookup for selected date
+  const appealsMap = useMemo(() => {
+    const map = new Map<string, AppealStatus>();
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    appeals.forEach(a => {
+      if (a.appeal_date !== dateStr) return;
+      const status = (a.status || '').toLowerCase();
+      let mapped: AppealStatus = 'none';
+      if (status === 'approved') mapped = 'approved';
+      else if (status === 'pending') mapped = 'pending';
+      else if (status === 'rejected') mapped = 'rejected';
+      const existing = map.get(a.employee_id);
+      if (!existing || mapped === 'approved' || (mapped === 'pending' && existing !== 'approved')) {
+        map.set(a.employee_id, mapped);
+      }
+    });
+    return map;
+  }, [appeals, selectedDate]);
 
   // Auto-calculate status based on check-in/out times
   useEffect(() => {
@@ -177,146 +198,96 @@ export default function TimeClockView() {
     return map;
   }, [attendance]);
 
-  // Convert database status to TimeClockStatus - returns array for compound statuses
-  const dbStatusToTimeClock = (dbStatus: string | undefined): TimeClockStatus[] => {
-    if (!dbStatus) return [];
-    
-    // Handle compound statuses that need multiple flags
-    const compoundStatusMap: Record<string, TimeClockStatus[]> = {
-      'Late | Undertime': ['late_entry', 'early_out'],
-      'Miss Punch In | Undertime': ['miss_punch_in', 'early_out'],
-    };
-    
-    if (compoundStatusMap[dbStatus]) {
-      return compoundStatusMap[dbStatus];
-    }
-    
-    // Single status mapping
-    const statusMap: Record<string, TimeClockStatus> = {
-      'Present': 'on_time',
-      'Late': 'late_entry',
-      'Undertime': 'early_out',
-      'Missed Punch': 'miss_punch_in',
-      'Miss Punch In': 'miss_punch_in',
-      // 'Appealed' is no longer blindly mapped - let calculateStatus re-evaluate from times
-      'Absent': 'absent',
-      'Half Day': 'early_out',
-      'On Leave': 'on_time',
-      'Holiday': 'on_time'
-    };
-    
-    const mapped = statusMap[dbStatus];
-    // Return empty array for unknown statuses - let calculateStatus handle it
-    return mapped ? [mapped] : [];
-  };
-
-  const calculateStatus = (
-    checkIn: string | undefined, 
-    checkOut: string | undefined, 
-    shiftStart: string, 
+  /**
+   * Convert evaluator flags to TimeClockStatus array for badge display.
+   * Time Clock shows granular multi-badge statuses while keeping
+   * real-time awareness (shift not yet started/ended).
+   */
+  const flagsToTimeClockStatuses = (
+    checkIn: string | undefined,
+    checkOut: string | undefined,
+    shiftStart: string,
     shiftEnd: string,
-    forDate: Date,
-    hasOverride?: boolean
+    employeeId: string,
   ): TimeClockStatus[] => {
-    // Chronological validation: check-out should not be before check-in
-    if (checkIn && checkOut && checkOut < checkIn) {
-      // Time inconsistency - flag as data issue
-      return ['miss_punch_in'];
-    }
-    
-    const statuses: TimeClockStatus[] = [];
-    const dateStr = format(forDate, 'yyyy-MM-dd');
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const now = new Date();
     const isViewingToday = dateStr === format(now, 'yyyy-MM-dd');
-    const isPastDate = forDate < new Date(format(now, 'yyyy-MM-dd'));
+    const isPastDate = selectedDate < new Date(format(now, 'yyyy-MM-dd'));
 
-    // Parse shift times
-    const shiftStartTime = shiftStart;
-    const shiftEndTime = shiftEnd;
-    
-    // Calculate early threshold (1 hour before shift start)
-    const [startHour, startMin] = shiftStartTime.split(':').map(Number);
-    const earlyThreshold = `${String(startHour - 1).padStart(2, '0')}:${String(startMin).padStart(2, '0')}`;
+    const appealStatus = appealsMap.get(employeeId) || 'none';
 
+    // Use evaluator for core logic
+    const result = evaluateAttendanceDay({
+      checkIn: checkIn || null,
+      checkOut: checkOut || null,
+      shiftStart,
+      shiftEnd,
+      dbStatus: null, // We re-evaluate from punch data
+      appealStatus,
+      isWeekend: false, // Time Clock already filters weekends/leaves
+      isHoliday: false,
+      leaveType: null,
+      isFuture: false,
+      isBeforeSystemStart: false,
+    });
+
+    const statuses: TimeClockStatus[] = [];
+
+    // No check-in at all
     if (!checkIn) {
-      // Check if shift has ended (absent) or just started (miss punch in)
-      const isPastShiftEnd = isPastDate || (isViewingToday && now > new Date(`${dateStr}T${shiftEndTime}:00`));
-      const isPastShiftStart = isPastDate || (isViewingToday && now > new Date(`${dateStr}T${shiftStartTime}:00`));
+      const isPastShiftEnd = isPastDate || (isViewingToday && now > new Date(`${dateStr}T${shiftEnd}:00`));
+      const isPastShiftStart = isPastDate || (isViewingToday && now > new Date(`${dateStr}T${shiftStart}:00`));
       
       if (isPastShiftEnd) {
-        // Shift has ended with no check-in = Absent
         statuses.push('absent');
       } else if (isPastShiftStart) {
-        // Shift started but not ended = Miss Punch In (can still come)
         statuses.push('miss_punch_in');
       }
-    } else {
-      // Check early in (1 hour early)
-      if (checkIn <= earlyThreshold) {
-        statuses.push('early_in');
-      }
-      // Check late entry
-      else if (checkIn > shiftStartTime) {
-        statuses.push('late_entry');
-      }
-      // On time for check-in
-      else {
-        statuses.push('on_time');
-      }
+      return statuses;
     }
 
-    if (checkIn && !checkOut) {
-      // Only mark as miss punch out if past shift end time (for today) or if viewing past date
-      if (isPastDate || (isViewingToday && now > new Date(`${dateStr}T${shiftEndTime}:00`))) {
+    // Has check-in: map flags to badges
+    if (result.flags.early_in) {
+      statuses.push('early_in');
+    } else if (result.flags.late_entry) {
+      statuses.push('late_entry');
+    } else {
+      statuses.push('on_time');
+    }
+
+    // Check-out logic
+    if (!checkOut) {
+      // Miss punch out if past shift end
+      const isPastShiftEnd = isPastDate || (isViewingToday && now > new Date(`${dateStr}T${shiftEnd}:00`));
+      if (isPastShiftEnd) {
         statuses.push('miss_punch_out');
       }
-    } else if (checkOut) {
-      // Check early out
-      if (checkOut < shiftEndTime) {
-        statuses.push('early_out');
-      }
-      // Check late exit
-      else if (checkOut > shiftEndTime) {
-        statuses.push('late_exit');
-      }
+    } else if (result.flags.undertime) {
+      statuses.push('early_out');
+    } else if (checkOut > shiftEnd) {
+      statuses.push('late_exit');
+    }
+
+    // Show appeal badge if applicable
+    if (appealStatus !== 'none' && (result.flags.miss_punch_in || result.flags.miss_punch_out)) {
+      statuses.push('appealed');
     }
 
     return statuses.length > 0 ? statuses : ['on_time'];
   };
 
   const timeClockRecords = useMemo<TimeClockRecord[]>(() => {
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const now = new Date();
-    const isPastDate = selectedDate < new Date(format(now, 'yyyy-MM-dd'));
-    
     return employees.map(emp => {
-      // Prioritize shift override, then permanent shift, then default
-      const override = overridesMap.get(emp.id);
-      const shiftType = shiftMap.get(emp.id) || 'default';
-      const shiftTimes = override ? 
-        { start: override.start, end: override.end } : 
-        (SHIFT_TIMES[shiftType] || SHIFT_TIMES.default);
-      
+      // Resolve shift times using shared utility
+      const shiftTimes = resolveShiftTimes(emp.id, format(selectedDate, 'yyyy-MM-dd'), shiftMap, overridesMap);
       const att = attendanceMap.get(emp.id);
-      
-      // Use saved database status if available and mapped, otherwise calculate
-      const dbStatuses = att?.dbStatus ? dbStatusToTimeClock(att.dbStatus) : [];
-      let statuses = dbStatuses.length > 0
-        ? [...dbStatuses]  // Clone to avoid mutating
-        : calculateStatus(att?.checkIn, att?.checkOut, shiftTimes.start, shiftTimes.end, selectedDate, !!override);
 
-      // CRITICAL FIX: Check for missing checkout regardless of database status
-      // If employee has check-in but no check-out, and shift has ended, add miss_punch_out
-      if (att?.checkIn && !att?.checkOut) {
-        const isPastShiftEnd = now > new Date(`${dateStr}T${shiftTimes.end}:00`);
-        
-        if (isPastDate || isPastShiftEnd) {
-          // Add miss_punch_out if not already present
-          if (!statuses.includes('miss_punch_out')) {
-            statuses = [...statuses, 'miss_punch_out'];
-          }
-        }
-      }
+      const statuses = flagsToTimeClockStatuses(
+        att?.checkIn, att?.checkOut,
+        shiftTimes.start, shiftTimes.end,
+        emp.id,
+      );
 
       return {
         employeeId: emp.id,
@@ -332,7 +303,7 @@ export default function TimeClockView() {
         attendanceId: att?.id
       };
     });
-  }, [employees, shiftMap, overridesMap, attendanceMap, selectedDate]);
+  }, [employees, shiftMap, overridesMap, attendanceMap, selectedDate, appealsMap]);
 
   // Get employee IDs who are on approved leave for the selected date
   const employeesOnLeave = useMemo(() => {

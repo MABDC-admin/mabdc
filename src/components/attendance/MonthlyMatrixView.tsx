@@ -11,6 +11,9 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO, 
 import { useAttendance } from '@/hooks/useAttendance';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useCompanySettings } from '@/hooks/useSettings';
+import { useTimeShifts } from '@/hooks/useTimeShifts';
+import { useShiftOverrides } from '@/hooks/useShiftOverrides';
+import { useAttendanceAppeals } from '@/hooks/useAttendanceAppeals';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import jsPDF from 'jspdf';
@@ -18,6 +21,7 @@ import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { EmployeeAttendanceCalendar } from './EmployeeAttendanceCalendar';
 import { getWeekendDays } from '@/utils/workWeekUtils';
+import { evaluateAttendanceDay, resolveShiftTimes, type AppealStatus, type AttendancePrimaryCode } from '@/utils/attendanceEvaluator';
 
 // Map matrix status codes to database status values
 const STATUS_TO_DB: Record<string, string> = {
@@ -60,6 +64,7 @@ const STATUS_CONFIG = {
   PH: { label: 'PH', name: 'Public Holiday', bg: 'bg-cyan-300', text: 'text-cyan-800', pdfBg: [103, 232, 249] },
   MP: { label: 'MP', name: 'Missed Punch', bg: 'bg-orange-500', text: 'text-white', pdfBg: [249, 115, 22] },
   UT: { label: 'UT', name: 'Undertime', bg: 'bg-purple-400', text: 'text-purple-900', pdfBg: [192, 132, 252] },
+  'L+UT': { label: 'L+UT', name: 'Late + Undertime', bg: 'bg-amber-500', text: 'text-white', pdfBg: [245, 158, 11] },
   '-': { label: '-', name: 'No Record', bg: 'bg-gray-200', text: 'text-gray-600', pdfBg: [229, 231, 235] },
 } as const;
 
@@ -84,6 +89,7 @@ const LEGEND_ITEMS = [
   { code: 'H', color: 'bg-orange-400', label: 'Half Day' },
   { code: 'MP', color: 'bg-orange-500', label: 'Missed Punch' },
   { code: 'UT', color: 'bg-purple-400', label: 'Undertime' },
+  { code: 'L+UT', color: 'bg-amber-500', label: 'Late + Undertime' },
 ];
 
 export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
@@ -105,6 +111,51 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
   const { data: allAttendance = [] } = useAttendance();
   const { data: employees = [] } = useEmployees();
   const { data: companySettings } = useCompanySettings();
+  const { data: shifts = [] } = useTimeShifts();
+  const { data: appeals = [] } = useAttendanceAppeals();
+
+  // Fetch all shift overrides for the selected month range
+  const { data: shiftOverrides = [] } = useShiftOverrides();
+
+  // Build shift maps for resolveShiftTimes
+  const shiftsMap = useMemo(() => {
+    const map = new Map<string, string>();
+    shifts.forEach(s => map.set(s.employee_id, s.shift_type));
+    return map;
+  }, [shifts]);
+
+  const overridesForDate = useMemo(() => {
+    // Build a map: date_employeeId -> { start, end }
+    const map = new Map<string, Map<string, { start: string; end: string }>>();
+    shiftOverrides.forEach(o => {
+      const dateKey = o.override_date;
+      if (!map.has(dateKey)) map.set(dateKey, new Map());
+      map.get(dateKey)!.set(o.employee_id, {
+        start: o.shift_start_time.substring(0, 5),
+        end: o.shift_end_time.substring(0, 5),
+      });
+    });
+    return map;
+  }, [shiftOverrides]);
+
+  // Build appeals lookup: key = "employeeId_date" → AppealStatus
+  const appealsMap = useMemo(() => {
+    const map = new Map<string, AppealStatus>();
+    appeals.forEach(a => {
+      const key = `${a.employee_id}_${a.appeal_date}`;
+      const status = (a.status || '').toLowerCase();
+      let mapped: AppealStatus = 'none';
+      if (status === 'approved') mapped = 'approved';
+      else if (status === 'pending') mapped = 'pending';
+      else if (status === 'rejected') mapped = 'rejected';
+      // Keep the "best" appeal status (approved > pending > rejected > none)
+      const existing = map.get(key);
+      if (!existing || mapped === 'approved' || (mapped === 'pending' && existing !== 'approved')) {
+        map.set(key, mapped);
+      }
+    });
+    return map;
+  }, [appeals]);
 
   // Calculate weekend days from company settings
   const weekendDays = useMemo(() => {
@@ -204,108 +255,52 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
 
     const dayOfWeek = getDay(date);
     const isWeekend = weekendDays.includes(dayOfWeek);
-    
-    // CHECK LEAVE FIRST - before weekends! So leave shows on Sat/Sun too
+    const dateStr = format(date, 'yyyy-MM-dd');
+
+    // Get leave
     const leave = getLeaveForEmployeeDay(employeeId, date);
-    if (leave) {
-      const leaveType = leave.leave_type?.toLowerCase() || '';
-      if (leaveType.includes('sick')) return 'SL';
-      if (leaveType.includes('vacation') || leaveType.includes('annual')) return 'VL';
-      if (leaveType.includes('maternity')) return 'M';
-      if (leaveType.includes('spring')) return 'SB';
-      if (leaveType.includes('winter')) return 'WB';
-      if (leaveType.includes('loss') || leaveType.includes('lop')) return 'LOP';
-      if (leaveType.includes('day off')) return 'DO';
-      return 'VL'; // Default to vacation leave for other approved leaves
-    }
-    
-    // Weekend - only if NOT on leave
-    if (isWeekend) {
-      return 'W';
-    }
-    
-    // Public Holiday
+    const leaveType = leave ? (leave.leave_type || 'Vacation Leave') : null;
+
+    // Get holiday
     const holiday = getHolidayForDay(date);
-    if (holiday) {
-      return 'PH';
-    }
-    
-    // Check attendance
+
+    // Get attendance record
     const attendance = getAttendanceForEmployeeDay(employeeId, date);
-    if (!attendance) {
-      // Check if date is in future
+
+    // Get shift times for this employee on this date
+    const dateOverrides = overridesForDate.get(dateStr) || new Map();
+    const shiftTimes = resolveShiftTimes(employeeId, dateStr, shiftsMap, dateOverrides);
+
+    // Get appeal status
+    const appealKey = `${employeeId}_${dateStr}`;
+    const appealStatus = appealsMap.get(appealKey) || 'none';
+
+    // System start date
+    const systemStartDate = new Date(2026, 0, 20);
+
+    const result = evaluateAttendanceDay({
+      checkIn: attendance?.check_in || null,
+      checkOut: attendance?.check_out || null,
+      shiftStart: shiftTimes.start,
+      shiftEnd: shiftTimes.end,
+      dbStatus: attendance?.status || null,
+      appealStatus,
+      isWeekend,
+      isHoliday: !!holiday,
+      leaveType,
+      isFuture: date > currentDate,
+      isBeforeSystemStart: date < systemStartDate,
+    });
+
+    // If no attendance record exists and evaluator returns A, verify it's not future/before-start
+    // (evaluator already handles this, but for records with no attendance row at all)
+    if (!attendance && !leave && !isWeekend && !holiday) {
       if (date > currentDate) return '-';
-      
-      // Show "-" for dates before January 20, 2026 (system start date)
-      const systemStartDate = new Date(2026, 0, 20);
       if (date < systemStartDate) return '-';
-      
-      return 'A'; // Absent if no record for past working day after system start
+      return 'A';
     }
 
-    // Map attendance status - check DB status FIRST before raw punch data
-    const status = attendance.status?.toLowerCase() || '';
-    
-    // Appealed - Analyze actual times to determine correct display status
-    if (status === 'appealed') {
-      if (attendance.check_out && attendance.check_out.trim() !== '') {
-        const [hours, minutes] = attendance.check_out.split(':').map(Number);
-        const checkOutMinutes = hours * 60 + minutes;
-        const shiftEndMinutes = 17 * 60; // 5:00 PM
-
-        // For appealed records: any check_out before shift end = UT (no grace period)
-        if (checkOutMinutes < shiftEndMinutes) {
-          return 'UT';
-        }
-      } else {
-        // No check_out
-        if (!attendance.check_in || attendance.check_in.trim() === '') {
-          return 'A'; // No check_in either = Absent
-        }
-        return 'UT'; // Has check_in but no check_out = missed punch out
-      }
-
-      // Check late
-      if (attendance.check_in) {
-        const [hours, minutes] = attendance.check_in.split(':').map(Number);
-        const checkInMinutes = hours * 60 + minutes;
-        const shiftStartMinutes = 8 * 60;
-        if (checkInMinutes > shiftStartMinutes + 5) {
-          return 'L';
-        }
-      }
-
-      return 'P'; // Full day, on time
-    }
-    
-    // Missed Punch statuses - Orange
-    if (status.includes('miss punch') || status === 'missed punch') return 'MP';
-    
-    // Undertime - Purple (but Late | Undertime should be Late)
-    if (status === 'undertime') return 'UT';
-    
-    // Late (includes Late | Undertime) - Yellow
-    if (status.includes('late')) return 'L';
-    
-    // Other statuses
-    if (status === 'present') return 'P';
-    if (status === 'absent') return 'A';
-    if (status === 'day off') return 'DO';
-    if (status === 'sick leave') return 'SL';
-    if (status === 'vacation leave' || status === 'on leave') return 'VL';
-    if (status === 'holiday') return 'PH';
-    if (status === 'spring break') return 'SB';
-    if (status === 'winter break') return 'WB';
-    if (status === 'half day absent') return 'HDA';
-    if (status === 'half day sick leave') return 'HDSL';
-    if (status === 'half day') return 'H';
-    if (status === 'no record') return '-';
-    
-    // Fallback: check raw punch data for missed punch
-    const isMissedPunch = (attendance.check_in && !attendance.check_out) || (!attendance.check_in && attendance.check_out);
-    if (isMissedPunch) return 'MP';
-    
-    return 'P';
+    return result.primaryCode as keyof typeof STATUS_CONFIG;
   };
 
   // Mutation to save status to database
@@ -475,7 +470,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
   const employeeSummaries = useMemo(() => {
     return filteredEmployees.map((emp, index) => {
       const counts = {
-        P: 0, L: 0, A: 0, VL: 0, SL: 0, DO: 0, H: 0, SB: 0, WB: 0, HDA: 0, HDSL: 0, PH: 0, AP: 0, MP: 0, UT: 0
+        P: 0, L: 0, A: 0, VL: 0, SL: 0, DO: 0, H: 0, SB: 0, WB: 0, HDA: 0, HDSL: 0, PH: 0, AP: 0, MP: 0, UT: 0, 'L+UT': 0
       };
       
       daysInMonth.forEach(day => {
@@ -490,7 +485,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       
       return { ...emp, index: index + 1, ...counts, presentWithAppealed };
     });
-  }, [filteredEmployees, daysInMonth, allAttendance, leaveRecords, publicHolidays, manualOverrides, weekendDays]);
+  }, [filteredEmployees, daysInMonth, allAttendance, leaveRecords, publicHolidays, manualOverrides, weekendDays, shiftsMap, overridesForDate, appealsMap]);
 
   // PDF Generation
   const generateMatrixPDF = () => {
