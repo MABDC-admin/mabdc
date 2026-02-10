@@ -311,17 +311,6 @@ export function LeaveRequestModal({ isOpen, onClose, employeeId, employeeName, e
             </div>
           )}
 
-          {/* LOP Warning */}
-          {isLOPLeave && requestedDays > 0 && (
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
-              <p className="text-sm font-medium text-amber-600">
-                ⚠️ Loss of Pay Leave
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                These {requestedDays} day(s) will be deducted from your salary. LOP is calculated at (Basic Salary ÷ 30) per day.
-              </p>
-            </div>
-          )}
           {hasOverlap && overlappingLeave && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
               <CalendarX2 className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
