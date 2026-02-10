@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -778,6 +779,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
       <Card className="overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
+            <TooltipProvider delayDuration={200}>
             <table className="border-collapse text-xs w-full">
               <thead>
                 <tr className="bg-muted">
@@ -833,23 +835,60 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
                       const config = STATUS_CONFIG[status];
                       const cellKey = getOverrideKey(emp.id, day);
                       const isSelected = selectedCells.has(cellKey);
-                      return (
-                        <td 
-                          key={day.toISOString()} 
-                          className={cn(
-                            "text-center p-0.5 border border-border cursor-pointer hover:opacity-80 transition-all",
-                            isSelected && "ring-2 ring-primary ring-inset"
-                          )}
-                          onClick={() => handleCellClick(emp.id, emp.full_name, day, status)}
-                        >
+                      return (() => {
+                        const nonWorkingCodes = ['W', 'PH', 'SB', 'WB', '-'];
+                        const isNonWorking = nonWorkingCodes.includes(status);
+                        const attendance = !isNonWorking ? getAttendanceForEmployeeDay(emp.id, day) : null;
+                        const dateStr = format(day, 'yyyy-MM-dd');
+                        const dateOverrides = overridesForDate.get(dateStr) || new Map();
+                        const shiftTimes = !isNonWorking ? resolveShiftTimes(emp.id, dateStr, shiftsMap, dateOverrides) : null;
+
+                        const formatTime12 = (isoStr: string | null | undefined) => {
+                          if (!isoStr) return '---';
+                          try {
+                            const d = new Date(isoStr);
+                            return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                          } catch { return '---'; }
+                        };
+
+                        const badge = (
                           <span className={cn(
                             "inline-flex items-center justify-center w-6 h-6 rounded text-[10px] font-bold",
                             config.bg, config.text
                           )}>
                             {config.label}
                           </span>
-                        </td>
-                      );
+                        );
+
+                        const cell = (content: React.ReactNode) => (
+                          <td 
+                            key={day.toISOString()} 
+                            className={cn(
+                              "text-center p-0.5 border border-border cursor-pointer hover:opacity-80 transition-all",
+                              isSelected && "ring-2 ring-primary ring-inset"
+                            )}
+                            onClick={() => handleCellClick(emp.id, emp.full_name, day, status)}
+                          >
+                            {content}
+                          </td>
+                        );
+
+                        if (isNonWorking || !attendance) {
+                          return cell(badge);
+                        }
+
+                        return cell(
+                          <Tooltip>
+                            <TooltipTrigger asChild>{badge}</TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs leading-relaxed">
+                              <div className="font-semibold mb-1">{config.name}</div>
+                              <div>Check In: {formatTime12(attendance.check_in)}</div>
+                              <div>Check Out: {formatTime12(attendance.check_out)}</div>
+                              {shiftTimes && <div className="mt-1 text-muted-foreground">Shift: {shiftTimes.start} – {shiftTimes.end}</div>}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })();
                     })}
                     {/* Summary cells */}
                     <td className="text-center p-1 border border-border bg-emerald-500/10">
@@ -868,6 +907,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
                 ))}
               </tbody>
             </table>
+            </TooltipProvider>
           </div>
         </CardContent>
       </Card>
