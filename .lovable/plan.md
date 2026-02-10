@@ -1,111 +1,62 @@
 
 
-# Plan: Unified Attendance Status Logic for Monthly Matrix and Time Clock
+# Fix: Glorie Ann Feb 4 Status Discrepancy
 
-## Current Problems
+## Root Cause
 
-1. **Monthly Matrix uses hardcoded 08:00-17:00** -- ignores Morning/Afternoon/Flexible shift assignments and per-day overrides
-2. **"Late | Undertime" masked as just "L"** -- undertime hidden when combined with late
-3. **5-minute grace period inconsistency** -- Matrix has a grace period for appealed records, Time Clock has zero grace
-4. **No Missed Punch appeal awareness** -- Matrix does not check appeal status for MP records
-5. **Appealed status still in code paths** -- even though DB records were corrected, the "appealed" branch in `getDayStatus` still uses hardcoded shifts
+The evaluator code is already correct and will display `MP` in the Monthly Matrix. The real issue is:
 
-## Resolution: Unified `evaluateAttendanceDay()` Function
+1. **The DB `status` column is still `Present`** even though `check_out` is NULL -- this was set by the check-in process and never corrected
+2. Other views or reports that read the raw DB `status` column (not the evaluator) will still show "Present"
 
-### New Shared Evaluator (`src/utils/attendanceEvaluator.ts`)
+## What Needs to Be Done
 
-Create a single function that both the Monthly Matrix and Time Clock can use. This replaces the inline `getDayStatus` logic in the Matrix and aligns it with Time Clock behavior.
+### Step 1: Fix the DB record
 
-```
-evaluateAttendanceDay(params) returns:
-  primaryCode: 'P' | 'A' | 'L' | 'UT' | 'L+UT' | 'MP' | 'W' | 'PH' | '-' | leaveCode
-  flags: {
-    late_entry: boolean
-    undertime: boolean
-    miss_punch_in: boolean
-    miss_punch_out: boolean
-    absent: boolean
-    present: boolean
-  }
-  appealStatus: 'none' | 'pending' | 'approved' | 'rejected'
+Update Glorie Ann's Feb 4 attendance record to have the correct computed status:
+
+```sql
+UPDATE attendance 
+SET status = 'Miss Punch Out'
+WHERE id = '508d81b3-9fa9-49e9-82a4-a949709b0f6d';
 ```
 
-### Priority Order (same for both views)
+### Step 2: Scan for ALL similar records
 
-1. Manual Override (Matrix-only feature)
-2. Approved Leave (SL, VL, M, SB, WB, LOP, DO)
-3. Weekend (W)
-4. Public Holiday (PH)
-5. Future Date (-)
-6. Before system start date (-)
-7. No attendance record = Absent (A)
-8. Has record -- evaluate punch data against **employee-specific shift times**:
-   - No check-in AND no check-out = Absent (A)
-   - Missing punch (one side only):
-     - If appeal approved: convert to Present (P)
-     - If no appeal / pending / rejected: Missed Punch (MP)
-   - Late + Undertime = L+UT (new combined code, not masked)
-   - Undertime only = UT
-   - Late only = L
-   - Full shift = Present (P)
+Find every attendance record where `check_in` exists but `check_out` is NULL and `status = 'Present'` -- these are all incorrectly labeled:
 
-### Key Behavior Differences From ChatGPT Suggestion
+```sql
+SELECT id, employee_id, date, check_in, check_out, status
+FROM attendance
+WHERE check_in IS NOT NULL 
+  AND check_out IS NULL 
+  AND status = 'Present';
+```
 
-| Topic | ChatGPT Suggestion | My Resolution |
-|-------|-------------------|---------------|
-| Appeal MP to P | Only MP to P | Same -- MP with approved appeal becomes P |
-| Shift awareness | Not mentioned | Use per-employee shifts (Morning/Afternoon/Flexible + overrides) |
-| Late + Undertime | Not addressed | New "L+UT" combined code instead of masking |
-| Grace period | Not mentioned | Zero grace -- strict shift boundary evaluation |
-| Where logic lives | Generic `evaluateAttendanceDay` | Same approach -- shared utility function |
-| Flags returned | Included in return | Same -- return flags for Time Clock granularity |
+Then bulk-update all of them to `Miss Punch Out`.
 
-### Missed Punch + Appeal Conversion Logic (matching ChatGPT)
+### Step 3: Also scan reverse (check_out exists, check_in NULL)
 
-The Matrix currently does NOT query appeal status. We will:
-1. Fetch `attendance_appeals` data in the Matrix view
-2. When a record has MP status, check if there is an approved appeal for that employee+date
-3. If approved appeal exists: primaryCode = P
-4. If no appeal / pending / rejected: primaryCode = MP
+```sql
+SELECT id, employee_id, date, check_in, check_out, status
+FROM attendance
+WHERE check_in IS NULL 
+  AND check_out IS NOT NULL 
+  AND status = 'Present';
+```
 
-## Files to Modify
+Update these to `Miss Punch In`.
 
-| File | Change |
+### No Code Changes Needed
+
+The unified evaluator already handles this correctly at display time. The DB fix ensures consistency for any view or export that reads the raw `status` column.
+
+## Summary
+
+| Item | Detail |
 |------|--------|
-| `src/utils/attendanceEvaluator.ts` | **New file** -- shared `evaluateAttendanceDay()` function |
-| `src/components/attendance/MonthlyMatrixView.tsx` | Replace `getDayStatus` with the new evaluator; fetch shifts + overrides + appeals data; add L+UT status config |
-| `src/components/views/TimeClockView.tsx` | Minor -- use shared evaluator for consistency (Time Clock keeps its multi-badge display using the `flags` from the evaluator) |
-| `src/utils/shiftValidation.ts` | No changes -- `computeAttendanceStatus` remains for appeal approval writes |
-
-## Detailed Changes
-
-### 1. New file: `src/utils/attendanceEvaluator.ts`
-
-- Accepts: checkIn, checkOut, shiftStart, shiftEnd, dbStatus, appealStatus, isWeekend, isHoliday, leaveType, isFuture, isBeforeSystemStart
-- Returns: `{ primaryCode, flags, appealStatus }`
-- Zero grace period
-- Uses employee-specific shift boundaries (passed in as params)
-
-### 2. MonthlyMatrixView.tsx
-
-- Add imports: `useTimeShifts`, `useShiftOverrides` (for selected month), and fetch `attendance_appeals`
-- Add new STATUS_CONFIG entry: `'L+UT': { label: 'L+UT', name: 'Late + Undertime', bg: 'bg-amber-500', text: 'text-white' }`
-- Replace the entire `getDayStatus` function body to call the shared evaluator
-- For each employee+day, look up their shift (override > permanent > default 08:00-17:00)
-- For MP records, check appeal status from the appeals query
-
-### 3. TimeClockView.tsx
-
-- Import shared evaluator
-- Use `evaluateAttendanceDay()` to get `flags`, then map flags to the existing `TimeClockStatus[]` array for badge display
-- Removes duplication between `calculateStatus` and `dbStatusToTimeClock`
-
-## New Legend Item
-
-Add to the Matrix legend:
-- L+UT = Late + Undertime (amber-500 background, distinguishable from L which is amber-400)
-
-## No Database Changes Required
-
-All changes are display/computation logic only.
+| Root cause | DB status says "Present" but check_out is NULL |
+| Evaluator behavior | Already correct -- returns MP |
+| DB fix | Update all miss-punch records with wrong status |
+| Code changes | None |
 
