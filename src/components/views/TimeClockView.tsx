@@ -198,7 +198,7 @@ export default function TimeClockView() {
       'Undertime': 'early_out',
       'Missed Punch': 'miss_punch_in',
       'Miss Punch In': 'miss_punch_in',
-      'Appealed': 'appealed',
+      // 'Appealed' is no longer blindly mapped - let calculateStatus re-evaluate from times
       'Absent': 'absent',
       'Half Day': 'early_out',
       'On Leave': 'on_time',

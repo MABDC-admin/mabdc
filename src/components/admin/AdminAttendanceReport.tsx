@@ -116,8 +116,8 @@ export function AdminAttendanceReport() {
           attDate <= monthEnd;
       });
 
-      // Appealed counts as Present in attendance calculations
-      const presentDays = empAttendance.filter(a => a.status === 'Present' || a.status === 'Late' || a.status === 'Appealed').length;
+      // Appealed records now retain their real computed status; count Present + Late as "attended"
+      const presentDays = empAttendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
       const lateDays = empAttendance.filter(a => a.status === 'Late').length;
       const absentDays = totalWorkDays - presentDays;
 
