@@ -7,6 +7,73 @@ const corsHeaders = {
   "Content-Type": "text/html; charset=utf-8",
 };
 
+const DEFAULT_SHIFT = { start: '08:00', end: '17:00' };
+
+const SHIFT_DEFINITIONS: Record<string, { start: string; end: string }> = {
+  morning: { start: '08:00', end: '17:00' },
+  afternoon: { start: '09:00', end: '18:00' },
+};
+
+/**
+ * Compute attendance status from shift for edge function context.
+ */
+async function computeStatusFromShift(
+  supabase: any,
+  employeeId: string,
+  date: string,
+  checkIn: string | null,
+  checkOut: string | null
+): Promise<string> {
+  if (!checkIn && !checkOut) return 'Absent';
+
+  // Get shift times: Override → Assignment → Default
+  let shiftStart = DEFAULT_SHIFT.start;
+  let shiftEnd = DEFAULT_SHIFT.end;
+
+  const [{ data: override }, { data: shift }] = await Promise.all([
+    supabase
+      .from('employee_shift_overrides')
+      .select('shift_start_time, shift_end_time')
+      .eq('employee_id', employeeId)
+      .eq('override_date', date)
+      .maybeSingle(),
+    supabase
+      .from('employee_shifts')
+      .select('shift_type')
+      .eq('employee_id', employeeId)
+      .maybeSingle()
+  ]);
+
+  if (override) {
+    shiftStart = override.shift_start_time.substring(0, 5);
+    shiftEnd = override.shift_end_time.substring(0, 5);
+  } else if (shift?.shift_type && SHIFT_DEFINITIONS[shift.shift_type]) {
+    shiftStart = SHIFT_DEFINITIONS[shift.shift_type].start;
+    shiftEnd = SHIFT_DEFINITIONS[shift.shift_type].end;
+  }
+
+  const [startH, startM] = shiftStart.split(':').map(Number);
+  const [endH, endM] = shiftEnd.split(':').map(Number);
+
+  let late = false;
+  let undertime = false;
+
+  if (checkIn) {
+    const [inH, inM] = checkIn.substring(0, 5).split(':').map(Number);
+    if (inH > startH || (inH === startH && inM > startM)) late = true;
+  }
+
+  if (checkOut) {
+    const [outH, outM] = checkOut.substring(0, 5).split(':').map(Number);
+    if (outH < endH || (outH === endH && outM < endM)) undertime = true;
+  }
+
+  if (late && undertime) return 'Late | Undertime';
+  if (late) return 'Late';
+  if (undertime) return 'Undertime';
+  return 'Present';
+}
+
 function generateResultPage(success: boolean, message: string, details: string = ""): string {
   const bgColor = success ? "#10b981" : "#ef4444";
   const icon = success ? "✅" : "❌";
@@ -280,32 +347,44 @@ const handler = async (req: Request): Promise<Response> => {
           .single();
 
         if (existingAttendance) {
-          // Fetch original attendance to preserve times if appeal didn't specify them
           const { data: originalAtt } = await supabase
             .from("attendance")
             .select("check_in, check_out")
             .eq("id", existingAttendance.id)
             .single();
 
+          const finalCheckIn = appealRecord.requested_check_in || originalAtt?.check_in;
+          const finalCheckOut = appealRecord.requested_check_out || originalAtt?.check_out;
+
+          // Compute real status from shift times
+          const computedStatus = await computeStatusFromShift(supabase, appealRecord.employee_id, appealRecord.appeal_date, finalCheckIn, finalCheckOut);
+
           await supabase
             .from("attendance")
             .update({
-              check_in: appealRecord.requested_check_in || originalAtt?.check_in,
-              check_out: appealRecord.requested_check_out || originalAtt?.check_out,
-              status: "Appealed",
+              check_in: finalCheckIn,
+              check_out: finalCheckOut,
+              status: computedStatus,
+              admin_remarks: `[Appeal Approved via Email] ${appealRecord.appeal_message || ''}`,
               modified_at: new Date().toISOString(),
               modified_by: "Email Approval",
             })
             .eq("id", existingAttendance.id);
         } else {
+          const finalCheckIn = appealRecord.requested_check_in;
+          const finalCheckOut = appealRecord.requested_check_out;
+
+          const computedStatus = await computeStatusFromShift(supabase, appealRecord.employee_id, appealRecord.appeal_date, finalCheckIn, finalCheckOut);
+
           await supabase
             .from("attendance")
             .insert({
               employee_id: appealRecord.employee_id,
               date: appealRecord.appeal_date,
-              check_in: appealRecord.requested_check_in,
-              check_out: appealRecord.requested_check_out,
-              status: "Appealed",
+              check_in: finalCheckIn,
+              check_out: finalCheckOut,
+              status: computedStatus,
+              admin_remarks: `[Appeal Approved via Email] ${appealRecord.appeal_message || ''}`,
               modified_by: "Email Approval",
             });
         }

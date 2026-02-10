@@ -20,6 +20,7 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { useUpdateAttendance, useCreateAttendance } from '@/hooks/useAttendance';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getEmployeeShiftTimes, computeAttendanceStatus } from '@/utils/shiftValidation';
 
 export function AttendanceAppealsView() {
   const { data: appeals = [], isLoading } = useAttendanceAppeals();
@@ -96,31 +97,43 @@ export function AttendanceAppealsView() {
 
       // If approved, update or create the attendance record with "Appealed" status
       if (action === 'approve') {
+        // Determine final check-in/check-out times
+        let finalCheckIn = selectedAppeal.requested_check_in;
+        let finalCheckOut = selectedAppeal.requested_check_out;
+
         if (selectedAppeal.attendance_id) {
-          // Fetch original attendance record to preserve times if not specified in appeal
           const { data: originalAttendance } = await supabase
             .from('attendance')
             .select('check_in, check_out')
             .eq('id', selectedAppeal.attendance_id)
             .single();
 
-          // Update existing attendance record - use requested time if provided, otherwise keep original
+          finalCheckIn = finalCheckIn || originalAttendance?.check_in;
+          finalCheckOut = finalCheckOut || originalAttendance?.check_out;
+        }
+
+        // Compute real status based on shift times
+        const shiftTimes = await getEmployeeShiftTimes(selectedAppeal.employee_id, selectedAppeal.appeal_date);
+        const computedStatus = computeAttendanceStatus(finalCheckIn, finalCheckOut, shiftTimes.start, shiftTimes.end);
+
+        const remarks = `[Appeal Approved] Time corrected: ${selectedAppeal.appeal_message}`;
+
+        if (selectedAppeal.attendance_id) {
           await updateAttendance.mutateAsync({
             id: selectedAppeal.attendance_id,
-            check_in: selectedAppeal.requested_check_in || originalAttendance?.check_in,
-            check_out: selectedAppeal.requested_check_out || originalAttendance?.check_out,
-            status: 'Appealed',
-            admin_remarks: `[Appeal Approved] Time corrected: ${selectedAppeal.appeal_message}`,
+            check_in: finalCheckIn,
+            check_out: finalCheckOut,
+            status: computedStatus,
+            admin_remarks: remarks,
           });
         } else {
-          // Create new attendance record if none exists
           await createAttendance.mutateAsync({
             employee_id: selectedAppeal.employee_id,
             date: selectedAppeal.appeal_date,
-            check_in: selectedAppeal.requested_check_in,
-            check_out: selectedAppeal.requested_check_out,
-            status: 'Appealed',
-            admin_remarks: `[Appeal Approved] Time corrected: ${selectedAppeal.appeal_message}`,
+            check_in: finalCheckIn,
+            check_out: finalCheckOut,
+            status: computedStatus,
+            admin_remarks: remarks,
           });
         }
       }

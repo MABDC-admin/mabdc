@@ -142,14 +142,37 @@ export function EmployeeAttendanceCalendar({
     });
 
     monthAttendance.forEach(record => {
-      const status = record.status?.toLowerCase() || '';
+      let status = record.status?.toLowerCase() || '';
       
-      // Check database status first
+      // Re-evaluate "appealed" records based on actual times
       if (status === 'appealed') {
         appealed++;
-      } else if (status.includes('miss punch') || status === 'missed punch') {
+        // Determine real status from actual punch times
+        if (!record.check_in && !record.check_out) {
+          absent++;
+          return;
+        }
+        const checkInTime = record.check_in ? record.check_in.substring(0, 5) : null;
+        const checkOutTime = record.check_out ? record.check_out.substring(0, 5) : null;
+        const shiftEnd = '17:00';
+        const shiftStart = '08:00';
+        // Check undertime (before shift end)
+        if (checkOutTime && checkOutTime < shiftEnd) {
+          undertime++;
+        } else {
+          // Check late
+          if (checkInTime && checkInTime > shiftStart) {
+            late++;
+          } else {
+            present++;
+          }
+        }
+        return;
+      }
+      
+      if (status.includes('miss punch') || status === 'missed punch') {
         missedPunch++;
-      } else if (status === 'undertime') {
+      } else if (status === 'undertime' || status.includes('undertime')) {
         undertime++;
       } else if (status.includes('late')) {
         late++;
@@ -166,9 +189,6 @@ export function EmployeeAttendanceCalendar({
         }
       }
     });
-
-    // Count appealed as present for stats display
-    present += appealed;
     
     return { present, late, absent, holidays, missedPunch, appealed, undertime, onLeave };
   }, [monthAttendance, publicHolidays, leaveRecords, selectedMonth, selectedYear, weekendDays]);

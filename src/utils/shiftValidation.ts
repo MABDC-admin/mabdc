@@ -109,3 +109,49 @@ export function isUndertimeForShift(currentTime: Date, shiftEndTime: string): bo
   
   return false;
 }
+
+/**
+ * Compute the real attendance status from check-in/check-out times and shift boundaries.
+ * Used by appeal approval, display views, and reports to avoid masking undertime.
+ * 
+ * @param checkIn - HH:MM:SS or HH:MM format check-in time (or null)
+ * @param checkOut - HH:MM:SS or HH:MM format check-out time (or null)
+ * @param shiftStart - HH:MM shift start time
+ * @param shiftEnd - HH:MM shift end time
+ * @returns "Present", "Late", "Undertime", "Late | Undertime", or "Absent"
+ */
+export function computeAttendanceStatus(
+  checkIn: string | null | undefined,
+  checkOut: string | null | undefined,
+  shiftStart: string,
+  shiftEnd: string
+): string {
+  if (!checkIn && !checkOut) return 'Absent';
+
+  const [startH, startM] = shiftStart.split(':').map(Number);
+  const [endH, endM] = shiftEnd.split(':').map(Number);
+
+  let late = false;
+  let undertime = false;
+
+  if (checkIn) {
+    const [inH, inM] = checkIn.substring(0, 5).split(':').map(Number);
+    // Late if strictly after shift start
+    if (inH > startH || (inH === startH && inM > startM)) {
+      late = true;
+    }
+  }
+
+  if (checkOut) {
+    const [outH, outM] = checkOut.substring(0, 5).split(':').map(Number);
+    // Undertime if strictly before shift end
+    if (outH < endH || (outH === endH && outM < endM)) {
+      undertime = true;
+    }
+  }
+
+  if (late && undertime) return 'Late | Undertime';
+  if (late) return 'Late';
+  if (undertime) return 'Undertime';
+  return 'Present';
+}
