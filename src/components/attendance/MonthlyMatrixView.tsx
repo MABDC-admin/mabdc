@@ -843,12 +843,16 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
                         const dateOverrides = overridesForDate.get(dateStr) || new Map();
                         const shiftTimes = !isNonWorking ? resolveShiftTimes(emp.id, dateStr, shiftsMap, dateOverrides) : null;
 
-                        const formatTime12 = (isoStr: string | null | undefined) => {
-                          if (!isoStr) return '---';
-                          try {
-                            const d = new Date(isoStr);
-                            return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                          } catch { return '---'; }
+                        const formatTime12 = (timeStr: string | null | undefined) => {
+                          if (!timeStr) return '---';
+                          const parts = timeStr.substring(0, 5).split(':');
+                          if (parts.length < 2) return '---';
+                          const h = parseInt(parts[0], 10);
+                          const m = parts[1];
+                          if (isNaN(h)) return '---';
+                          const period = h >= 12 ? 'PM' : 'AM';
+                          const display = h > 12 ? h - 12 : h === 0 ? 12 : h;
+                          return `${display.toString().padStart(2, '0')}:${m} ${period}`;
                         };
 
                         const badge = (
@@ -880,7 +884,7 @@ export function MonthlyMatrixView({ onBack }: MonthlyMatrixViewProps) {
                         return cell(
                           <Tooltip>
                             <TooltipTrigger asChild>{badge}</TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs leading-relaxed">
+                            <TooltipContent side="top" className="text-xs leading-relaxed bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-lg">
                               <div className="font-semibold mb-1">{config.name}</div>
                               <div>Check In: {formatTime12(attendance.check_in)}</div>
                               <div>Check Out: {formatTime12(attendance.check_out)}</div>
