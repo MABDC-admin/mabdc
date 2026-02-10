@@ -6,7 +6,7 @@ import { useTodayAttendance, useRealtimeAttendance } from '@/hooks/useAttendance
 import { useCompanySettings } from '@/hooks/useSettings';
 import { useHRStore } from '@/store/hrStore';
 import { cn } from '@/lib/utils';
-import { Users, FileText, Clock, AlertTriangle, TrendingUp, Calendar, ArrowRight, RefreshCw, LogIn, LogOut, CheckCircle, QrCode, Bell, Zap, Cake, Monitor } from 'lucide-react';
+import { Users, FileText, Clock, AlertTriangle, TrendingUp, Calendar, ArrowRight, RefreshCw, LogIn, LogOut, CheckCircle, QrCode, Bell, Zap, Cake, Monitor, LayoutGrid } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { differenceInDays, parseISO, format, isAfter, isBefore, addDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -200,6 +200,15 @@ export function DashboardView() {
         </div>
       )}
         <div className="flex gap-2">
+          <Button 
+            variant="default" 
+            size="sm" 
+            onClick={() => setCurrentView('attendance')}
+            className="gap-2"
+          >
+            <LayoutGrid className="w-4 h-4" />
+            Monthly Matrix
+          </Button>
           <Button 
             variant="default" 
             size="sm" 
