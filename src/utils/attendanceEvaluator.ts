@@ -141,8 +141,14 @@ export function evaluateAttendanceDay(params: EvaluateAttendanceDayParams): Atte
     if (isMissingPunchIn) flags.miss_punch_in = true;
     if (isMissingPunchOut) flags.miss_punch_out = true;
 
-    // Appeal conversion: MP → P only if approved
+    // Appeal conversion: MP → P only if approved AND no undertime
     if (appealStatus === 'approved') {
+      // Missing punch IN: we have check_out → check for undertime
+      if (isMissingPunchIn && checkOutMin !== null && checkOutMin < shiftEndMin) {
+        flags.undertime = true;
+        flags.present = true;
+        return result('UT');
+      }
       flags.present = true;
       return result('P');
     }
