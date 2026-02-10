@@ -1,37 +1,49 @@
 
 
-# Plan: Add Hover Info (Check-in/Check-out) to Monthly Matrix
+# Fix: Tooltip "Invalid Date" and Transparent Background
 
-## What Changes
+## Two Bugs to Fix
 
-Add a tooltip to each day cell in the Monthly Matrix that shows the employee's check-in and check-out times when hovering.
+### Bug 1: "Invalid Date" for Check In / Check Out
 
-## Single File Change: `src/components/attendance/MonthlyMatrixView.tsx`
+**Cause:** The database stores `check_in` and `check_out` as **time-only** strings (e.g., `"07:44:00"`, `"17:31:00"`). The current code does `new Date("07:44:00")` which returns `Invalid Date` in most browsers because it's not a valid date string.
 
-### 1. Add Tooltip imports (line 7 area)
+**Fix:** Replace `new Date()` parsing with a simple string-based time formatter that converts `"07:44:00"` to `"07:44 AM"` and `"17:31:00"` to `"05:31 PM"`.
 
-Import `Tooltip, TooltipTrigger, TooltipContent, TooltipProvider` from `@/components/ui/tooltip`.
+### Bug 2: Tooltip Background Not Visible
 
-### 2. Wrap the matrix table with `<TooltipProvider>`
+**Cause:** The default tooltip uses `bg-popover` which relies on CSS custom properties. In the context of the matrix table, this may not render as fully opaque.
 
-Wrap the `<table>` element (around line 781) with `<TooltipProvider delayDuration={200}>`.
+**Fix:** Override the tooltip background with an explicit solid color: `bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg` so it's always clearly visible regardless of theme context.
 
-### 3. Update cell rendering (lines 836-852)
+## File Changed
 
-For each day cell, look up the attendance record to get `check_in` and `check_out`. Wrap the status badge in a `Tooltip` that displays:
+`src/components/attendance/MonthlyMatrixView.tsx` -- lines 846-888
 
-- **Check In:** 07:44 AM (or "---" if missing)
-- **Check Out:** 05:02 PM (or "---" if missing)
-- **Status:** Present / Late / etc.
-- **Shift:** 08:00 - 17:00
+### Specific Changes
 
-Only show the tooltip for working days that have data (skip weekends, holidays, future dates, etc.).
+1. **Replace `formatTime12` function** (lines 846-852): Parse the `HH:MM:SS` time string directly instead of using `new Date()`.
 
-### Technical Details
+```typescript
+const formatTime12 = (timeStr: string | null | undefined) => {
+  if (!timeStr) return '---';
+  const parts = timeStr.substring(0, 5).split(':');
+  if (parts.length < 2) return '---';
+  const h = parseInt(parts[0], 10);
+  const m = parts[1];
+  if (isNaN(h)) return '---';
+  const period = h >= 12 ? 'PM' : 'AM';
+  const display = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  return `${display.toString().padStart(2, '0')}:${m} ${period}`;
+};
+```
 
-- Use the existing `getAttendanceForEmployeeDay()` helper (line 228) to fetch the record
-- Use `resolveShiftTimes()` to show the assigned shift in the tooltip
-- Format times as 12-hour (e.g., "08:01 AM") for readability
-- Non-working day codes (W, PH, SB, WB, `-`) will show a simpler tooltip or no tooltip
-- The tooltip uses the existing shadcn Tooltip component already in the project
+2. **Update TooltipContent className** (line 883): Add explicit background and text color classes.
 
+```
+className="text-xs leading-relaxed bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-lg"
+```
+
+## No Other Files Changed
+
+These are both contained within the same cell-rendering block.
