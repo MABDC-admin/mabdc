@@ -10,6 +10,7 @@ import { ContractsView } from '@/components/views/ContractsView';
 import { RenewalView } from '@/components/views/RenewalView';
 import { AttendanceView } from '@/components/views/AttendanceView';
 import { EmployeeAttendanceView } from '@/components/views/EmployeeAttendanceView';
+import { MonthlyMatrixView } from '@/components/attendance/MonthlyMatrixView';
 import { AttendanceAppealsView } from '@/components/views/AttendanceAppealsView';
 import { LeaveView } from '@/components/views/LeaveView';
 import { PayrollView } from '@/components/views/PayrollView';
@@ -28,7 +29,7 @@ import { useHRStore } from '@/store/hrStore';
 import type { Employee } from '@/types/hr';
 
 const Index = () => {
-  const { currentView, setCurrentEmployee } = useHRStore();
+  const { currentView, setCurrentEmployee, setCurrentView } = useHRStore();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const handleEmployeeSelect = (employee: Employee) => {
@@ -57,6 +58,8 @@ const Index = () => {
         return <RenewalView />;
       case 'attendance':
         return <AttendanceView />;
+      case 'monthly-matrix':
+        return <MonthlyMatrixView onBack={() => setCurrentView('dashboard')} />;
       case 'employee-attendance':
         return <EmployeeAttendanceView />;
       case 'attendance-appeals':

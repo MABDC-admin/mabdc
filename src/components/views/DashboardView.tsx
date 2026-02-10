@@ -203,7 +203,7 @@ export function DashboardView() {
           <Button 
             variant="default" 
             size="sm" 
-            onClick={() => setCurrentView('attendance')}
+            onClick={() => setCurrentView('monthly-matrix')}
             className="gap-2"
           >
             <LayoutGrid className="w-4 h-4" />
