@@ -1,37 +1,42 @@
 
 
-# Disable Approval Email Notifications
+# Add Ramadan Shift Schedule (Feb 18 – Mar 18, 2026)
 
-## What Will Change
+## Overview
 
-Add an early-return guard at the top of the two edge functions that send approval action emails to HR (`myranelsotto@gmail.com`). This will skip all email sending while keeping the functions intact so they can be re-enabled later by simply removing the guard.
+Create temporary shift overrides for all 31 active employees during the Ramadan period. The system already supports per-employee per-date shift overrides, which take highest priority in schedule resolution.
 
-### Functions to Disable
+## Schedule Details
 
-1. **`send-leave-request-notification`** -- Sends the "New Leave Request" email with Approve/Reject buttons to HR
-2. **`send-appeal-request-notification`** -- Sends the "New Attendance Appeal" email with Approve/Reject buttons to HR
+| Employees | Start Time | End Time | Period |
+|-----------|-----------|---------|--------|
+| All except Melanie N. Tangonan | 08:00 AM | 03:00 PM | Feb 18 – Mar 18 |
+| Melanie N. Tangonan | 09:00 AM | 04:00 PM | Feb 18 – Mar 18 |
 
-### How
+**March 19 onward**: No overrides, so the system automatically falls back to each employee's permanent shift assignment (normal schedule).
 
-In each function's handler, right after the OPTIONS check, add:
+## Working Days Covered (Mon–Fri)
 
-```typescript
-// EMAIL SENDING DISABLED - re-enable by removing this block
-console.log("Email sending is currently disabled");
-return new Response(
-  JSON.stringify({ success: true, message: "Email sending disabled" }),
-  { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-);
-```
+- **February**: 18, 19, 20, 23, 24, 25, 26, 27 (8 days)
+- **March**: 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 16, 17, 18 (13 days)
+- **Total**: 21 working days
 
-This means:
-- No approval emails will be sent to `myranelsotto@gmail.com`
-- Leave requests and appeals will still be created in the database normally
-- The dashboard approve/reject buttons will still work
-- The `process-email-approval` function stays untouched (existing tokens still work if clicked)
-- To re-enable later, just remove the early-return block
+## Data to Insert
 
-### Files Changed
-- `supabase/functions/send-leave-request-notification/index.ts` (add early return at line ~212)
-- `supabase/functions/send-appeal-request-notification/index.ts` (add early return at line ~206)
+- 30 employees x 21 days = **630 records** (08:00–15:00)
+- 1 employee (Mel) x 21 days = **21 records** (09:00–16:00)
+- **Total: 651 shift override records** in the `employee_shift_overrides` table
+- Reason field set to "Ramadan Shift" for easy identification and future cleanup
+
+## Technical Approach
+
+A single SQL `INSERT` using:
+1. A CTE generating the 21 working dates
+2. A `CROSS JOIN` with all active employee IDs
+3. A `CASE` expression to apply 09:00–16:00 for Mel and 08:00–15:00 for everyone else
+4. `ON CONFLICT (employee_id, override_date) DO UPDATE` to safely handle any pre-existing overrides
+
+## Why This Works Automatically
+
+The attendance trigger (`apply_attendance_shift_rules`) and the `getEmployeeShiftTimes()` utility both check `employee_shift_overrides` first. Since overrides exist only for Feb 18–Mar 18, on March 19 the system naturally falls back to each employee's permanent shift — no additional cleanup needed.
 
