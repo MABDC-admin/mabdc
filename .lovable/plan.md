@@ -1,31 +1,37 @@
 
 
-# Add Absent Records for All Employees (Jan 5–19, 2025)
+# Disable Approval Email Notifications
 
-## What Will Be Done
+## What Will Change
 
-Insert "Absent" attendance records for all 30 active employees on every **working day** (Mon–Fri) from January 5 to January 19, 2025.
+Add an early-return guard at the top of the two edge functions that send approval action emails to HR (`myranelsotto@gmail.com`). This will skip all email sending while keeping the functions intact so they can be re-enabled later by simply removing the guard.
 
-### Working Days Covered
-Jan 5, 6, 7, 8, 9, 12, 13, 14, 15, 16, 19
+### Functions to Disable
 
-### Exceptions (will NOT get Absent)
-- **Gelene A. Viray** on **Jan 5** (LOP leave)
-- **Sheila Mae P. Dadula** on **Jan 14, 15, 16** (VL leave)
+1. **`send-leave-request-notification`** -- Sends the "New Leave Request" email with Approve/Reject buttons to HR
+2. **`send-appeal-request-notification`** -- Sends the "New Attendance Appeal" email with Approve/Reject buttons to HR
 
-### What Gets Inserted
-For each employee+date combination (excluding the exceptions above), an attendance record with:
-- `status`: "Absent"
-- `check_in`: NULL
-- `check_out`: NULL
+### How
 
-### Data Summary
-- 30 employees x 11 working days = 330 records
-- Minus 1 (Gelene Jan 5) and 3 (Sheila Jan 14-16) = **326 Absent records** to insert
-- Plus 1 LOP leave record for Gelene (Jan 5)
-- Plus 1 VL leave record for Sheila (Jan 14-16, 3 days)
+In each function's handler, right after the OPTIONS check, add:
 
-### Technical Details
+```typescript
+// EMAIL SENDING DISABLED - re-enable by removing this block
+console.log("Email sending is currently disabled");
+return new Response(
+  JSON.stringify({ success: true, message: "Email sending disabled" }),
+  { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+);
+```
 
-A single database migration will use a SQL `INSERT` statement with all 326 employee-date pairs, each with `status = 'Absent'` and null punch times. The leave records for Gelene (LOP) and Sheila (VL) will be inserted as approved leave records so the system correctly shows them as LOP/VL in the matrix.
+This means:
+- No approval emails will be sent to `myranelsotto@gmail.com`
+- Leave requests and appeals will still be created in the database normally
+- The dashboard approve/reject buttons will still work
+- The `process-email-approval` function stays untouched (existing tokens still work if clicked)
+- To re-enable later, just remove the early-return block
+
+### Files Changed
+- `supabase/functions/send-leave-request-notification/index.ts` (add early return at line ~212)
+- `supabase/functions/send-appeal-request-notification/index.ts` (add early return at line ~206)
 
