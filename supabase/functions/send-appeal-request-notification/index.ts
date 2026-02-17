@@ -203,6 +203,13 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // EMAIL SENDING DISABLED - re-enable by removing this block
+  console.log("Email sending is currently disabled");
+  return new Response(
+    JSON.stringify({ success: true, message: "Email sending disabled" }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+
   try {
     const payload: AppealRequestPayload = await req.json();
     console.log("Received payload:", JSON.stringify(payload));
