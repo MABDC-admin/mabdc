@@ -96,14 +96,28 @@ export function isLateForShift(currentTime: Date, shiftStartTime: string): boole
 }
 
 /**
- * Check if current time is before shift end (for undertime calculation)
+ * Check if current time is before shift end (for undertime calculation).
+ * Accepts either a Date object OR a time string "HH:MM" to be timezone-safe.
+ * When a string is passed, it is compared directly without any timezone conversion,
+ * which prevents incorrect undertime flags on devices set to UTC.
  */
-export function isUndertimeForShift(currentTime: Date, shiftEndTime: string): boolean {
+export function isUndertimeForShift(currentTime: Date | string, shiftEndTime: string): boolean {
   const [endHour, endMinute] = shiftEndTime.split(':').map(Number);
-  const currentHour = currentTime.getHours();
-  const currentMinute = currentTime.getMinutes();
 
-  // Undertime if before shift end time
+  let currentHour: number;
+  let currentMinute: number;
+
+  if (typeof currentTime === 'string') {
+    // Parse "HH:MM" or "HH:MM:SS" directly — no timezone involved
+    const parts = currentTime.split(':').map(Number);
+    currentHour = parts[0];
+    currentMinute = parts[1];
+  } else {
+    currentHour = currentTime.getHours();
+    currentMinute = currentTime.getMinutes();
+  }
+
+  // Undertime if strictly before shift end time
   if (currentHour < endHour) return true;
   if (currentHour === endHour && currentMinute < endMinute) return true;
   
