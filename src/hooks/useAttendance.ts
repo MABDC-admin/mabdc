@@ -276,8 +276,8 @@ export function useCheckOutByHRMS() {
       // If already checked out, prevent double checkout
       if (attendance?.check_out) throw new Error(`${employee.full_name} already checked out`);
       
-      // Check if undertime based on shift end time
-      const isUndertime = isUndertimeForShift(now, shiftTimes.end);
+      // Check if undertime based on shift end time — use checkOutTime string for timezone safety
+      const isUndertime = isUndertimeForShift(checkOutTime, shiftTimes.end);
       
       // If no attendance record exists (no check-in), create one with miss_punch_in status
       if (!attendance) {
@@ -306,7 +306,8 @@ export function useCheckOutByHRMS() {
           checkOutTime,
           status,
           isUndertime,
-          isMissPunch: true
+          isMissPunch: true,
+          shiftEndTime: shiftTimes.end,
         };
       }
       
@@ -340,7 +341,8 @@ export function useCheckOutByHRMS() {
         jobPosition: employee.job_position,
         checkInTime: attendance.check_in,
         checkOutTime,
-        status: newStatus
+        status: newStatus,
+        shiftEndTime: shiftTimes.end,
       };
     },
     onSuccess: (data) => {
@@ -470,9 +472,9 @@ export function useCheckOutById() {
       if (!attendance) throw new Error(`${employee.full_name} hasn't checked in today`);
       if (attendance.check_out) throw new Error(`${employee.full_name} already checked out`);
       
-      // Get employee's shift end time for today and check if undertime
+      // Get employee's shift end time for today and check if undertime — use string for timezone safety
       const shiftTimes = await getEmployeeShiftTimes(employee.id, today);
-      const isUndertime = isUndertimeForShift(now, shiftTimes.end);
+      const isUndertime = isUndertimeForShift(checkOutTime, shiftTimes.end);
       const wasLate = String(attendance.status).includes('Late');
       
       // Determine combined status
@@ -502,7 +504,8 @@ export function useCheckOutById() {
         jobPosition: employee.job_position,
         checkInTime: attendance.check_in,
         checkOutTime,
-        status: newStatus
+        status: newStatus,
+        shiftEndTime: shiftTimes.end,
       };
     },
     onSuccess: (data) => {

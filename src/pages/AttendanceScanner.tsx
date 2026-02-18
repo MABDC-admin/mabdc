@@ -250,7 +250,7 @@ export default function AttendanceScanner() {
             jobPosition: data.jobPosition || '',
             employeeEmail: empData?.work_email || '',
             checkOutTime: data.checkOutTime,
-            scheduledEndTime: '17:00', // Default shift end
+            scheduledEndTime: data.shiftEndTime || '17:00',
           });
         }
       }
@@ -344,7 +344,7 @@ export default function AttendanceScanner() {
             jobPosition: data.jobPosition || '',
             employeeEmail: empData?.work_email || '',
             checkOutTime: data.checkOutTime,
-            scheduledEndTime: '17:00', // Default shift end
+            scheduledEndTime: data.shiftEndTime || '17:00',
           });
         }
       }
