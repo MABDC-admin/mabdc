@@ -1,63 +1,70 @@
 
-# Fix: Undertime Displaying Incorrectly (Ramadan Shift)
+# Fix: New Checkouts Still Showing Undertime (Root Cause Found)
 
 ## Root Cause
 
-When employees checked out today (Feb 18), the checkout hook (`useCheckOutByHRMS`) correctly fetched the Ramadan shift overrides via `getEmployeeShiftTimes()`. However, 3 employees have a **stale/wrong `status` in the attendance table** because their checkout time was recorded as "Undertime" against the OLD 17:00 shift end, but then the Ramadan overrides were applied. The stored status was not recomputed after the override was set.
+The checkout hooks compute undertime using the browser's `Date` object: `now.getHours()`. If the kiosk device's timezone is set to UTC instead of GST (UTC+4), then at 3:12 PM local time, JavaScript sees it as 11:12 AM — which is before 15:00 — so it incorrectly marks the checkout as "Undertime."
 
-**Affected employees today (Feb 18):**
+**The fix must stop using `Date.getHours()` for undertime comparison** and instead compare the recorded `checkOutTime` string (which is always displayed in the correct local format "HH:MM") directly against the shift end string — both as simple string/number comparisons. This makes the logic timezone-independent.
 
-| Employee | Check-in | Check-out | Stored Status | Correct Status |
-|---|---|---|---|---|
-| Ashley Scott Dadula | 09:27 | 15:08 | Late \| Undertime | Late (checked out AFTER 15:00) |
-| Gema E. Guevara | 07:55 | 15:04 | Undertime | Present (checked out AFTER 15:00) |
-| Homer S. Macrohon | 07:55 | 14:51 | Undertime | Undertime ✓ (genuinely before 15:00) |
-| Raffa Jade E. Sumindol | 07:49 | 15:05 | Undertime | Present (checked out AFTER 15:00) |
-
-Also, views like **AttendanceView**, **DashboardView**, and **EmployeePortalPreview** display `a.status` directly from the database without re-evaluating against shift overrides — so even future correct checkouts might display the wrong status on those views.
-
-## Two-Part Fix
-
-### Part 1: Database Correction (SQL migration)
-Correct the 3 wrong records for today:
-- Ashley Scott Dadula → `"Late"` (late check-in, on-time checkout)
-- Gema E. Guevara → `"Present"` (on-time check-in and checkout)
-- Raffa Jade E. Sumindol → `"Present"` (on-time check-in and checkout)
-
-This is a targeted UPDATE on those specific attendance row IDs.
-
-### Part 2: Fix the Checkout Hook for Future Checkouts
-
-The `useCheckOutByHRMS` hook in `src/hooks/useAttendance.ts` correctly calls `getEmployeeShiftTimes()` which reads shift overrides from the database. This is working correctly for **new** checkouts from today onward — the issue was only for records written before the Ramadan overrides were applied. No code change is needed in the hook.
-
-### Part 3: Fix Status Display on Views that Show Raw `a.status`
-
-The **Time Clock View** and **Monthly Matrix** already use the evaluator correctly and will show the right status after the DB is corrected.
-
-The **AttendanceView** (`src/components/views/AttendanceView.tsx`) and **DashboardView** render the raw `a.status` from the database. After the DB correction in Part 1, these will also show the correct status.
+The second issue found: `AttendanceScanner.tsx` line 253 hardcodes `scheduledEndTime: '17:00'` for undertime notifications, which would send wrong emails during Ramadan. This also needs to be fixed to use the actual shift end time.
 
 ## What Will Change
 
-### Files Modified
-- **Database only** (SQL migration): Update 3 attendance rows with corrected status values
+### File 1: `src/utils/shiftValidation.ts`
+**Change `isUndertimeForShift`** to accept either a `Date` or a time string `"HH:MM"`. This makes it work correctly regardless of device timezone.
 
-### No Frontend Code Changes Needed
-The evaluator-based views (Time Clock, Monthly Matrix) already compute correctly. The raw-status views (Attendance, Dashboard) will show correctly once the DB records are fixed.
-
-## Technical Detail
-
-```sql
--- Fix Ashley Scott Dadula: checked out 15:08 (after 15:00), was late in → "Late"
-UPDATE attendance SET status = 'Late', modified_by = 'Ramadan Shift Correction', modified_at = now()
-WHERE employee_id = 'efd7ee9f-7589-4951-9812-48fc68f506b8' AND date = '2026-02-18';
-
--- Fix Gema E. Guevara: checked out 15:04 (after 15:00), on-time in → "Present"  
-UPDATE attendance SET status = 'Present', modified_by = 'Ramadan Shift Correction', modified_at = now()
-WHERE employee_id = '5860bd88-c097-4857-9669-1be825edfb62' AND date = '2026-02-18';
-
--- Fix Raffa Jade E. Sumindol: checked out 15:05 (after 15:00), on-time in → "Present"
-UPDATE attendance SET status = 'Present', modified_by = 'Ramadan Shift Correction', modified_at = now()
-WHERE employee_id = 'cf452996-33b2-4886-8895-e321cf71730a' AND date = '2026-02-18';
+New signature:
+```typescript
+export function isUndertimeForShift(
+  currentTime: Date | string, 
+  shiftEndTime: string
+): boolean
 ```
 
-Homer S. Macrohon (checked out at 14:51, before 15:00) is genuinely undertime and his record is left unchanged.
+If `currentTime` is a string (e.g. `"15:12"`), parse it directly. If it is a `Date`, extract hours/minutes using `getHours()`/`getMinutes()` as a fallback. This is backwards-compatible.
+
+### File 2: `src/hooks/useAttendance.ts`
+In **`useCheckOutByHRMS`** and **`useCheckOutById`**, replace:
+```typescript
+const isUndertime = isUndertimeForShift(now, shiftTimes.end);
+```
+With:
+```typescript
+const isUndertime = isUndertimeForShift(checkOutTime, shiftTimes.end);
+```
+
+`checkOutTime` is already the recorded string like `"15:12"` — this makes undertime detection 100% timezone-safe.
+
+### File 3: `src/pages/AttendanceScanner.tsx`
+Fix the hardcoded `scheduledEndTime: '17:00'` in the undertime notification call. After the checkout mutation, the returned `data` object contains `shiftTimes` info — but since it does not currently return `shiftTimes.end`, we need to pass the checkout status correctly.
+
+The simplest fix: only send the undertime notification when the `data.status` actually contains "Undertime" (which after the hook fix will only be true when genuinely early). The scheduled end time should be fetched from the shift override — we will pass the correct `shiftTimes.end` through the checkout hook's return value.
+
+### Database Correction
+Once the hook is fixed, **future checkouts will be correct automatically**. For today's already-wrongly-recorded records (Krisha and Myranel, checkout 15:12 both marked Undertime), a targeted SQL update will correct them:
+
+```sql
+UPDATE attendance 
+SET status = 'Present', 
+    modified_by = 'Ramadan Shift Correction', 
+    modified_at = now()
+WHERE employee_id IN (
+  '3093642a-32ae-41f4-aaab-3a3e86aa0748', -- Krisha Dwine R. Riotoc
+  '1f583766-2711-4d82-883e-b357d2358df8'  -- Myranel D. Plaza
+)
+AND date = '2026-02-18';
+```
+
+## Summary of Changes
+
+| File | Change |
+|------|--------|
+| `src/utils/shiftValidation.ts` | `isUndertimeForShift` accepts time string, compares directly without timezone |
+| `src/hooks/useAttendance.ts` | Pass `checkOutTime` string instead of `now` Date to `isUndertimeForShift` (both `useCheckOutByHRMS` and `useCheckOutById`) |
+| `src/pages/AttendanceScanner.tsx` | Fix hardcoded `'17:00'` scheduledEndTime; use actual shift end from hook return |
+| Database | Fix 2 remaining wrong records (Krisha, Myranel) for Feb 18 |
+
+## Why This Fixes It Permanently
+
+After the change, `isUndertimeForShift("15:12", "15:00")` correctly parses both as numbers: `15 === 15 && 12 < 0` → false → not undertime. This works identically on any device timezone.
