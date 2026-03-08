@@ -3,7 +3,7 @@ import {
   Shield, Users, Calendar, FileText, DollarSign, ClipboardList, 
   Trash2, Edit, Plus, Download, RefreshCw, Database, BarChart3,
   ChevronDown, AlertTriangle, Star, Scale, LogOut, MessageSquare, FileSignature, UserCog, Megaphone,
-  Lock, KeyRound, Mail, CalendarClock
+  Lock, KeyRound, Mail, CalendarClock, HardDrive
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,6 +28,7 @@ import { AdminAnnouncementsSection } from '@/components/admin/AdminAnnouncements
 import { HRAssistantChat } from '@/components/admin/HRAssistantChat';
 import { EmailHistorySection } from '@/components/admin/EmailHistorySection';
 import { AdminBulkAttendanceEditor } from '@/components/admin/AdminBulkAttendanceEditor';
+import { AdminStorageBackup } from '@/components/admin/AdminStorageBackup';
 import { useAnnouncements } from '@/hooks/useAnnouncements';
 import { useEmailHistory } from '@/hooks/useEmailHistory';
 import { useAuth } from '@/hooks/useAuth';
@@ -243,6 +244,9 @@ export default function AdminDashboard() {
             <TabsTrigger value="email-history" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Mail className="w-4 h-4 mr-2" />Email History
             </TabsTrigger>
+            <TabsTrigger value="storage-backup" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <HardDrive className="w-4 h-4 mr-2" />Storage Backup
+            </TabsTrigger>
             <TabsTrigger value="data-reset" className="rounded-lg data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
               <Database className="w-4 h-4 mr-2" />Data Management
             </TabsTrigger>
@@ -339,6 +343,10 @@ export default function AdminDashboard() {
             <div className="glass-card rounded-3xl border border-border p-6">
               <EmailHistorySection maxHeight="600px" />
             </div>
+          </TabsContent>
+
+          <TabsContent value="storage-backup">
+            <AdminStorageBackup />
           </TabsContent>
 
           <TabsContent value="data-reset">
