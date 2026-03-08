@@ -3,7 +3,7 @@ import {
   Shield, Users, Calendar, FileText, DollarSign, ClipboardList, 
   Trash2, Edit, Plus, Download, RefreshCw, Database, BarChart3,
   ChevronDown, AlertTriangle, Star, Scale, LogOut, MessageSquare, FileSignature, UserCog, Megaphone,
-  Lock, KeyRound, Mail, CalendarClock
+  Lock, KeyRound, Mail, CalendarClock, HardDrive
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
