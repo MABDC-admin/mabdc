@@ -244,6 +244,9 @@ export default function AdminDashboard() {
             <TabsTrigger value="email-history" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Mail className="w-4 h-4 mr-2" />Email History
             </TabsTrigger>
+            <TabsTrigger value="storage-backup" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <HardDrive className="w-4 h-4 mr-2" />Storage Backup
+            </TabsTrigger>
             <TabsTrigger value="data-reset" className="rounded-lg data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
               <Database className="w-4 h-4 mr-2" />Data Management
             </TabsTrigger>
