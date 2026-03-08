@@ -347,7 +347,10 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="storage-backup">
-            <AdminStorageBackup />
+            <div className="space-y-6">
+              <AdminStorageBackup />
+              <AdminDataExport />
+            </div>
           </TabsContent>
 
           <TabsContent value="data-reset">
