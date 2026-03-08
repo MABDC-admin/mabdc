@@ -29,6 +29,7 @@ import { HRAssistantChat } from '@/components/admin/HRAssistantChat';
 import { EmailHistorySection } from '@/components/admin/EmailHistorySection';
 import { AdminBulkAttendanceEditor } from '@/components/admin/AdminBulkAttendanceEditor';
 import { AdminStorageBackup } from '@/components/admin/AdminStorageBackup';
+import { AdminDataExport } from '@/components/admin/AdminDataExport';
 import { useAnnouncements } from '@/hooks/useAnnouncements';
 import { useEmailHistory } from '@/hooks/useEmailHistory';
 import { useAuth } from '@/hooks/useAuth';
