@@ -49,6 +49,13 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // EMAIL SENDING DISABLED - Resend integration turned off
+  console.log("[EMAIL DISABLED] Skipping send for this function");
+  return new Response(
+    JSON.stringify({ success: true, disabled: true, message: "Email sending is disabled" }),
+    { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+  );
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
